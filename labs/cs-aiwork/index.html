@@ -1,0 +1,1142 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по информатике, 8–11 класс: как ставить задачу ИИ-ассистенту, как проверять его ответы, как учиться с ИИ честно и как защищать данные.">
+<link rel="icon" href="data:,">
+<title>Работа с ИИ-ассистентами</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /labs/cs-ai. The stage holds an HTML "assistant screen" (prompt builder, chat, answer cards) instead of an SVG bench.
+   The task card sits top-left over the stage; fit() measures it and puts the screen beside it (wide stage) or below it (narrow stage). */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --paper:#eef1f6;
+  --ink:#0b1019;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.stage::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(160,185,230,.04) 1.5px,transparent 1.5px),linear-gradient(90deg,rgba(160,185,230,.04) 1.5px,transparent 1.5px);background-size:40px 40px;pointer-events:none}
+
+.task{position:absolute;top:14px;left:14px;width:300px;max-width:min(300px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none;z-index:3}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none;z-index:3}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .v.bad{color:var(--warn)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px;overflow:hidden}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px);z-index:3}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button:disabled{opacity:.35;cursor:default}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;font-size:12px;line-height:1.45;color:var(--muted);pointer-events:none;z-index:2}
+
+/* ---------- the assistant screen ---------- */
+.screen{position:absolute;left:14px;right:14px;top:120px;bottom:60px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;z-index:1;display:flex;flex-direction:column;gap:10px;padding-right:2px}
+.cols{display:grid;gap:10px;grid-template-columns:minmax(0,1fr);align-items:start}
+.screen.wide .cols{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0}
+.bh{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 9px;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.bh em{font-style:normal;color:var(--force);letter-spacing:.06em}
+.segs{display:flex;flex-wrap:wrap;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px}
+.segs button{flex:1 1 auto;background:none;border:0;border-radius:7px;padding:7px 10px;font:600 12px/1.1 var(--font-body);color:var(--muted);cursor:pointer;white-space:nowrap}
+.segs button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.segs button .ck{color:var(--ok)}
+.flash{animation:flash 1.8s ease-out}
+@keyframes flash{0%,45%{box-shadow:0 0 0 3px var(--arm)}100%{box-shadow:0 0 0 0 transparent}}
+
+/* lesson 1: prompt builder */
+.prow{display:grid;grid-template-columns:96px minmax(0,1fr);gap:8px;align-items:start;padding:7px 0;border-top:1px solid var(--line)}
+.prow:first-of-type{border-top:0}
+.pl{font:600 12px/1.3 var(--font-body);color:var(--fg);padding-top:6px}
+.pl small{display:block;font:400 11px/1.3 var(--font-body);color:var(--muted)}
+.pch{display:flex;flex-direction:column;gap:5px}
+.pchip{text-align:left;background:var(--bg);border:1px dashed #3a4762;border-radius:8px;padding:6px 9px;font:500 12.5px/1.35 var(--font-body);cursor:pointer;color:var(--muted)}
+.pchip:hover{color:var(--fg);border-color:var(--muted)}
+.pchip[aria-pressed="true"]{border-style:solid;border-color:var(--arm);color:var(--fg);background:rgba(114,212,232,.08)}
+.composer{display:flex;gap:8px;align-items:flex-end;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:8px 8px 8px 12px;margin-top:10px}
+.ptext{flex:1;min-width:0;font-size:13.5px;line-height:1.45}
+.ptext .base{color:var(--fg)}
+.ptext .add{color:#bfe9f3}
+.send{flex:none;background:var(--force);color:var(--ink);border:0;border-radius:9px;padding:8px 12px;font:600 13px/1 var(--font-body);cursor:pointer}
+.send:disabled{opacity:.4;cursor:default}
+
+.win{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;min-width:0}
+.winbar{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface-2);border-bottom:1px solid var(--line);font:500 11.5px/1 var(--font-mono);color:var(--muted)}
+.winbar .dots{display:flex;gap:4px;flex:none}
+.winbar .dots i{width:8px;height:8px;border-radius:50%;background:#3a4762}
+.winbar .sim{margin-left:auto;font:600 9.5px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line);border-radius:5px;padding:3px 5px}
+.winbody{padding:10px;display:flex;flex-direction:column;gap:8px}
+.empty{color:var(--muted);font-size:13px;text-align:center;padding:18px 8px}
+.bub{max-width:92%;border-radius:12px;padding:8px 11px;font-size:13.5px;line-height:1.45;overflow-wrap:anywhere}
+.bub.user{align-self:flex-end;background:#2a3a5c;border:1px solid #3a4f78;border-bottom-right-radius:4px}
+.bub.bot{align-self:flex-start;background:var(--surface-2);border:1px solid var(--line);border-bottom-left-radius:4px}
+.bub .who{display:block;font:600 9.5px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.bub i.more{color:var(--muted)}
+.bub p{margin:0 0 6px}
+.bub p:last-child{margin-bottom:0}
+.bub table{border-collapse:collapse;width:100%;font-size:12px;margin:4px 0 6px}
+.bub td,.bub th{border:1px solid #3a4762;padding:4px 5px;vertical-align:top;text-align:left}
+.bub th{color:var(--muted);font-weight:600}
+pre.code{margin:4px 0;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:500 12px/1.5 var(--font-mono);white-space:pre;overflow-x:auto;overflow-wrap:normal;scrollbar-width:thin}
+.rub{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+.rub span{font:500 11px/1 var(--font-mono);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
+.rub .y{color:var(--ok);border-color:rgba(134,224,168,.5)}
+.rub .v{color:var(--force);border-color:rgba(255,181,71,.5)}
+.rub .n{color:var(--warn);border-color:rgba(255,138,115,.45)}
+.why{list-style:none;margin:7px 0 0;padding:0;font-size:12px;color:var(--muted);display:grid;gap:3px}
+.why li::before{content:"— "}
+.score{font:600 11px/1 var(--font-mono);margin-left:6px}
+
+/* lesson 2: answer cards */
+.q{font-size:13.5px}
+.segt{display:inline;background:none;border:0;padding:1px 2px;margin:0 1px;border-radius:4px;text-align:left;font:inherit;line-height:1.6;cursor:pointer;color:inherit;border-bottom:1px dashed #56627d;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.segt:hover{background:rgba(114,212,232,.08)}
+.segt.sel{background:rgba(114,212,232,.16);border-bottom-color:var(--arm)}
+.segt.mark{background:rgba(255,138,115,.2);border-bottom:2px solid var(--warn)}
+.segt.hit{background:rgba(134,224,168,.16);border-bottom:2px solid var(--ok)}
+.segt.fp{background:rgba(255,181,71,.2);border-bottom:2px solid var(--force)}
+pre.code .segt{display:block;width:100%;border-bottom-style:dotted;margin:0;font:500 12px/1.55 var(--font-mono);white-space:pre}
+.detail .quote{font-size:13px;line-height:1.45;border-left:3px solid var(--arm);padding:2px 0 2px 9px;margin-bottom:9px;overflow-wrap:anywhere}
+.chk{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.chk button{text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:7px 9px;font:600 12.5px/1.25 var(--font-body);cursor:pointer}
+.chk button span{display:block;font:400 11.5px/1.3 var(--font-body);color:var(--muted);margin-top:2px}
+.chk button[aria-pressed="true"]{border-color:var(--arm)}
+.evs{display:grid;gap:6px;margin-top:9px}
+.ev{font-size:12.5px;line-height:1.45;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:7px 9px}
+.ev b{display:block;font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.ev.red{border-color:rgba(255,138,115,.6)}
+.ev.red b{color:var(--warn)}
+.ev.green{border-color:rgba(134,224,168,.45)}
+.ev.green b{color:var(--ok)}
+.acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+.btn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font:600 13px/1 var(--font-body);cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.main{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.btn.red{color:var(--warn);border-color:rgba(255,138,115,.55);background:rgba(255,138,115,.1)}
+.btn.grn{color:var(--ok);border-color:rgba(134,224,168,.55);background:rgba(134,224,168,.1)}
+.btn:disabled{opacity:.4;cursor:default}
+.res{font-size:13px;line-height:1.45;margin-top:9px;padding:8px 10px;border-radius:9px;background:var(--bg);border:1px solid var(--line)}
+.res.ok{border-color:rgba(134,224,168,.5);color:#c4f2d4}
+.res.no{border-color:rgba(255,138,115,.5);color:#ffcabf}
+
+/* lesson 3: requests and plan */
+.reqs{display:grid;gap:6px}
+.req{display:flex;gap:8px;align-items:flex-start;text-align:left;width:100%;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:7px 9px;font-size:12.5px;line-height:1.35;cursor:pointer}
+.req:hover{border-color:var(--muted)}
+.req[aria-current="true"]{border-color:var(--arm);background:rgba(114,212,232,.06)}
+.req .n{flex:none;font:500 11px/1.4 var(--font-mono);color:var(--muted)}
+.req .tg{margin-left:auto;flex:none;font:600 10px/1 var(--font-body);letter-spacing:.06em;text-transform:uppercase;border-radius:5px;padding:4px 5px;border:1px solid var(--line);color:var(--muted)}
+.req .tg.l{color:var(--ok);border-color:rgba(134,224,168,.5)}
+.req .tg.c{color:var(--warn);border-color:rgba(255,138,115,.5)}
+.req .tg.x{text-decoration:line-through}
+.pool,.myplan{display:grid;gap:5px}
+.stp{display:flex;gap:8px;align-items:center;text-align:left;width:100%;background:var(--bg);border:1px dashed #3a4762;border-radius:9px;padding:7px 9px;font-size:12.5px;line-height:1.35;cursor:pointer}
+.stp:hover{border-color:var(--muted)}
+.stp b{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font:600 11px/1 var(--font-mono);background:var(--surface-2);border:1px solid var(--line)}
+.myplan .stp{border-style:solid}
+.myplan .stp.ok b{background:var(--ok);color:var(--ink);border-color:var(--ok)}
+.myplan .stp.no b{background:var(--warn);color:var(--ink);border-color:var(--warn)}
+.slot{border:1px dashed var(--line);border-radius:9px;padding:8px 9px;font-size:12px;color:var(--muted)}
+.lbl2{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:10px 0 6px}
+
+/* lesson 4: message, fakes, bias */
+.msg{line-height:1.9;font-size:13.5px}
+.msg .segt{border-bottom-style:dotted}
+.msg .segt.red{background:#2b3346;color:transparent;border-bottom-color:transparent;text-shadow:none;border-radius:3px;position:relative}
+.msg .segt.red::after{content:"скрыто";position:absolute;left:4px;top:0;color:var(--muted);font:500 11px/1.9 var(--font-mono)}
+.media{display:grid;gap:8px}
+.mcard{display:grid;grid-template-columns:86px minmax(0,1fr);gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px;cursor:pointer;text-align:left;width:100%}
+.mcard[aria-current="true"]{border-color:var(--arm)}
+.mcard svg{width:86px;height:64px;border-radius:7px;display:block}
+.mcard .kd{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.mcard .tt{display:block;font-size:12.5px;line-height:1.38;margin-top:4px}
+.mcard .vd{display:inline-block;margin-top:5px;font:600 10.5px/1 var(--font-body);border-radius:5px;padding:4px 6px;border:1px solid}
+.vd.t{color:var(--ok);border-color:rgba(134,224,168,.5)}
+.vd.f{color:var(--warn);border-color:rgba(255,138,115,.5)}
+.vd.w{color:var(--force);border-color:rgba(255,181,71,.5)}
+.opts{display:grid;gap:6px}
+.opt{text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:13px;line-height:1.4;cursor:pointer}
+.opt:hover{border-color:var(--muted)}
+.opt.ok{border-color:var(--ok);background:rgba(134,224,168,.1)}
+.opt.no{border-color:var(--warn);background:rgba(255,138,115,.08)}
+
+/* ---------- side panel ---------- */
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.pbody ul.list{margin:0 0 12px;padding-left:18px;line-height:1.55;font-size:14px}
+.pbody ul.list li{margin-bottom:5px}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.tpl{font:500 13px/1.6 var(--font-mono);padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.tpl b{color:var(--force);font-weight:500}
+.formula{font:500 16px/1.35 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px;overflow-wrap:anywhere}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+.step.okk span{color:var(--ok)}
+.step.bad span{color:var(--warn)}
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:78vh;min-height:600px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  /* phone: no overlay — task, meter, screen and tools simply stack, the page scrolls */
+  .stage{height:auto;min-height:0;display:flex;flex-direction:column;gap:8px;padding:10px}
+  .task,.meter,.tools,.screen{position:static!important;transform:none;max-width:none}
+  .task{width:auto;padding:9px 11px}
+  .task p{font-size:13px}
+  .meter{width:auto;padding:8px 10px}
+  .screen{overflow:visible}
+  .tools{align-self:center;max-width:100%}
+  .tools button{padding:6px 7px;font-size:12px}
+  .hint{display:none}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .prow{grid-template-columns:minmax(0,1fr);gap:4px}
+  .pl{padding-top:0}
+  .chk{grid-template-columns:minmax(0,1fr)}
+  .mcard{grid-template-columns:70px minmax(0,1fr)}
+  .mcard svg{width:70px;height:52px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<script src="/luch/splash.js"></script>
+<div class="app">
+  <header>
+    <div class="brand" role="link" tabindex="0" title="Карта предметов" style="cursor:pointer" onclick="location.href='/#cs'" onkeydown="if(event.key==='Enter')location.href='/#cs'">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9.6 14.6 9.2 6.2 15 10.6Q20 9.4 25 10.6L30.8 6.2 30.4 14.6Q34.6 22 31.6 29Q27.6 36 20 36Q12.4 36 8.4 29Q5.4 22 9.6 14.6Z" fill="#ffb547"/><path d="M20 14Q15.2 10.8 10.9 13.4Q7.6 17.2 9.4 21.8Q11.6 25.8 15.9 25.4Q18.5 25.1 20 27.1Q21.5 25.1 24.1 25.4Q28.4 25.8 30.6 21.8Q32.4 17.2 29.1 13.4Q24.8 10.8 20 14Z" fill="#ffd896"/><circle cx="15" cy="18.8" r="5" fill="#fffaf0"/><circle cx="25" cy="18.8" r="5" fill="#fffaf0"/><circle cx="15.6" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="24.4" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="16.6" cy="18.1" r="1" fill="#fff"/><circle cx="25.4" cy="18.1" r="1" fill="#fff"/><path d="M18.6 23.4h2.8L20 26.6z" fill="#ff8a73"/><path d="M10.5 29.6Q15.3 27.4 20 29.7Q24.7 27.4 29.5 29.6V34.6Q24.7 32.6 20 34.8Q15.3 32.6 10.5 34.6Z" fill="#72d4e8"/><path d="M20 29.7V34.8" stroke="#0b1019" stroke-width="1.1"/><path d="M8.2 23.5Q5.6 28.6 9.4 32.6Q11.6 33.2 12.4 31Q10.4 28.4 8.2 23.5Z" fill="#e8962a"/><path d="M31.8 23.5Q34.4 28.6 30.6 32.6Q28.4 33.2 27.6 31Q29.6 28.4 31.8 23.5Z" fill="#e8962a"/><path d="M35 3.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="#86e0a8"/></svg>
+      <div><h1>OPEN SCHOOL AI</h1><small>Доступное образование для всех</small></div>
+    </div>
+    <div class="headr">
+      <div class="prog" aria-label="Прогресс"><b>ИИ-ассистенты</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Экран лаборатории: симуляция ИИ-ассистента">
+    <div class="task" id="taskBox" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="screen" id="screen"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const big = n => Math.round(n).toLocaleString('ru-RU');
+
+// ---------- lesson 1: prompt builder. Every row has one vague phrase and one specific phrase; only specific ones count ----------
+const PARTS = [
+  { k: 'goal', name: 'Цель', sub: 'зачем нужен ответ', miss: 'Нет цели — ассистент не знает, зачем вам ответ, и пишет «про всё».' },
+  { k: 'ctx', name: 'Контекст', sub: 'кто вы, что известно', miss: 'Нет контекста — уровень и подробности угаданы наугад.' },
+  { k: 'fmt', name: 'Формат', sub: 'таблица, код, письмо', miss: 'Не задан формат — вышел сплошной текст, который неудобно использовать.' },
+  { k: 'lim', name: 'Ограничения', sub: 'объём, стиль, чего не делать', miss: 'Нет ограничений — слишком длинно, не тот стиль или лишнее.' },
+  { k: 'ex', name: 'Пример', sub: 'образец или ваш черновик', miss: 'Нет примера — ассистент не видит, что именно вам нужно.' },
+];
+const SCEN = [
+  { id: 'bio', name: 'Биология', base: 'Расскажи про фотосинтез.',
+    opts: {
+      goal: [['Мне надо для школы.', 0], ['Хочу подготовиться к контрольной по биологии в пятницу.', 1]],
+      ctx: [['Я не очень разбираюсь.', 0], ['Я в 8 классе и путаю, что происходит на свету, а что — без света.', 1]],
+      fmt: [['Оформи красиво.', 0], ['Ответь таблицей: фаза — где идёт — что нужно — что получается.', 1]],
+      lim: [['Покороче.', 0], ['Не больше 120 слов, только то, что есть в школьном учебнике.', 1]],
+      ex: [['Как в интернете.', 0], ['Сейчас я думаю так: «свет нужен растению, чтобы согреться». Поправь, если это неверно.', 1]] },
+    ans: [
+      '<p>Фотосинтез — сложный многостадийный процесс преобразования энергии электромагнитного излучения в энергию химических связей органических соединений, протекающий в хлоропластах растений, водорослей и цианобактерий. Различают C₃-, C₄- и CAM-типы фиксации углерода. Световая стадия включает фотосистемы I и II, электрон-транспортную цепь тилакоидов, фотолиз воды и хемиосмотический синтез АТФ… <i class="more">(ещё 640 слов)</i></p>',
+      '<p>Фотосинтез идёт в листьях, в хлоропластах. Растение берёт углекислый газ и воду и с помощью энергии света делает глюкозу, а кислород выделяет. Сначала идут световые реакции, потом темновые (цикл Кальвина), в которых участвуют АТФ и НАДФН… <i class="more">(ещё 300 слов, без таблицы)</i></p>',
+      '<table><tr><th>Фаза</th><th>Где</th><th>Что нужно</th><th>Что получается</th></tr><tr><td>Световая</td><td>мембраны тилакоидов в хлоропласте</td><td>свет, вода</td><td>кислород (выделяется), запас энергии — АТФ</td></tr><tr><td>Темновая</td><td>строма хлоропласта</td><td>CO₂ и энергия из световой фазы</td><td>глюкоза</td></tr></table><p><b>Поправка:</b> свет нужен не для тепла, а как источник энергии — она расщепляет воду и запасается в АТФ. «Темновая» фаза идёт и днём: ей просто не нужен сам свет.</p><p>Запомни цепочку: свет → вода → O₂ и АТФ → CO₂ → глюкоза.</p>'] },
+  { id: 'code', name: 'Программа', base: 'Напиши код.',
+    opts: {
+      goal: [['Нужна программа для учёбы.', 0], ['Нужна функция, которая считает средний балл ученика.', 1]],
+      ctx: [['Язык любой.', 0], ['Пишу на Python 3, я новичок; оценки хранятся в списке целых чисел от 2 до 5.', 1]],
+      fmt: [['Сделай нормально.', 0], ['Дай только код функции и 2 примера вызова с короткими комментариями.', 1]],
+      lim: [['Чтобы работало.', 0], ['Без сторонних библиотек; для пустого списка верни None, а не ошибку.', 1]],
+      ex: [['Как обычно делают.', 0], ['Пример: average([5, 4, 3]) → 4.0', 1]] },
+    ans: [
+      '<p>Конечно! Вот программа на JavaScript, которая выводит приветствие:</p><pre class="code">console.log("Hello, World!");</pre><p>Если нужно что-то другое — уточните задачу.</p>',
+      '<pre class="code">def average(grades):\n    return sum(grades) / len(grades)</pre><p>Функция считает среднее арифметическое оценок. <i class="more">(для пустого списка упадёт с ошибкой деления на ноль — вы об этом не спросили)</i></p>',
+      '<pre class="code">def average(grades):\n    # пустой список: среднего нет\n    if not grades:\n        return None\n    # сумма оценок / их количество\n    return sum(grades) / len(grades)\n\nprint(average([5, 4, 3]))  # 4.0\nprint(average([]))         # None</pre>'] },
+  { id: 'mail', name: 'Письмо', base: 'Напиши письмо учителю.',
+    opts: {
+      goal: [['Надо кое-что попросить.', 0], ['Попросить перенести сдачу проекта на неделю.', 1]],
+      ctx: [['Так получилось.', 0], ['Я болел 5 дней, справка есть, проект по физике готов примерно на 60 %.', 1]],
+      fmt: [['Как-нибудь.', 0], ['Электронное письмо: тема, обращение, 3–4 предложения, подпись.', 1]],
+      lim: [['Чтобы не ругали.', 0], ['Вежливо и коротко, без долгих оправданий, назови конкретную новую дату.', 1]],
+      ex: [['Как пишут взрослые.', 0], ['Начни так: «Здравствуйте, Анна Сергеевна!»', 1]] },
+    ans: [
+      '<p>Уважаемый учитель! Пишу Вам, чтобы выразить глубокую благодарность за Ваш нелёгкий труд, терпение и мудрость. Каждый Ваш урок открывает нам новый мир… <i class="more">(ещё 250 слов; о просьбе — ни слова)</i></p>',
+      '<p>Здравствуйте! Я болел и не успел сделать проект. Пожалуйста, можно сдать его позже? Я очень старался, но так получилось, болезнь была тяжёлая, и я… <i class="more">(ещё 6 предложений оправданий, новой даты нет)</i></p>',
+      '<p><b>Тема:</b> перенос срока сдачи проекта по физике</p><p>Здравствуйте, Анна Сергеевна!</p><p>Я болел 5 дней (справку принесу в понедельник) и не успел закончить проект: сейчас он готов примерно на 60 %. Можно ли сдать его через неделю, 24-го числа? Если удобно, покажу черновик раньше.</p><p>Спасибо!<br>Тимур, 9 «Б»</p>'] },
+];
+
+// ---------- lesson 2: answers with planted mistakes ----------
+const CHECKS = [
+  { k: 'src', name: 'Источник', sub: 'существует ли он?' },
+  { k: 'est', name: 'Оценка', sub: 'прикинуть число' },
+  { k: 'cross', name: 'Сверка', sub: 'с надёжным источником' },
+  { k: 'run', name: 'Тест кода', sub: 'запустить на примерах' },
+];
+const CARDS = [
+  { id: 'moon', name: 'История', q: 'Когда люди впервые высадились на Луну? Дай источник.',
+    segs: [
+      { t: 'Первая высадка состоялась 20 июля 1969 года, миссия «Аполлон-11».', ev: { cross: 'Энциклопедия и сайт NASA: 20 июля 1969 года, «Аполлон-11». Совпадает.' } },
+      { t: 'Первым на поверхность вышел Нил Армстронг, за ним — Базз Олдрин.' },
+      { t: 'Третий член экипажа, Майкл Коллинз, тоже прошёлся по Луне.', err: 1, ev: { cross: 'NASA: Коллинз оставался на орбите в командном модуле и на Луну не спускался. Ошибка.' } },
+      { t: 'Лунный модуль пробыл на поверхности около 21 часа.', ev: { est: 'Правдоподобно: прогулка длилась около 2,5 часа, остальное время экипаж был внутри модуля.', cross: 'NASA: 21 час 36 минут. Совпадает.' } },
+      { t: 'Источник: Н. Армстронг, «Шаг за горизонт», NASA Press, 1974.', err: 1, ev: { src: 'В каталогах библиотек такой книги нет. Армстронг не писал мемуаров — его биографию «First Man» написал Джеймс Хансен (2005). Источник выдуман.' } },
+    ] },
+  { id: 'body', name: 'Медицина', q: 'Какая нормальная температура тела и сколько раз в сутки бьётся сердце?',
+    segs: [
+      { t: 'Нормальная температура тела взрослого — около 36,6 °C; за день она меняется примерно от 36 до 37 °C.' },
+      { t: 'Сердце взрослого в покое делает 60–100 ударов в минуту.', ev: { cross: 'Справочники для врачей: 60–100 ударов в минуту в покое. Совпадает.' } },
+      { t: 'Значит, за сутки сердце бьётся примерно 10 000 раз.', err: 1, ev: { est: '70 ударов × 60 минут × 24 часа ≈ 100 000. У ассистента в 10 раз меньше. Ошибка в расчёте.' } },
+      { t: 'У взрослого человека 206 костей.', ev: { cross: 'Учебник анатомии: 206 костей. Совпадает.' } },
+      { t: 'У новорождённого костей меньше — около 150, остальные вырастают позже.', err: 1, ev: { cross: 'Учебник анатомии: у новорождённого около 270–300 костей и хрящей, со временем часть из них срастается. Всё наоборот.', est: 'Число на вид правдоподобное — оценкой эту ошибку не поймать. Нужна сверка.' } },
+      { t: 'Если температура выше 38 °C держится больше трёх дней — нужен врач, а не чат-бот.' },
+    ] },
+  { id: 'code', name: 'Код', q: 'Напиши на Python функцию, которая находит самое большое число в списке.',
+    run: 'Тесты: biggest([3, 9, 4]) → 9 ✓; biggest([7]) → 7 ✓; biggest([-5, -2, -9]) → 0 ✗ (надо −2). Для отрицательных чисел ответ неверный: начальное значение 0 больше любого из них.',
+    segs: [
+      { t: 'def biggest(nums):', code: 1 },
+      { t: '    best = 0', code: 1, err: 1 },
+      { t: '    for n in nums:', code: 1 },
+      { t: '        if n > best:', code: 1 },
+      { t: '            best = n', code: 1 },
+      { t: '    return best', code: 1 },
+      { t: 'Функция работает для любых чисел, в том числе отрицательных.', err: 1 },
+      { t: 'То же самое делает встроенная функция max(nums).', ev: { cross: 'Документация Python: max() возвращает наибольший элемент. Совпадает.' } },
+    ] },
+  { id: 'law', name: 'Право', q: 'Можно ли взять фото из интернета для школьного проекта?',
+    segs: [
+      { t: 'Фотография охраняется авторским правом с момента создания, даже если на ней нет значка ©.', ev: { cross: 'Бернская конвенция (в ней больше 180 стран): охрана возникает автоматически. Совпадает.' } },
+      { t: 'Если картинка нашлась в поиске, значит, её можно использовать как угодно.', err: 1, ev: { cross: 'Поисковики показывают чужие работы, но не дают на них прав — об этом сказано в их правилах: изображения могут быть защищены. Ошибка.' } },
+      { t: 'По статье 12-бис Всемирной конвенции об интернете 2015 года школьникам разрешено брать любые фото.', err: 1, ev: { src: 'Такого документа нет ни в базах международных договоров, ни в новостях. Ассистент выдумал закон — это галлюцинация.', est: 'Номер статьи и год не прикинешь в уме. Проверьте, существует ли сам документ.' } },
+      { t: 'Для учёбы во многих странах можно цитировать чужие работы с указанием автора, но правила отличаются — уточните у учителя.' },
+      { t: 'Надёжнее брать фото со свободной лицензией (например, Creative Commons) и подписывать автора.', ev: { cross: 'Сайт Creative Commons: лицензии разрешают использование при указании автора. Совпадает.' } },
+    ] },
+];
+const ERR_TOTAL = CARDS.reduce((s, c) => s + c.segs.filter(x => x.err).length, 0);
+function evidence(c, i, k) {
+  const card = CARDS[c], sg = card.segs[i], own = sg.ev && sg.ev[k];
+  if (own) return { t: own, cls: sg.err ? 'red' : 'green' };
+  if (k === 'run') return card.run ? { t: card.run, cls: 'red' } : { t: 'Это не код — запускать нечего. Выберите другую проверку.', cls: '' };
+  if (sg.err) return { t: 'Эта проверка здесь ничего не показала. Попробуйте другую.', cls: '' };
+  if (k === 'src') return { t: 'Ссылки нет, но это не ошибка: факт можно сверить самому.', cls: '' };
+  if (k === 'est') return { t: /\d/.test(sg.t) ? 'Число правдоподобное — оценка не находит противоречий.' : 'Числа здесь нет — оценивать нечего.', cls: '' };
+  return { t: 'Сверка с надёжным источником: совпадает.', cls: 'green' };
+}
+
+// ---------- lesson 3: requests to the assistant + a project plan ----------
+const REQS = [
+  { id: 'essay', t: 'Напиши за меня эссе на 2 страницы — сдам как своё.', copy: 1,
+    reply: 'Конечно! Вот эссе «Вода в нашем доме»: «Вода — главный ресурс планеты. Каждый день мы…» <i class="more">(ещё 600 слов)</i>',
+    why: 'Вы получите текст, но не умение. Сдать его как свой — нарушение академической честности, а первый же вопрос учителя покажет, что текст не ваш.' },
+  { id: 'median', t: 'Объясни на примере расходов воды, чем среднее отличается от медианы.', copy: 0,
+    reply: 'Пусть 5 семей тратят в день 90, 100, 110, 120 и 600 литров (у последней течёт кран). Среднее — 204 л, медиана — 110 л. Как думаешь, что лучше описывает «обычную» семью и почему?',
+    why: 'Объяснение на вашем примере и встречный вопрос — так тему понимаете вы сами.' },
+  { id: 'quiz', t: 'Задай мне 5 вопросов по теме, проверь ответы и объясни ошибки.', copy: 0,
+    reply: 'Вопрос 1 из 5: какой прибор показывает, сколько воды израсходовала квартира? Напиши ответ — потом разберём.',
+    why: 'Самопроверка вопросами — один из самых действенных способов запомнить материал.' },
+  { id: 'weak', t: 'Вот мой план проекта. Какое в нём самое слабое место?', copy: 0,
+    reply: 'Сильная сторона — ты меряешь реальные данные. Слабое место: 2 дня измерений мало, будни и выходные отличаются. Сколько дней нужно, чтобы захватить целую неделю?',
+    why: 'Обратная связь на вашу работу: исправляете и решаете вы.' },
+  { id: 'hw', t: 'Реши все задачи из домашки и пришли только ответы.', copy: 1,
+    reply: '1) 42; 2) 3,5 м; 3) x = 7; 4) 0,25… <i class="more">(без решений)</i>',
+    why: 'Ответы без решений ничему не учат, а если ассистент ошибся — вы этого даже не заметите.' },
+  { id: 'para', t: 'Перескажи чужую статью другими словами, чтобы проверка на плагиат её не нашла.', copy: 1,
+    reply: 'Вот изменённый текст статьи… <i class="more">(слова другие, а идеи и структура — чужие)</i>',
+    why: 'Это плагиат, даже если слова другие: идеи и структура принадлежат автору. Честно — цитировать и указывать источник.' },
+  { id: 'steps', t: 'Помоги разбить проект на шаги и прикинуть сроки на 2 недели.', copy: 0,
+    reply: 'Давай начнём с вопроса исследования: что ты хочешь узнать в конце? Под него подберём шаги и даты.',
+    why: 'Планировать большую задачу — навык; ассистент помогает его тренировать, а план остаётся вашим.' },
+  { id: 'draft', t: 'Проверь мой черновик: где не сходится логика? Не переписывай, только укажи.', copy: 0,
+    reply: 'В 3-м абзаце ты пишешь, что расход «сильно вырос», но за две недели цифры почти одинаковые: 410 и 402 л. Как это объяснить или исправить?',
+    why: 'Вы просите указать на проблему, а исправляете сами — текст остаётся вашим.' },
+];
+const PLAN = [
+  'Сформулировать вопрос: сколько воды тратит семья за день и на что',
+  'Собрать данные: записывать показания счётчика 7 дней подряд',
+  'Посчитать расход на человека в день и сравнить со средним по стране',
+  'Сделать выводы и предложить 3 способа сберечь воду',
+  'Написать отчёт и указать, где и как помогал ИИ',
+];
+const POOL = [2, 4, 0, 3, 1];
+
+// ---------- lesson 4: what not to share, deepfakes, bias ----------
+const MSG = [
+  { id: 'hi', t: 'Привет!' },
+  { id: 'name', t: 'Я Алия Сапарова, живу на ул. Садовой, д. 12, кв. 5.', risk: 1, why: 'полное имя и домашний адрес' },
+  { id: 'task', t: 'Помоги составить письмо в поддержку школьного портала: я третий день не могу войти.', need: 1 },
+  { id: 'err', t: 'На экране написано: «Ошибка 403 — доступ запрещён».', need: 1 },
+  { id: 'pass', t: 'Мой пароль: Sun_2010!', risk: 1, why: 'пароль' },
+  { id: 'phone', t: 'Мой телефон: 8 (000) 123-45-67.', risk: 1, why: 'номер телефона' },
+  { id: 'photo', t: '[фото одноклассника Тимура] Сделай из него смешной мем для чата класса.', risk: 1, why: 'чужое фото без согласия' },
+  { id: 'thx', t: 'Спасибо!' },
+];
+const FAKES = [
+  { id: 'mom', kind: 'Видеозвонок', fake: 1, title: '«Мама» звонит с незнакомого номера: «Срочно переведи деньги на эту карту, потом объясню!»',
+    checks: [['Лицо и звук', 'Губы отстают от слов, лицо «плывёт», когда она поворачивает голову.', 1], ['Канал связи', 'Незнакомый номер, а не мамин контакт.', 1], ['Давление', '«Срочно», «потом объясню» — любимые слова мошенников.', 1], ['Перезвонить', 'Мама по своему номеру отвечает: она на работе и никому не звонила.', 1]] },
+  { id: 'dir', kind: 'Голосовое', fake: 1, title: 'Голосовое «от директора» в чате класса: «Завтра уроков не будет, перешлите всем».',
+    checks: [['Источник', 'Переслано из незнакомого канала; на сайте школы ничего нет.', 1], ['Голос', 'Ровная интонация без дыхания и пауз — похоже на клон голоса.', 1], ['Давление', '«Перешлите всем» — так фейк быстрее разлетается.', 1], ['Перезвонить', 'Классный руководитель подтвердил: уроки по расписанию.', 1]] },
+  { id: 'museum', kind: 'Видео', fake: 0, title: 'Видео на официальном канале музея: выставка о космосе открывается 1 марта.',
+    checks: [['Источник', 'Официальный канал музея; та же новость есть на сайте музея.', 0], ['Лицо и звук', 'Движения естественные, звук совпадает с губами.', 0], ['Давление', 'Никто ничего не требует и не торопит.', 0], ['Другие источники', 'Об открытии написали городские новости.', 0]] },
+  { id: 'star', kind: 'Фото', fake: 1, title: 'Фото: известный футболист держит плакат «Скачай приложение — получи $500».',
+    checks: [['Детали', 'Шесть пальцев на руке, буквы на плакате «поплыли» — типичные следы генерации.', 1], ['Источник', 'В официальных соцсетях футболиста такого поста нет.', 1], ['Давление', 'Деньги «просто так» — приманка.', 1], ['Поиск по картинке', 'Оригинал фото — с матча, плаката в руках не было.', 1]] },
+];
+const BIAS = {
+  prompt: 'Придумай 4 героев для рассказа: врач, программист, медсестра, пилот.',
+  answer: 'Врач — Андрей, 50 лет, строгий и опытный. Программист — Максим, 25 лет, ночами сидит за кодом. Медсестра — Ольга, добрая и заботливая. Пилот — Сергей, смелый капитан.',
+  fixed: 'Врач — Мадина, 34 года, хирург и альпинистка. Программист — Хироши, 58 лет, начал писать код на пенсии. Медсестра — Даниэль, 29 лет, работает в детской больнице. Пилот — Амара, 41 год, командир экипажа.',
+  q: [
+    { q: 'Что не так с ответом?', a: ['Ошибка в фактах: таких профессий нет', 'Повторяет стереотипы: «мужские» и «женские» профессии, как в текстах, на которых училась модель', 'Ничего: ответ полностью нормальный'], ok: 1 },
+    { q: 'Как это исправить?', a: ['Попросить ответить подлиннее', 'Явно попросить героев разного пола, возраста и происхождения — и проверить результат', 'Больше никогда не пользоваться ассистентами'], ok: 1 },
+  ],
+};
+
+const LESSONS = [
+  { id: 'prompt', title: 'Как ставить задачу',
+    text: ['ИИ-ассистент (например, ChatGPT, Claude или Gemini) не читает мысли. Он видит только текст запроса — и если там три слова, всё остальное он додумывает сам: уровень, объём, формат, даже язык программирования.',
+           'Хороший запрос похож на задание толковому новичку. В нём пять частей: <b>цель</b> (зачем нужен ответ), <b>контекст</b> (кто вы и что уже известно), <b>формат</b> (список, таблица, код, письмо), <b>ограничения</b> (объём, стиль, чего не делать) и <b>пример</b> того, что вы хотите получить.',
+           'Конкретность важнее длины и вежливости: «покороче» — расплывчато, «не больше 120 слов» — понятно. Если ответ не подошёл, не начинайте заново, а уточните запрос в том же диалоге. Так работают и профессионалы: запрос улучшают в несколько шагов.'],
+    why: 'В ближайшие 10 лет ИИ-ассистенты станут обычным инструментом почти в любой профессии — как когда-то поиск в интернете. Программист описывает ассистенту функцию и тесты, юрист — какой договор проверить и на что смотреть, дизайнер — настроение и ограничения макета, учёный — какие статьи найти и сравнить. Ценится не умение «нажать кнопку», а умение точно поставить задачу: от этого зависит, сэкономит ассистент час работы или добавит час исправлений.',
+    safe: 'Не вставляйте в запрос пароли и личные данные — даже если так «удобнее объяснить». Подробнее — в уроке 4.',
+    task: 'Для двух задач из трёх отправьте сначала расплывчатый запрос, а потом запрос из всех пяти частей с конкретными формулировками (5 из 5). Сравните ответы.',
+    hint: 'В каждой строке конструктора выберите одну фразу. Конкретная фраза отвечает на вопросы «что именно?», «сколько?», «для кого?». Расплывчатый запрос — когда не выбрано ничего или почти ничего.',
+    stage: 'Выберите фразы в конструкторе и нажмите «Отправить». Ответ ассистента — заготовленный пример, без настоящего ИИ.',
+    check: m => m.pairs >= 2 },
+  { id: 'verify', title: 'Проверка ответа',
+    text: ['Языковая модель пишет правдоподобный текст, а не проверенный. Поэтому она иногда уверенно выдумывает: несуществующие книги и законы, неверные даты, числа «с потолка». Это называют галлюцинациями. Коварно то, что ошибка звучит так же убедительно, как правда.',
+           'Чек-лист проверки. <b>Источник</b>: существует ли книга, статья, закон? Найдите его сами. <b>Оценка</b>: прикиньте число в уме — порядок величины сходится? <b>Сверка</b>: сравните факт с надёжным источником — энциклопедией, учебником, официальным сайтом, документацией. <b>Тест</b>: код запускают на примерах, особенно на «неудобных» — пустой список, отрицательные числа.',
+           'Проверяют каждое утверждение, на которое вы опираетесь, а не только подозрительные. Ассистенты, которые ищут в интернете и показывают ссылки, ошибаются реже, но ссылку тоже нужно открыть и прочитать. За результат отвечает тот, кто его сдал, — а не ассистент.'],
+    why: 'Юристы в нескольких странах уже получали штрафы за то, что приносили в суд ссылки на несуществующие дела, придуманные чат-ботом. Врач может с помощью ИИ быстрее найти исследования, но диагноз ставит и подписывает сам. Программисты проверяют код ассистента тестами и ревью, учёные — каждую цитату и цифру. Работодатели ценят людей, которые быстро находят ошибки ИИ: это и есть ответственность за результат.',
+    safe: 'О здоровье, деньгах и законе ассистент может помочь подготовить вопросы, но решение принимает специалист — врач, юрист или взрослый, которому вы доверяете.',
+    task: 'В 4 ответах ассистента найдите все ошибки: отметьте неверные фразы и нажмите «Сдать ответ». Лишние отметки тоже считаются ошибкой.',
+    hint: 'Нажмите на фразу и примените проверки из чек-листа. Не каждая проверка подходит к каждой фразе: для числа — оценка, для ссылки — источник, для кода — тест.',
+    stage: 'Нажмите на фразу в ответе, чтобы проверить её.',
+    check: m => m.solved === CARDS.length },
+  { id: 'study', title: 'ИИ как помощник в учёбе',
+    text: ['ИИ-ассистент может быть терпеливым репетитором: объяснить тему на вашем примере, задать вопросы для самопроверки, найти слабое место в черновике. Так знания остаются у вас в голове.',
+           'Если же попросить «сделай за меня», вы получите текст, но не умение. Сдать сгенерированный текст как свой — нарушение академической честности, такое же, как списывание. В школах и вузах разные правила об ИИ: где-то можно с пометкой, где-то нельзя совсем. Узнайте правила заранее и указывайте, где помогал ИИ.',
+           'Большую задачу удобно разбить на шаги: вопрос → данные → расчёт → выводы → отчёт. Ассистент поможет составить план и проверить каждый шаг, но решения и выводы — ваши. Простое правило: просите объяснить, спросить и указать на ошибку, а не написать за вас.'],
+    why: 'Учиться придётся всю жизнь: технологии меняются быстрее учебников. Кто умеет учиться с ИИ — просит объяснение, проверяет себя, получает обратную связь, — осваивает новое в разы быстрее. А кто просто копирует, остаётся без навыка: на экзамене, собеседовании или в операционной ассистента рядом может не оказаться.',
+    task: 'Разберите 8 запросов к ассистенту: какие помогают учиться, а какие делают работу за вас. Затем соберите план проекта из 5 шагов в правильном порядке.',
+    hint: 'Спросите себя: после этого ответа я буду уметь больше или просто получу готовое? В плане: сначала вопрос, потом данные, расчёт, выводы и отчёт.',
+    stage: 'Нажмите на запрос — увидите, что ответит ассистент.',
+    check: m => m.correct === REQS.length && m.planOk },
+  { id: 'privacy', title: 'Безопасность и приватность',
+    text: ['Всё, что вы пишете ассистенту, уходит на серверы компании. Там переписка может храниться, её могут просматривать сотрудники или использовать для обучения моделей (часто это можно отключить в настройках). Поэтому не отправляйте пароли, коды из СМС, номера документов и карт, адрес и телефон — и чужие фото и данные без согласия.',
+           'Дипфейк — поддельное видео, фото или голос, созданные нейросетью. Признаки: губы не совпадают со звуком, лицо «плывёт» на поворотах, лишние пальцы, «поплывшие» буквы, ровный голос без дыхания. Но главный признак — ситуация: срочность, просьба о деньгах, незнакомый номер. Проверка: перезвонить по знакомому номеру, найти новость в официальном источнике.',
+           'Модели учатся на текстах людей и перенимают их стереотипы: врач и пилот в ответах чаще мужчины, медсестра — женщина. Это смещение (bias). В рассказе это мелочь, а при отборе резюме или выдаче кредита — несправедливость. Замечайте перекос и просите разнообразия явно.'],
+    why: 'Специалисты по защите данных, кибербезопасности и ответственному ИИ нужны уже каждому банку, больнице и школе. Врачи и юристы обязаны хранить тайну клиента и не могут вставлять его данные в общедоступный чат-бот. Дизайнеры и журналисты проверяют, не сгенерировано ли фото. А мошенники уже звонят голосами родственников — умение распознать дипфейк защищает вашу семью.',
+    safe: 'Если «родные» пишут или звонят и срочно просят деньги или коды — положите трубку и перезвоните им сами по знакомому номеру. Если ваш пароль попал в чат — сразу смените его.',
+    task: 'Скройте в сообщении ассистенту всё, что нельзя отправлять, и отправьте его; распознайте, какие из 4 материалов — дипфейки; найдите предвзятость в ответе и способ её исправить.',
+    hint: 'Нажимайте на части сообщения, чтобы скрыть их. Перед решением о дипфейке откройте хотя бы 2 проверки.',
+    stage: 'Переключайте части задания вверху экрана.',
+    check: m => m.msgOK && m.fakes === FAKES.length && m.biasOK },
+];
+
+const KEY = 'luch-cs-aiwork';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const savedIdx = saved.lessonId ? LESSONS.findIndex(l => l.id === saved.lessonId) : -1;
+const S = { lesson: clamp(savedIdx >= 0 ? savedIdx : (saved.lesson | 0), 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, lessonId: LESSONS[S.lesson].id, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+function resetState() {
+  // lesson 1
+  S.sc = 0; S.pk = SCEN.map(() => ({})); S.thread = []; S.pairs = SCEN.map(() => ({ v: false, f: false })); S.sent = 0;
+  // lesson 2
+  S.c = 0; S.mk = CARDS.map(c => c.segs.map(() => false)); S.sel = -1; S.ev = CARDS.map(c => c.segs.map(() => [])); S.res = CARDS.map(() => null); S.nChecks = 0;
+  // lesson 3
+  S.cls = {}; S.rq = null; S.plan = [];
+  // lesson 4
+  S.p4 = 'msg'; S.red = {}; S.msgRes = null; S.fc = 0; S.fopen = {}; S.verd = {}; S.bias = [-1, -1];
+}
+
+// ---------- models ----------
+function scoreOf(i) {
+  const sc = SCEN[i], pk = S.pk[i];
+  const st = PARTS.map(p => pk[p.k] === undefined ? 'n' : sc.opts[p.k][pk[p.k]][1] ? 'y' : 'v');
+  return { st, score: st.filter(x => x === 'y').length, used: st.filter(x => x !== 'n').length };
+}
+function model() {
+  const id = LID();
+  if (id === 'prompt') {
+    const cur = scoreOf(S.sc), last = S.thread.filter(x => x.who === 'bot').slice(-1)[0];
+    return { kind: id, pairs: S.pairs.filter(p => p.v && p.f).length, cur, last };
+  }
+  if (id === 'verify') {
+    const solved = S.res.filter(r => r && r.ok).length;
+    const found = S.res.reduce((s, r) => s + (r ? r.found : 0), 0);
+    return { kind: id, solved, found, nChecks: S.nChecks };
+  }
+  if (id === 'study') {
+    const correct = REQS.filter(r => S.cls[r.id] === (r.copy ? 'copy' : 'learn')).length;
+    const planOk = S.plan.length === PLAN.length && S.plan.every((p, i) => p === i);
+    return { kind: id, correct, sorted: Object.keys(S.cls).length, planOk, planLen: S.plan.length };
+  }
+  const fakes = FAKES.filter(f => S.verd[f.id] !== undefined && S.verd[f.id] === !!f.fake).length;
+  const biasOK = S.bias[0] === BIAS.q[0].ok && S.bias[1] === BIAS.q[1].ok;
+  const msgOK = !!(S.msgRes && S.msgRes.ok);
+  return { kind: id, msgOK, fakes, biasOK, parts: [msgOK, fakes === FAKES.length, biasOK].filter(Boolean).length };
+}
+
+// ---------- screen ----------
+const screen = $('#screen');
+const win = (title, body, part) => `<div class="win"${part ? ` data-part="${part}"` : ''}><div class="winbar"><span class="dots"><i></i><i></i><i></i></span>${title}<span class="sim">симуляция</span></div><div class="winbody">${body}</div></div>`;
+const bub = (who, html, extra = '') => `<div class="bub ${who}"><span class="who">${who === 'user' ? 'вы' : 'ассистент'}${extra}</span>${html}</div>`;
+const segBar = (items, cur, act) => `<div class="segs" role="group">${items.map((x, i) => `<button data-a="${act}" data-i="${i}" aria-pressed="${i === cur}">${x}</button>`).join('')}</div>`;
+
+function promptText(i) {
+  const sc = SCEN[i], pk = S.pk[i];
+  return `<span class="base">${esc(sc.base)}</span>` + PARTS.filter(p => pk[p.k] !== undefined).map(p => ` <span class="add">${esc(sc.opts[p.k][pk[p.k]][0])}</span>`).join('');
+}
+function screen1(m) {
+  const sc = SCEN[S.sc], pk = S.pk[S.sc];
+  const tabs = segBar(SCEN.map((x, i) => `${x.name}${S.pairs[i].v && S.pairs[i].f ? ' <span class="ck">✓</span>' : ''}`), S.sc, 'sc');
+  let b = `<div class="box" data-part="builder"><div class="bh">Конструктор запроса <em>${m.cur.used} из 5 частей</em></div>${tabs}<div style="margin-top:8px">`;
+  b += PARTS.map(p => `<div class="prow"><span class="pl">${p.name}<small>${p.sub}</small></span><div class="pch">${sc.opts[p.k].map((o, j) => `<button class="pchip" data-a="chip" data-k="${p.k}" data-j="${j}" aria-pressed="${pk[p.k] === j}">${esc(o[0])}</button>`).join('')}</div></div>`).join('');
+  b += `</div><div class="composer" data-part="composer"><div class="ptext">${promptText(S.sc)}</div><button class="send" data-a="send">Отправить</button></div></div>`;
+  const msgs = S.thread.slice(-4);
+  const body = msgs.length ? msgs.map(x => x.who === 'user' ? bub('user', x.html) : bub('bot', x.html + rubric(x), ` · ${x.scen}`)).join('') : '<div class="empty">Здесь появятся запросы и ответы. Сравните ответ на расплывчатый и на точный запрос.</div>';
+  const chat = win('ИИ-ассистент', body, 'chat');
+  return `<div class="cols">${b}${chat}</div>`;
+}
+function rubric(x) {
+  const lab = { y: '✓', v: '~', n: '✗' };
+  let h = `<div class="rub" data-part="rubric">${PARTS.map((p, i) => `<span class="${x.st[i]}">${lab[x.st[i]]} ${p.name}</span>`).join('')}<span class="score">${x.score}/5</span></div>`;
+  const why = PARTS.map((p, i) => x.st[i] === 'n' ? p.miss : x.st[i] === 'v' ? `${p.name}: «${x.vague[i]}» — слишком общо, ничего конкретного.` : '').filter(Boolean);
+  if (why.length) h += `<ul class="why">${why.slice(0, 3).map(w => `<li>${esc(w)}</li>`).join('')}${why.length > 3 ? `<li>и ещё ${why.length - 3}…</li>` : ''}</ul>`;
+  return h;
+}
+
+function screen2(m) {
+  const c = S.c, card = CARDS[c], res = S.res[c];
+  const tabs = segBar(CARDS.map((x, i) => `${x.name}${S.res[i] && S.res[i].ok ? ' <span class="ck">✓</span>' : ''}`), c, 'card');
+  const segCls = i => {
+    const sg = card.segs[i], mk = S.mk[c][i];
+    let k = 'segt';
+    if (res && res.shown) { if (mk && sg.err) k += ' hit'; else if (mk && !sg.err) k += ' fp'; else if (mk) k += ' mark'; }
+    else if (mk) k += ' mark';
+    if (S.sel === i) k += ' sel';
+    return k;
+  };
+  let ans = '', inCode = false;
+  card.segs.forEach((sg, i) => {
+    if (sg.code && !inCode) { ans += '<pre class="code">'; inCode = true; }
+    if (!sg.code && inCode) { ans += '</pre>'; inCode = false; }
+    ans += `<button class="${segCls(i)}" data-a="seg" data-i="${i}">${esc(sg.t)}</button>${sg.code ? '' : ' '}`;
+  });
+  if (inCode) ans += '</pre>';
+  const chat = win('ИИ-ассистент', bub('user', esc(card.q)) + `<div class="bub bot" data-part="answer"><span class="who">ассистент</span>${ans}</div>`);
+  let det = '<div class="box detail" data-part="checks"><div class="bh">Чек-лист проверки</div>';
+  if (S.sel < 0) det += '<p class="note" style="margin:0">Нажмите на фразу в ответе ассистента, чтобы проверить её.</p>';
+  else {
+    const sg = card.segs[S.sel], used = S.ev[c][S.sel];
+    det += `<div class="quote">${esc(sg.t.trim())}</div><div class="chk">${CHECKS.map(k => `<button data-a="check" data-k="${k.k}" aria-pressed="${used.includes(k.k)}">${k.name}<span>${k.sub}</span></button>`).join('')}</div>`;
+    if (used.length) det += `<div class="evs">${used.map(k => { const e = evidence(c, S.sel, k); return `<div class="ev ${e.cls}"><b>${CHECKS.find(x => x.k === k).name}</b>${esc(e.t)}</div>`; }).join('')}</div>`;
+    const locked = res && res.ok;
+    det += `<div class="acts">${S.mk[c][S.sel] ? `<button class="btn" data-a="mark" ${locked ? 'disabled' : ''}>Снять отметку</button>` : `<button class="btn red" data-a="mark" ${locked ? 'disabled' : ''}>Это ошибка</button>`}</div>`;
+  }
+  det += '</div>';
+  const nm = S.mk[c].filter(Boolean).length;
+  let sub = `<div class="box" data-part="submit"><div class="bh">Разметка ответа <em>отмечено: ${nm}</em></div><div class="acts" style="margin-top:0"><button class="btn main" data-a="submit" ${res && res.ok ? 'disabled' : ''}>Сдать ответ</button><button class="btn" data-a="unmark" ${res && res.ok ? 'disabled' : ''}>Снять все отметки</button></div>`;
+  if (res) sub += `<div class="res ${res.ok ? 'ok' : 'no'}">${res.ok ? `Все ошибки найдены (${res.total} из ${res.total}), лишних отметок нет.` : `Найдено ${res.found} из ${res.total}${res.fp ? `, лишних отметок: ${res.fp} (оранжевые)` : ''}. ${res.found < res.total ? 'Какие-то ошибки остались неотмеченными — проверьте другие фразы.' : ''}`}</div>`;
+  sub += '</div>';
+  return `${tabs}<div class="cols">${chat}<div style="display:grid;gap:10px">${det}${sub}</div></div>`;
+}
+
+function screen3(m) {
+  const list = `<div class="box" data-part="reqs"><div class="bh">Запросы к ассистенту <em>${m.sorted} из ${REQS.length}</em></div><div class="reqs">${REQS.map((r, i) => {
+    const v = S.cls[r.id], right = v && v === (r.copy ? 'copy' : 'learn');
+    const tg = v ? `<span class="tg ${v === 'learn' ? 'l' : 'c'}${right ? '' : ' x'}">${v === 'learn' ? 'учит' : 'за меня'}</span>` : '';
+    return `<button class="req" data-a="req" data-i="${i}" aria-current="${S.rq === i}"><span class="n">${i + 1}</span><span>${esc(r.t)}</span>${tg}</button>`;
+  }).join('')}</div></div>`;
+  let prev;
+  if (S.rq === null) prev = '<div class="empty">Выберите запрос слева — здесь появится ответ ассистента.</div>';
+  else {
+    const r = REQS[S.rq], v = S.cls[r.id];
+    prev = bub('user', esc(r.t)) + bub('bot', r.reply);
+    prev += `<div class="acts"><button class="btn grn" data-a="cls" data-v="learn">Помогает учиться</button><button class="btn red" data-a="cls" data-v="copy">Делает за меня</button></div>`;
+    if (v) { const ok = v === (r.copy ? 'copy' : 'learn'); prev += `<div class="res ${ok ? 'ok' : 'no'}">${ok ? 'Верно. ' : 'Не совсем. '}${esc(r.why)}</div>`; }
+  }
+  const chat = win('ИИ-ассистент', prev, 'preview');
+  const pool = POOL.filter(i => !S.plan.includes(i));
+  let plan = `<div class="box" data-part="plan"><div class="bh">План проекта «Вода дома» <em>${S.plan.length} из ${PLAN.length}</em></div>`;
+  plan += `<div class="lbl2">Мой план — нажмите на шаг, чтобы убрать</div><div class="myplan">${S.plan.map((p, i) => `<button class="stp${S.plan.length === PLAN.length ? (p === i ? ' ok' : ' no') : ''}" data-a="unplan" data-i="${i}"><b>${i + 1}</b><span>${esc(PLAN[p])}</span></button>`).join('')}${S.plan.length < PLAN.length ? `<div class="slot">Шаг ${S.plan.length + 1}: выберите ниже</div>` : ''}</div>`;
+  if (pool.length) plan += `<div class="lbl2">Шаги вразброс</div><div class="pool">${pool.map(i => `<button class="stp" data-a="plan" data-i="${i}"><b>+</b><span>${esc(PLAN[i])}</span></button>`).join('')}</div>`;
+  else plan += m.planOk ? '<div class="res ok">План в правильном порядке: от вопроса к данным, расчёту, выводам и честному отчёту.</div>' : '<div class="res no">Порядок нарушен (красные номера). Нажмите на шаг, чтобы вернуть его, и соберите заново.</div>';
+  plan += '</div>';
+  return `<div class="cols">${list}<div style="display:grid;gap:10px">${chat}${plan}</div></div>`;
+}
+
+const THUMB = {
+  mom: '<svg viewBox="0 0 86 64"><rect width="86" height="64" fill="#1d2840"/><circle cx="43" cy="26" r="13" fill="#d9a77f"/><path d="M22 64q2-22 21-22t21 22z" fill="#7b5ea7"/><path d="M30 22q2-14 13-14t13 14q-4-6-13-6t-13 6z" fill="#3b2a1f"/><path d="M37 33q6 3 12 0" stroke="#7a3b2e" stroke-width="2" fill="none"/><rect x="58" y="4" width="24" height="10" rx="3" fill="#e5484d"/><text x="70" y="12" font-size="7" fill="#fff" text-anchor="middle" font-family="monospace">REC</text><path d="M49 22l6 -2" stroke="#ffb547" stroke-width="1.4" stroke-dasharray="2 2"/></svg>',
+  dir: '<svg viewBox="0 0 86 64"><rect width="86" height="64" fill="#1a2438"/><circle cx="16" cy="32" r="9" fill="#72d4e8"/><path d="M13 27l8 5-8 5z" fill="#0b1019"/>' + Array.from({ length: 14 }, (_, i) => `<rect x="${30 + i * 3.6}" y="${32 - (4 + (i * 7) % 11)}" width="2" height="${2 * (4 + (i * 7) % 11)}" rx="1" fill="#8b96ad"/>`).join('') + '</svg>',
+  museum: '<svg viewBox="0 0 86 64"><rect width="86" height="64" fill="#0e1520"/><circle cx="62" cy="20" r="9" fill="#ffb547"/><circle cx="20" cy="14" r="1" fill="#fff"/><circle cx="34" cy="8" r="1" fill="#fff"/><circle cx="12" cy="30" r="1" fill="#fff"/><path d="M8 54h70v4H8zM14 30h58l-29-14z" fill="#8b96ad"/><path d="M18 34h6v20h-6zM32 34h6v20h-6zM48 34h6v20h-6zM62 34h6v20h-6z" fill="#c9d1e0"/></svg>',
+  star: '<svg viewBox="0 0 86 64"><rect width="86" height="64" fill="#1f5a3a"/><circle cx="43" cy="18" r="9" fill="#c98e63"/><path d="M28 64q0-30 15-30t15 30z" fill="#e5484d"/><rect x="18" y="30" width="50" height="22" rx="2" fill="#f3f0e6"/><text x="43" y="40" font-size="6.5" fill="#0b1019" text-anchor="middle" font-family="sans-serif">ПОЛУЧИ</text><text x="43" y="48" font-size="7.5" fill="#d23" text-anchor="middle" font-family="sans-serif" font-weight="700">$5OO</text><path d="M15 38q-4-2-3 3M15 42q-4 0-3 4M15 46q-4 1-2 4" stroke="#c98e63" stroke-width="2.4" fill="none"/></svg>',
+};
+function screen4(m) {
+  const tabs = segBar([`Сообщение${m.msgOK ? ' <span class="ck">✓</span>' : ''}`, `Дипфейки ${m.fakes}/${FAKES.length}${m.fakes === FAKES.length ? ' <span class="ck">✓</span>' : ''}`, `Предвзятость${m.biasOK ? ' <span class="ck">✓</span>' : ''}`], ['msg', 'fake', 'bias'].indexOf(S.p4), 'p4');
+  let h = tabs;
+  if (S.p4 === 'msg') {
+    const nRed = Object.keys(S.red).filter(k => S.red[k]).length;
+    let draft = `<div class="box" data-part="msg"><div class="bh">Черновик сообщения ассистенту <em>скрыто: ${nRed}</em></div><div class="msg">${MSG.map(x => `<button class="segt${S.red[x.id] ? ' red' : ''}" data-a="red" data-id="${x.id}" ${S.msgRes && S.msgRes.ok ? 'disabled' : ''}>${esc(x.t)}</button>`).join(' ')}</div>`;
+    draft += `<div class="acts"><button class="btn main" data-a="msgsend" ${S.msgRes && S.msgRes.ok ? 'disabled' : ''}>Отправить</button><button class="btn" data-a="msgreset">Новое сообщение</button></div><p class="note" style="margin:8px 0 0">Нажмите на часть текста, чтобы скрыть её или вернуть.</p></div>`;
+    let chat;
+    if (!S.msgRes) chat = '<div class="empty">Ответ появится после отправки.</div>';
+    else {
+      const sent = MSG.filter(x => !S.red[x.id]).map(x => esc(x.t)).join(' ');
+      chat = bub('user', sent || '<i class="more">(пустое сообщение)</i>') + bub('bot', S.msgRes.reply);
+      chat += `<div class="res ${S.msgRes.ok ? 'ok' : 'no'}">${S.msgRes.note}</div>`;
+    }
+    h += `<div class="cols">${draft}${win('ИИ-ассистент', chat, 'msgchat')}</div>`;
+  } else if (S.p4 === 'fake') {
+    const list = `<div class="box" data-part="fakes"><div class="bh">Что пришло в телефон</div><div class="media">${FAKES.map((f, i) => {
+      const v = S.verd[f.id], ok = v !== undefined && v === !!f.fake;
+      const vd = v === undefined ? '' : `<span class="vd ${ok ? (f.fake ? 'f' : 't') : 'w'}">${v ? 'дипфейк' : 'настоящее'}${ok ? ' ✓' : ' — неверно'}</span>`;
+      return `<button class="mcard" data-a="fc" data-i="${i}" aria-current="${S.fc === i}">${THUMB[f.id]}<span><span class="kd">${f.kind}</span><span class="tt">${esc(f.title)}</span>${vd}</span></button>`;
+    }).join('')}</div></div>`;
+    const f = FAKES[S.fc], op = S.fopen[f.id] || [];
+    let det = `<div class="box" data-part="fcheck"><div class="bh">Проверка: ${esc(f.kind.toLowerCase())} <em>открыто ${op.length} из 4</em></div><div class="chk">${f.checks.map((c, j) => `<button data-a="fopen" data-j="${j}" aria-pressed="${op.includes(j)}">${c[0]}<span>${op.includes(j) ? 'открыто' : 'нажмите, чтобы проверить'}</span></button>`).join('')}</div>`;
+    if (op.length) det += `<div class="evs">${op.map(j => `<div class="ev ${f.checks[j][2] ? 'red' : 'green'}"><b>${f.checks[j][0]}</b>${esc(f.checks[j][1])}</div>`).join('')}</div>`;
+    det += `<div class="acts"><button class="btn red" data-a="verd" data-v="1" ${op.length < 2 ? 'disabled' : ''}>Дипфейк</button><button class="btn grn" data-a="verd" data-v="0" ${op.length < 2 ? 'disabled' : ''}>Настоящее</button>${op.length < 2 ? '<span class="note">сначала 2 проверки</span>' : ''}</div>`;
+    const v = S.verd[f.id];
+    if (v !== undefined) det += `<div class="res ${v === !!f.fake ? 'ok' : 'no'}">${v === !!f.fake ? (f.fake ? 'Верно: это подделка. Не отвечайте, не переводите деньги, не пересылайте — проверьте по знакомому каналу.' : 'Верно: признаков подделки нет, а новость подтверждают несколько официальных источников.') : 'Посмотрите ещё раз на красные улики — и на то, чего от вас хотят.'}</div>`;
+    det += '</div>';
+    h += `<div class="cols">${list}${det}</div>`;
+  } else {
+    let chat = bub('user', esc(BIAS.prompt)) + bub('bot', esc(BIAS.answer));
+    if (m.biasOK) chat += bub('user', 'Сделай героев разного пола, возраста и происхождения, без стереотипов о профессиях.') + bub('bot', esc(BIAS.fixed));
+    let qs = '<div class="box" data-part="bias"><div class="bh">Разбор ответа</div>';
+    BIAS.q.forEach((q, qi) => {
+      if (qi === 1 && S.bias[0] !== BIAS.q[0].ok) return;
+      const a = S.bias[qi];
+      qs += `<p style="margin:${qi ? '12px' : '0'} 0 7px;font-size:13.5px;font-weight:600">${qi + 1}. ${q.q}</p><div class="opts">${q.a.map((o, j) => `<button class="opt${a === j ? (j === q.ok ? ' ok' : ' no') : ''}" data-a="bias" data-q="${qi}" data-j="${j}">${esc(o)}</button>`).join('')}</div>`;
+      if (a >= 0 && a !== q.ok) qs += `<div class="res no">${qi === 0 ? 'Посмотрите, у кого какая профессия. Не напоминает ли это расхожие стереотипы?' : 'Длина ответа и отказ от ассистента не убирают перекос. Что нужно сказать в запросе явно?'}</div>`;
+    });
+    if (m.biasOK) qs += '<div class="res ok">Верно. Модель учится на текстах, где врачи и пилоты чаще мужчины, а медсестра — женщина, и усиливает этот перекос. В рассказе это мелочь, а в отборе резюме — уже несправедливость.</div>';
+    qs += '</div>';
+    h += `<div class="cols">${win('ИИ-ассистент', chat, 'biaschat')}${qs}</div>`;
+  }
+  return h;
+}
+
+function renderScreen() {
+  const id = LID(), m = model(), st = screen.scrollTop;
+  screen.innerHTML = id === 'prompt' ? screen1(m) : id === 'verify' ? screen2(m) : id === 'study' ? screen3(m) : screen4(m);
+  screen.scrollTop = st;
+  if (S.hl) {
+    const el = screen.querySelector(`[data-part="${S.hl}"]`);
+    if (el) { el.classList.add('flash'); el.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); }
+    S.hl = null;
+  }
+}
+
+// ---------- actions ----------
+function send1() {
+  const i = S.sc, sc = SCEN[i], r = scoreOf(i);
+  const bucket = r.score <= 1 ? 0 : r.score < 5 ? 1 : 2;
+  const vague = PARTS.map(p => S.pk[i][p.k] !== undefined ? sc.opts[p.k][S.pk[i][p.k]][0] : '');
+  S.thread.push({ who: 'user', html: promptText(i) });
+  S.thread.push({ who: 'bot', html: sc.ans[bucket], st: r.st, score: r.score, vague, scen: sc.name });
+  S.thread = S.thread.slice(-8); S.sent++;
+  if (r.score <= 1) S.pairs[i].v = true;
+  if (r.score === 5) S.pairs[i].f = true;
+  const p = S.pairs[i];
+  if (r.score === 5 && !p.v) toast('Отличный запрос! Для сравнения отправьте и расплывчатый: снимите все фразы.');
+  else if (r.score <= 1 && !p.f) toast('Видите, сколько ассистент додумал сам? Теперь соберите запрос из 5 конкретных частей.');
+  else if (r.score > 1 && r.score < 5) toast(`Запрос ${r.score} из 5: ответ лучше, но ещё не тот. Смотрите, чего не хватает.`);
+  else if (p.v && p.f && SCEN.filter((_, k) => S.pairs[k].v && S.pairs[k].f).length < 2) toast('Пара готова. Теперь возьмите другую задачу.');
+  update();
+  requestAnimationFrame(() => { const c = screen.querySelector('[data-part="chat"]'); if (c && screen.classList.contains('wide')) return; if (c) c.scrollIntoView({ block: 'end', behavior: 'smooth' }); });
+}
+function submit2() {
+  const c = S.c, card = CARDS[c], mk = S.mk[c];
+  const total = card.segs.filter(x => x.err).length, found = card.segs.filter((x, i) => x.err && mk[i]).length, fp = card.segs.filter((x, i) => !x.err && mk[i]).length;
+  const ok = found === total && fp === 0;
+  S.res[c] = { ok, found, total, fp, shown: true };
+  toast(ok ? 'Все ошибки найдены!' : `Найдено ${found} из ${total}${fp ? `, лишних: ${fp}` : ''}.`);
+  if (ok) { const nx = S.res.findIndex(r => !r || !r.ok); if (nx >= 0) setTimeout(() => { if (LID() === 'verify' && S.c === c) { S.c = nx; S.sel = -1; update(); } }, 1600); }
+  update();
+}
+function send4() {
+  const leaked = MSG.filter(x => x.risk && !S.red[x.id]), lost = MSG.filter(x => x.need && S.red[x.id]);
+  let reply, note, ok = false;
+  if (lost.length) {
+    reply = 'Я не совсем понял, с чем помочь. Опишите, пожалуйста, задачу: что случилось и что вы видите на экране?';
+    note = 'Вы скрыли то, что нужно для ответа: ' + lost.map(x => x.id === 'task' ? 'саму просьбу' : 'текст ошибки').join(' и ') + '. Скрывают только лишние личные данные.';
+  } else {
+    reply = 'Вот черновик: «Здравствуйте! С [дата] не могу войти на школьный портал: появляется «Ошибка 403 — доступ запрещён». Мой логин: [ваш логин]. Подскажите, пожалуйста, как восстановить доступ». Свои данные впишите сами. Пароль в письмо не пишите — поддержка его не спрашивает.';
+    if (leaked.length) note = 'Ответ полезный, но на сервер ушло: ' + leaked.map(x => x.why).join(', ') + '. Этого уже не вернуть' + (leaked.some(x => x.id === 'pass') ? ' — пароль надо срочно сменить' : '') + '. Нажмите «Новое сообщение» и попробуйте снова.';
+    else { ok = true; note = 'Ассистент помог, а лишних данных не получил: имя, адрес, телефон и пароль впишете сами, чужое фото осталось у вас.'; }
+  }
+  S.msgRes = { ok, reply, note };
+  toast(ok ? 'Сообщение отправлено без лишних данных.' : lost.length ? 'Ассистенту не хватило информации.' : 'Утечка данных!');
+  update();
+}
+
+screen.addEventListener('click', e => {
+  const b = e.target.closest('[data-a]'); if (!b || b.disabled) return;
+  const a = b.dataset.a, i = +b.dataset.i;
+  if (a === 'sc') { S.sc = i; update(); return; }
+  if (a === 'chip') { const k = b.dataset.k, j = +b.dataset.j; S.pk[S.sc][k] = S.pk[S.sc][k] === j ? undefined : j; update(); return; }
+  if (a === 'send') return send1();
+  if (a === 'card') { S.c = i; S.sel = -1; update(); return; }
+  if (a === 'seg') { S.sel = S.sel === i ? -1 : i; update(); return; }
+  if (a === 'check') { const u = S.ev[S.c][S.sel]; if (!u.includes(b.dataset.k)) { u.push(b.dataset.k); S.nChecks++; } update(); return; }
+  if (a === 'mark') { S.mk[S.c][S.sel] = !S.mk[S.c][S.sel]; if (S.res[S.c]) S.res[S.c].shown = false; update(); return; }
+  if (a === 'submit') return submit2();
+  if (a === 'unmark') { S.mk[S.c] = S.mk[S.c].map(() => false); S.res[S.c] = null; update(); return; }
+  if (a === 'req') { S.rq = i; update(); return; }
+  if (a === 'cls') { const r = REQS[S.rq]; S.cls[r.id] = b.dataset.v; const ok = b.dataset.v === (r.copy ? 'copy' : 'learn'); toast(ok ? 'Верно.' : 'Подумайте ещё: после такого ответа вы будете уметь больше?'); update(); return; }
+  if (a === 'plan') { S.plan.push(i); update(); if (S.plan.length === PLAN.length) toast(model().planOk ? 'План собран верно.' : 'Порядок не тот — красные шаги стоят не на месте.'); return; }
+  if (a === 'unplan') { S.plan.splice(i, 1); update(); return; }
+  if (a === 'p4') { S.p4 = ['msg', 'fake', 'bias'][i]; renderTools(); update(); screen.scrollTop = 0; return; }
+  if (a === 'red') { const id = b.dataset.id; S.red[id] = !S.red[id]; if (S.msgRes && !S.msgRes.ok) S.msgRes = null; update(); return; }
+  if (a === 'msgsend') return send4();
+  if (a === 'msgreset') { S.red = {}; S.msgRes = null; update(); return; }
+  if (a === 'fc') { S.fc = i; update(); return; }
+  if (a === 'fopen') { const f = FAKES[S.fc], op = S.fopen[f.id] || (S.fopen[f.id] = []); const j = +b.dataset.j; if (!op.includes(j)) op.push(j); update(); return; }
+  if (a === 'verd') {
+    const f = FAKES[S.fc], v = b.dataset.v === '1'; S.verd[f.id] = v; const ok = v === !!f.fake;
+    toast(ok ? 'Верно!' : 'Не совсем — посмотрите на улики.');
+    if (ok) { const nx = FAKES.findIndex(x => S.verd[x.id] === undefined || S.verd[x.id] !== !!x.fake); if (nx >= 0) setTimeout(() => { if (LID() === 'privacy' && S.p4 === 'fake' && S.fc === FAKES.indexOf(f)) { S.fc = nx; update(); } }, 1400); }
+    update(); return;
+  }
+  if (a === 'bias') { const q = +b.dataset.q, j = +b.dataset.j; S.bias[q] = j; if (q === 0 && j !== BIAS.q[0].ok) S.bias[1] = -1; update(); return; }
+});
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  if (id === 'prompt') tb.innerHTML = B('send', 'Отправить') + B('vague', 'Снять все фразы') + sep + B('nextsc', 'Другая задача') + B('clear', 'Очистить чат');
+  if (id === 'verify') tb.innerHTML = B('submit', 'Сдать ответ') + sep + CHECKS.map(k => B('t-' + k.k, k.name)).join('') + sep + B('nextcard', 'Следующий ответ');
+  if (id === 'study') tb.innerHTML = B('learn', 'Помогает учиться') + B('copy', 'Делает за меня') + sep + B('nextreq', 'Следующий запрос') + B('planreset', 'Сбросить план');
+  if (id === 'privacy') tb.innerHTML = B('p-msg', 'Сообщение', S.p4 === 'msg') + B('p-fake', 'Дипфейки', S.p4 === 'fake') + B('p-bias', 'Предвзятость', S.p4 === 'bias') + sep + B('reset4', 'Начать заново');
+}
+function act(a) {
+  if (a === 'send') return send1();
+  if (a === 'vague') { S.pk[S.sc] = {}; update(); return; }
+  if (a === 'nextsc') { S.sc = (S.sc + 1) % SCEN.length; update(); return; }
+  if (a === 'clear') { S.thread = []; update(); return; }
+  if (a === 'submit') return submit2();
+  if (a.startsWith('t-')) {
+    if (S.sel < 0) { toast('Сначала нажмите на фразу в ответе.'); return; }
+    const u = S.ev[S.c][S.sel], k = a.slice(2); if (!u.includes(k)) { u.push(k); S.nChecks++; } update(); return;
+  }
+  if (a === 'nextcard') { S.c = (S.c + 1) % CARDS.length; S.sel = -1; update(); return; }
+  if (a === 'learn' || a === 'copy') {
+    if (S.rq === null) { toast('Сначала выберите запрос.'); return; }
+    const r = REQS[S.rq]; S.cls[r.id] = a; toast(a === (r.copy ? 'copy' : 'learn') ? 'Верно.' : 'Подумайте ещё: после такого ответа вы будете уметь больше?'); update(); return;
+  }
+  if (a === 'nextreq') { const nx = REQS.findIndex((r, i) => i > (S.rq === null ? -1 : S.rq) && !S.cls[r.id]); S.rq = nx >= 0 ? nx : ((S.rq === null ? -1 : S.rq) + 1) % REQS.length; update(); return; }
+  if (a === 'planreset') { S.plan = []; update(); return; }
+  if (a.startsWith('p-')) { S.p4 = a.slice(2); renderTools(); update(); screen.scrollTop = 0; return; }
+  if (a === 'reset4') { S.red = {}; S.msgRes = null; S.fopen = {}; S.verd = {}; S.bias = [-1, -1]; S.fc = 0; update(); return; }
+  if (a === 'restart') { const id = LID(); resetState(); if (id === 'privacy') renderTools(); update(); return; }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.dataset.a) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  builder: IC('<rect x="4" y="5" width="26" height="6" rx="2" fill="none" stroke="var(--arm)" stroke-width="1.5"/><rect x="4" y="14" width="18" height="6" rx="2" fill="none" stroke="var(--muted)" stroke-dasharray="2 2"/><rect x="4" y="23" width="22" height="6" rx="2" fill="none" stroke="var(--arm)" stroke-width="1.5"/>'),
+  composer: IC('<rect x="3" y="10" width="28" height="14" rx="5" fill="var(--surface-2)" stroke="var(--line)"/><path d="M7 17h12" stroke="var(--fg)" stroke-width="1.5"/><rect x="22" y="13" width="7" height="8" rx="2" fill="var(--force)"/>'),
+  chat: IC('<rect x="10" y="5" width="21" height="9" rx="4" fill="#2a3a5c"/><rect x="3" y="17" width="22" height="12" rx="4" fill="var(--surface-2)" stroke="var(--muted)"/><path d="M7 22h14M7 25h9" stroke="var(--fg)" stroke-width="1.2"/>'),
+  rubric: IC('<rect x="3" y="12" width="8" height="10" rx="2" fill="none" stroke="var(--ok)"/><rect x="13" y="12" width="8" height="10" rx="2" fill="none" stroke="var(--force)"/><rect x="23" y="12" width="8" height="10" rx="2" fill="none" stroke="var(--warn)"/>'),
+  cards: IC('<rect x="3" y="11" width="28" height="12" rx="4" fill="var(--bg)" stroke="var(--line)"/><rect x="5" y="13" width="9" height="8" rx="2" fill="var(--surface-2)"/>'),
+  answer: IC('<rect x="3" y="6" width="28" height="22" rx="5" fill="var(--surface-2)" stroke="var(--muted)"/><path d="M7 12h20M7 17h9" stroke="var(--fg)" stroke-width="1.4"/><path d="M17 17h10" stroke="var(--warn)" stroke-width="2.6"/><path d="M7 22h16" stroke="var(--fg)" stroke-width="1.4"/>'),
+  checks: IC('<path d="M6 9l3 3 5-6M6 19l3 3 5-6" fill="none" stroke="var(--ok)" stroke-width="1.8"/><path d="M18 9h11M18 19h11M6 28h23" stroke="var(--muted)" stroke-width="1.6"/>'),
+  submit: IC('<rect x="5" y="11" width="24" height="12" rx="4" fill="var(--fg)"/><path d="M12 17l3 3 7-7" fill="none" stroke="var(--bg)" stroke-width="2"/>'),
+  reqs: IC('<rect x="4" y="5" width="26" height="6" rx="2" fill="var(--bg)" stroke="var(--line)"/><rect x="4" y="14" width="26" height="6" rx="2" fill="var(--bg)" stroke="var(--arm)"/><rect x="4" y="23" width="26" height="6" rx="2" fill="var(--bg)" stroke="var(--line)"/><rect x="23" y="15.5" width="5" height="3" fill="var(--ok)"/>'),
+  preview: IC('<rect x="3" y="7" width="28" height="20" rx="5" fill="var(--surface-2)" stroke="var(--muted)"/><path d="M8 14h18M8 19h12" stroke="var(--fg)" stroke-width="1.4"/>'),
+  plan: IC('<circle cx="7" cy="8" r="3" fill="var(--ok)"/><circle cx="7" cy="17" r="3" fill="var(--ok)"/><circle cx="7" cy="26" r="3" fill="none" stroke="var(--muted)"/><path d="M13 8h17M13 17h14M13 26h16" stroke="var(--fg)" stroke-width="1.5"/>'),
+  msg: IC('<rect x="3" y="7" width="28" height="20" rx="5" fill="var(--surface-2)" stroke="var(--muted)"/><path d="M8 14h6" stroke="var(--fg)" stroke-width="1.6"/><rect x="16" y="11.5" width="11" height="5" rx="1.5" fill="#3a4762"/><path d="M8 21h18" stroke="var(--fg)" stroke-width="1.6"/>'),
+  fakes: IC('<rect x="4" y="5" width="26" height="20" rx="3" fill="var(--bg)" stroke="var(--line)"/><circle cx="17" cy="13" r="5" fill="#d9a77f"/><path d="M9 25q2-6 8-6t8 6" fill="#7b5ea7"/><path d="M4 30h26" stroke="var(--warn)" stroke-width="2" stroke-dasharray="3 2"/>'),
+  bias: IC('<path d="M17 4v24M8 28h18" stroke="var(--fg)" stroke-width="1.6"/><path d="M5 10h24" stroke="var(--fg)" stroke-width="1.6" transform="rotate(-8 17 10)"/><path d="M5 12l-3 8h7z" fill="var(--force)"/><path d="M29 8l-3 8h7z" fill="var(--muted)"/>'),
+};
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function partsList() {
+  const id = LID();
+  if (id === 'prompt') return [
+    { id: 'builder', name: 'Конструктор запроса', spec: 'Пять строк — пять частей хорошего запроса. В каждой одна фраза конкретная, другая расплывчатая. Какая есть какая — решаете вы.' },
+    { id: 'composer', name: 'Строка ввода', spec: 'Здесь собирается текст запроса, который «увидит» ассистент. Больше он ничего о вас не знает.' },
+    { id: 'chat', name: 'Окно ассистента', spec: 'Показывает последние два обмена: удобно сравнивать ответы. Ответы заранее подготовлены — настоящий ИИ здесь не вызывается.' },
+    { id: 'rubric', name: 'Разбор запроса', spec: '✓ — часть есть и конкретна, ~ — есть, но расплывчата, ✗ — части нет. Ниже — что из-за этого пошло не так.' }];
+  if (id === 'verify') return [
+    { id: 'cards', name: 'Четыре ответа', spec: 'История, медицина, код и право. В каждом есть ошибки — от выдуманного источника до бага в коде.' },
+    { id: 'answer', name: 'Ответ ассистента', spec: 'Каждая фраза — отдельная кнопка. Нажмите, чтобы проверить; отмеченные как ошибка подсвечены красным.' },
+    { id: 'checks', name: 'Чек-лист проверки', spec: 'Источник, оценка, сверка, тест кода. Каждая проверка ловит свой тип ошибок.' },
+    { id: 'submit', name: 'Сдать ответ', spec: 'Сравнивает вашу разметку с правильной: зелёные — найденные ошибки, оранжевые — лишние отметки.' }];
+  if (id === 'study') return [
+    { id: 'reqs', name: 'Запросы', spec: '8 вещей, которые ученики просят у ассистента. Метка показывает ваш выбор; зачёркнута — если выбор неверный.' },
+    { id: 'preview', name: 'Ответ ассистента', spec: 'Что примерно ответит ассистент на такой запрос. Сравните: где вы учитесь, а где получаете готовое.' },
+    { id: 'plan', name: 'План проекта', spec: 'Пять шагов исследования «Сколько воды тратит семья». Порядок важен: без вопроса непонятно, какие данные собирать.' }];
+  return [
+    { id: 'msg', name: 'Черновик сообщения', spec: 'Текст, который ученица хочет отправить ассистенту. Скрывайте то, что отправлять нельзя, но оставьте то, без чего не помочь.' },
+    { id: 'fakes', name: 'Подозрительные материалы', spec: 'Видеозвонок, голосовое, видео и фото. Часть из них — дипфейки.' },
+    { id: 'bias', name: 'Разбор предвзятости', spec: 'Ответ ассистента о героях рассказа и два вопроса: что не так и как исправить.' }];
+}
+function partTab(id) { return { msg: 'msg', fakes: 'fake', bias: 'bias' }[id]; }
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      (Ls.safe ? `<div class="safe"><b>Безопасность</b>${Ls.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на экране</h2><p class="note">Нажмите на деталь, чтобы найти её на экране.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${ICON[p.id]}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => {
+      const id = b.dataset.id;
+      if (LID() === 'privacy' && partTab(id) && S.p4 !== partTab(id)) { S.p4 = partTab(id); renderTools(); }
+      S.hl = id; renderScreen();
+    });
+  }
+  if (S.tab === 'scheme') $('#pane-scheme').innerHTML = schemeHTML(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+  $('#pane-scheme').querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+
+function schemeHTML(m) {
+  const id = LID();
+  const btns = (...xs) => `<div class="row">${xs.map(([a, t]) => `<button class="ghostbtn" data-a="${a}">${t}</button>`).join('')}</div>`;
+  if (id === 'prompt') return `<h2>Шаблон хорошего запроса</h2><div class="tpl"><b>Цель:</b> что нужно и зачем.<br><b>Контекст:</b> кто я, что уже знаю, какие данные есть.<br><b>Формат:</b> таблица / код / письмо / список из N пунктов.<br><b>Ограничения:</b> объём, стиль, чего не делать.<br><b>Пример:</b> образец ответа или мой черновик.</div>
+    <dl class="reads"><div><dt>в конструкторе</dt><dd>${m.cur.score}/5</dd></div><div><dt>последний</dt><dd>${m.last ? m.last.score + '/5' : '—'}</dd></div><div><dt>пар готово</dt><dd>${m.pairs}/2</dd></div></dl>
+    <h3>Как работать с ответом</h3><ul class="list"><li>Не подошло — уточните в том же диалоге: «короче», «для 8 класса», «таблицей».</li><li>Попросите задать вам уточняющие вопросы, если сами не знаете, что важно.</li><li>Попросите показать ход рассуждения или источники — и проверьте их (урок 2).</li></ul>` +
+    btns(['send', 'Отправить'], ['vague', 'Снять все фразы'], ['nextsc', 'Другая задача'], ['clear', 'Очистить чат']);
+  if (id === 'verify') return `<h2>Чек-лист проверки ответа</h2><div class="steps">${step('Источник', 'книга, статья, закон существуют?')}${step('Оценка', 'порядок числа сходится?')}${step('Сверка', 'энциклопедия, учебник, офиц. сайт')}${step('Тест', 'код на «неудобных» примерах')}</div>
+    <dl class="reads"><div><dt>ответов</dt><dd>${m.solved}/${CARDS.length}</dd></div><div><dt>ошибок</dt><dd>${m.found}/${ERR_TOTAL}</dd></div><div><dt>проверок</dt><dd>${m.nChecks}</dd></div></dl>
+    <h3>Типы галлюцинаций</h3><ul class="list"><li><b>Выдуманный источник</b> — книга, статья или закон, которых нет.</li><li><b>Неверный факт</b> — правдоподобная деталь, которой не было.</li><li><b>Ошибка в числе</b> — потерянный ноль, неверный расчёт.</li><li><b>Код «почти работает»</b> — верно на простых примерах, ломается на краевых.</li></ul>` +
+    btns(['submit', 'Сдать ответ'], ['nextcard', 'Следующий ответ']);
+  if (id === 'study') return `<h2>Учиться с ИИ, а не вместо себя</h2><div class="steps">${step('Объясни', 'на моём примере, проще')}${step('Спроси меня', 'вопросы для самопроверки')}${step('Укажи ошибку', 'не переписывай за меня')}${step('Помоги спланировать', 'шаги и сроки')}</div>
+    <dl class="reads"><div><dt>верно</dt><dd>${m.correct}/${REQS.length}</dd></div><div><dt>разобрано</dt><dd>${m.sorted}/${REQS.length}</dd></div><div><dt>план</dt><dd>${m.planOk ? 'готов' : m.planLen + '/5'}</dd></div></dl>
+    <h3>Академическая честность</h3><ul class="list"><li>Узнайте правила школы или вуза об ИИ заранее.</li><li>Указывайте, где и как помогал ИИ: «план обсуждал с ассистентом, текст писал сам».</li><li>Цитаты — в кавычках и с источником; пересказ чужой работы без ссылки — плагиат.</li></ul>` +
+    btns(['nextreq', 'Следующий запрос'], ['planreset', 'Сбросить план']);
+  return `<h2>Три правила безопасности</h2><div class="steps">${step('Данные', 'не отправлять пароли, коды, адрес, чужое')}${step('Дипфейки', 'срочность + деньги = перезвонить')}${step('Предвзятость', 'замечать перекос, просить разнообразия')}</div>
+    <dl class="reads"><div><dt>сообщение</dt><dd>${m.msgOK ? '✓' : '—'}</dd></div><div><dt>дипфейки</dt><dd>${m.fakes}/${FAKES.length}</dd></div><div><dt>bias</dt><dd>${m.biasOK ? '✓' : '—'}</dd></div></dl>
+    <h3>Никогда не отправляйте ассистенту</h3><ul class="list"><li>Пароли, коды из СМС, ключи доступа.</li><li>Номера документов, банковских карт, счетов.</li><li>Адрес, телефон, точные данные о здоровье — свои и чужие.</li><li>Чужие фото и переписку без согласия.</li></ul>` +
+    btns(['p-msg', 'Сообщение'], ['p-fake', 'Дипфейки'], ['p-bias', 'Предвзятость'], ['reset4', 'Начать заново']);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'prompt') {
+    const sc = SCEN[S.sc], r = m.cur;
+    let h = `<h2>Оценка запроса</h2><div class="formula">качество = число конкретных частей</div><p class="note">Каждая часть даёт 1 балл, только если сформулирована конкретно. Расплывчатая фраза («покороче», «красиво») — 0: ассистенту по-прежнему приходится угадывать.</p><h3>Задача «${sc.name}» сейчас</h3><div class="steps">`;
+    PARTS.forEach((p, i) => { const j = S.pk[S.sc][p.k]; h += step(p.name, j === undefined ? 'нет → 0' : `«${esc(sc.opts[p.k][j][0].slice(0, 34))}${sc.opts[p.k][j][0].length > 34 ? '…' : ''}» → ${r.st[i] === 'y' ? 1 : 0}`, r.st[i] === 'y' ? 'okk' : j === undefined ? '' : 'bad'); });
+    h += step('итого', `${r.score} из 5`, 'sum') + `</div><h3>Какой ответ получится</h3><div class="steps">${step('0–1 балл', 'ассистент угадывает почти всё')}${step('2–4 балла', 'ближе, но придётся уточнять')}${step('5 баллов', 'ответ можно сразу использовать')}</div>
+      <h3>Сколько времени экономит точный запрос</h3><p class="note">Если каждое уточнение — это минута на чтение ответа и минута на новый запрос, то расплывчатый запрос с 3–4 уточнениями стоит 6–8 минут, а точный — 2. За день из 20 задач это разница около двух часов.</p><div class="steps">${step('расплывчато', '20 × 7 мин = 140 мин')}${step('точно', '20 × 2 мин = 40 мин')}${step('экономия', '≈ 100 мин в день', 'sum')}</div>`;
+    return h;
+  }
+  if (id === 'verify') {
+    let h = `<h2>Оценка в уме</h2><p class="note">Ассистент утверждает, что сердце за сутки бьётся 10 000 раз. Проверим порядок величины: берём средний пульс и считаем.</p><div class="formula">ударов в сутки = пульс × 60 × 24</div><div class="steps">${step('пульс', '≈ 70 уд/мин')}${step('в час', '70 × 60 = 4 200')}${step('в сутки', `4 200 × 24 = ${big(100800)}`)}${step('у ассистента', '10 000 — в 10 раз меньше', 'bad')}</div>
+      <p class="note" style="margin-top:8px">Оценка ловит потерянные нули и неверные расчёты, но не ловит правдоподобные выдумки — для них нужна сверка с источником.</p><h3>Ваша разметка</h3><div class="steps">`;
+    CARDS.forEach((c, i) => { const r = S.res[i]; h += step(c.name, r ? `найдено ${r.found}/${r.total}${r.fp ? `, лишних ${r.fp}` : ''}${r.ok ? ' ✓' : ''}` : `отмечено ${S.mk[i].filter(Boolean).length}, не сдано`, r && r.ok ? 'okk' : ''); });
+    h += step('всего ошибок в ответах', `${m.found} из ${ERR_TOTAL} найдено`, 'sum') + `</div><p class="note" style="margin-top:8px">Проверок использовано: ${m.nChecks}. В реальной работе проверка занимает время — поэтому важные ответы проверяют всегда, а не «когда кажется подозрительным».</p>`;
+    return h;
+  }
+  if (id === 'study') {
+    const xs = [90, 100, 110, 120, 600], sum = xs.reduce((a, b) => a + b, 0);
+    return `<h2>Среднее и медиана</h2><p class="note">Так ассистент-репетитор объясняет тему на вашем примере: расход воды пяти семей в день, литры.</p><div class="formula">среднее = сумма / количество</div><div class="steps">${step('сумма', xs.join(' + ') + ' = ' + sum)}${step('среднее', `${sum} / 5 = ${sum / 5} л`)}${step('медиана', 'середина ряда 90, 100, <b>110</b>, 120, 600 = 110 л', 'sum')}</div>
+      <p class="note" style="margin-top:8px">Одна семья с протекающим краном «тянет» среднее вверх почти в 2 раза, а медиана почти не меняется. Поэтому для «типичной» семьи лучше медиана.</p>
+      <h3>План на 2 недели</h3><div class="steps">${step('1. Вопрос исследования', '1 день')}${step('2. Сбор данных', '7 дней')}${step('3. Расчёты', '2 дня')}${step('4. Выводы', '2 дня')}${step('5. Отчёт', '2 дня')}${step('итого', '1 + 7 + 2 + 2 + 2 = 14 дней', 'sum')}</div>`;
+  }
+  const leaked = MSG.filter(x => x.risk && !S.red[x.id]);
+  let h = `<h2>Что уйдёт на сервер</h2><p class="note">Всё, что не скрыто, окажется на сервере компании. Чем меньше личных данных, тем меньше риск утечки.</p><div class="steps">`;
+  MSG.filter(x => x.risk || x.need).forEach(x => h += step(x.risk ? x.why : x.id === 'task' ? 'суть просьбы' : 'текст ошибки', x.risk ? (S.red[x.id] ? 'скрыто ✓' : 'уйдёт ✗') : (S.red[x.id] ? 'скрыто — ассистенту не хватит' : 'нужно, отправляем ✓'), x.risk ? (S.red[x.id] ? 'okk' : 'bad') : (S.red[x.id] ? 'bad' : 'okk')));
+  h += step('лишних данных уйдёт', String(leaked.length), 'sum') + `</div><h3>Улики в материалах</h3><div class="steps">`;
+  FAKES.forEach(f => { const op = S.fopen[f.id] || [], red = op.filter(j => f.checks[j][2]).length; h += step(f.kind, `открыто ${op.length}/4, тревожных ${red}`); });
+  h += `</div><p class="note" style="margin-top:8px">Одна тревожная улика — повод проверить внимательнее, несколько — почти наверняка подделка. Нет улик и есть подтверждение из официальных источников — скорее всего, правда.</p>`;
+  return h;
+}
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  if (id === 'prompt') return `Готовых пар «расплывчато → точно»: ${m.pairs} из 2`;
+  if (id === 'verify') return `Ответов разобрано без ошибок: ${m.solved} из ${CARDS.length}`;
+  if (id === 'study') return `Запросы: верно ${m.correct} из ${REQS.length} · план: ${m.planOk ? 'готов ✓' : `${m.planLen} из 5`}`;
+  return `Сообщение ${m.msgOK ? '✓' : '—'} · дипфейки ${m.fakes}/${FAKES.length} · предвзятость ${m.biasOK ? '✓' : '—'}`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'prompt') { const s = m.last ? m.last.score : 0; el.innerHTML = `<div class="k">Последний запрос</div><div class="v ${m.last && s === 5 ? 'ok' : ''}">${m.last ? s : '—'} / 5</div><div class="gauge"><b style="width:${s * 20}%"></b></div><div class="lr"><span>пар готово</span><span>${m.pairs} из 2</span></div>`; }
+  if (id === 'verify') el.innerHTML = `<div class="k">Ответов разобрано</div><div class="v ${m.solved === CARDS.length ? 'ok' : ''}">${m.solved} из ${CARDS.length}</div><div class="gauge"><b style="width:${m.solved / CARDS.length * 100}%"></b></div><div class="lr"><span>ошибок найдено</span><span>${m.found}/${ERR_TOTAL}</span></div>`;
+  if (id === 'study') el.innerHTML = `<div class="k">Запросы разобраны</div><div class="v ${m.correct === REQS.length ? 'ok' : ''}">${m.correct} из ${REQS.length} верно</div><div class="gauge"><b style="width:${m.correct / REQS.length * 100}%"></b></div><div class="lr"><span>план</span><span>${m.planOk ? 'готов ✓' : m.planLen + ' из 5'}</span></div>`;
+  if (id === 'privacy') el.innerHTML = `<div class="k">Частей задания</div><div class="v ${m.parts === 3 ? 'ok' : ''}">${m.parts} из 3</div><div class="gauge"><b style="width:${m.parts / 3 * 100}%"></b></div><div class="lr"><span>дипфейки</span><span>${m.fakes}/${FAKES.length}</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Вы умеете работать с ИИ-ассистентом осознанно!'), 900);
+    if (window.LuchShell && window.LuchShell.prefetchQuiz) try { window.LuchShell.prefetchQuiz(); } catch (e) {}
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderScreen();
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+}
+
+// ---------- layout: keep the screen clear of the task card ----------
+const stage = $('#stage');
+function fit() {
+  const tb = $('#taskBox'), mt = $('#meter'), tl = $('#tools'), hint = $('#hint');
+  if (getComputedStyle(screen).position === 'static') {    // phone: everything stacks
+    mt.style.cssText = ''; screen.style.cssText = '';
+    screen.classList.toggle('wide', false);
+    return;
+  }
+  const r = stage.getBoundingClientRect(); if (!r.width || !r.height) return;
+  const tr = tb.getBoundingClientRect(), bottom = Math.round(r.bottom - tl.getBoundingClientRect().top + 8);
+  const sideW = r.right - tr.right - 12 - 14;
+  if (sideW >= 460) {
+    // wide stage: task + meter + hint form a left column, the screen takes the rest
+    mt.style.cssText = `top:${Math.round(tr.bottom - r.top + 8)}px;left:14px;right:auto;width:${Math.round(tr.width)}px`;
+    const mr = mt.getBoundingClientRect();
+    hint.style.cssText = `top:${Math.round(mr.bottom - r.top + 12)}px;left:16px;width:${Math.round(tr.width) - 4}px;display:block`;
+    screen.style.cssText = `left:${Math.round(tr.right - r.left + 12)}px;top:14px;right:14px;bottom:${bottom}px`;
+  } else {
+    // narrow stage: task top-left, meter top-right, the screen below both
+    mt.style.cssText = '';
+    hint.style.cssText = 'display:none';
+    const mr = mt.getBoundingClientRect();
+    const top = Math.round(Math.max(tr.bottom, mr.bottom) - r.top + 8);
+    screen.style.cssText = `left:14px;top:${top}px;right:14px;bottom:${bottom}px`;
+  }
+  screen.classList.toggle('wide', screen.clientWidth >= 640);
+}
+const ro = new ResizeObserver(() => fit());
+[stage, $('#taskBox'), $('#tools')].forEach(x => ro.observe(x));
+
+// ---------- lesson strip ----------
+const MINI = {
+  prompt: '<rect x="5" y="6" width="34" height="5" rx="2" fill="none" stroke="#72d4e8"/><rect x="5" y="13" width="26" height="5" rx="2" fill="none" stroke="#56627d" stroke-dasharray="2 2"/><rect x="5" y="20" width="30" height="5" rx="2" fill="none" stroke="#72d4e8"/><rect x="44" y="11" width="17" height="9" rx="3" fill="#ffb547"/>',
+  verify: '<rect x="5" y="5" width="56" height="20" rx="4" fill="#1a2438"/><path d="M10 11h18" stroke="#e8ecf4" stroke-width="1.4"/><path d="M31 11h24" stroke="#ff8a73" stroke-width="3"/><path d="M10 18h34" stroke="#e8ecf4" stroke-width="1.4"/><path d="M48 16l3 3 6-6" fill="none" stroke="#86e0a8" stroke-width="1.6"/>',
+  study: '<circle cx="11" cy="8" r="3" fill="#86e0a8"/><circle cx="11" cy="15" r="3" fill="#86e0a8"/><circle cx="11" cy="22" r="3" fill="none" stroke="#8b96ad"/><path d="M18 8h22M18 15h16M18 22h20" stroke="#e8ecf4" stroke-width="1.4"/><path d="M46 22l6-14 6 14" fill="none" stroke="#ffb547" stroke-width="1.6"/>',
+  privacy: '<rect x="6" y="6" width="30" height="18" rx="4" fill="#1a2438"/><path d="M10 12h8" stroke="#e8ecf4" stroke-width="1.4"/><rect x="20" y="10" width="12" height="4" rx="1" fill="#3a4762"/><path d="M10 19h20" stroke="#e8ecf4" stroke-width="1.4"/><rect x="44" y="13" width="14" height="11" rx="2" fill="#ffb547"/><path d="M47 13v-3a4 4 0 0 1 8 0v3" fill="none" stroke="#ffb547" stroke-width="1.8"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Ls, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Ls.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Ls.title}</span></span>
+      ${S.done[Ls.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.hl = null;
+  resetState();
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  screen.scrollTop = 0;
+  renderTools(); renderStrip(); update();
+  requestAnimationFrame(fit);
+  const cur = $('#lessons .lesson[aria-current="true"]'), ls = $('#lessons');
+  if (cur) { const dx = cur.getBoundingClientRect().left - ls.getBoundingClientRect().left; if (dx < 0 || dx + cur.offsetWidth > ls.clientWidth) ls.scrollLeft += dx - 8; }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'prompt') {
+    const sc = SCEN[S.sc];
+    now = `Конструктор запроса (симуляция, ответы ассистента заранее подготовлены). Задача «${sc.name}», базовый запрос «${sc.base}». Сейчас выбрано: ${PARTS.map((p, i) => `${p.name} — ${S.pk[S.sc][p.k] === undefined ? 'нет' : `«${sc.opts[p.k][S.pk[S.sc][p.k]][0]}» (${m.cur.st[i] === 'y' ? 'конкретно' : 'расплывчато'})`}`).join('; ')}. Оценка ${m.cur.score}/5. Отправлено запросов: ${S.sent}${m.last ? `, последний ${m.last.score}/5` : ''}. Пары «расплывчато → точно» готовы для задач: ${SCEN.filter((_, k) => S.pairs[k].v && S.pairs[k].f).map(x => x.name).join(', ') || 'ни одной'}. Не называй, какая фраза конкретная, — спрашивай: «отвечает ли эта фраза на вопрос "сколько?" или "для кого?"».`;
+  }
+  if (id === 'verify') {
+    const c = CARDS[S.c];
+    now = `Разметка ошибок в ответах ассистента (симуляция). Открыт ответ «${c.name}»: вопрос «${c.q}». Фразы: ${c.segs.map((s, i) => `${i + 1}) «${s.t.trim()}»${S.mk[S.c][i] ? ' [отмечена как ошибка]' : ''}`).join(' ')}. ${S.sel >= 0 ? `Выбрана фраза ${S.sel + 1}, проверки: ${S.ev[S.c][S.sel].map(k => CHECKS.find(x => x.k === k).name).join(', ') || 'нет'}.` : ''} Разобрано без ошибок: ${m.solved} из ${CARDS.length}. Не говори прямо, какие фразы ошибочны, — подсказывай, какую проверку из чек-листа (источник, оценка, сверка, тест кода) применить.`;
+  }
+  if (id === 'study') now = `8 запросов к ассистенту нужно разделить на «помогает учиться» и «делает за меня». Ответы ученика: ${REQS.map((r, i) => `${i + 1}) «${r.t}» — ${S.cls[r.id] ? (S.cls[r.id] === 'learn' ? 'учит' : 'за меня') : 'не разобран'}`).join('; ')}. Верно ${m.correct} из ${REQS.length}. План проекта «Вода дома»: ${S.plan.map((p, i) => `${i + 1}. ${PLAN[p]}`).join('; ') || 'пусто'}${m.planOk ? ' (верно)' : ''}. Не давай готовых ответов — спрашивай, что ученик будет уметь после такого ответа ассистента.`;
+  if (id === 'privacy') now = `Три части. 1) Сообщение ассистенту: ${MSG.map(x => `«${x.t}»${S.red[x.id] ? ' [скрыто]' : ''}`).join(' ')}; ${S.msgRes ? (S.msgRes.ok ? 'отправлено без лишних данных' : 'отправлено с ошибкой: ' + S.msgRes.note) : 'не отправлено'}. 2) Дипфейки: ${FAKES.map(f => `${f.kind} «${f.title}» — ${S.verd[f.id] === undefined ? 'нет решения' : S.verd[f.id] ? 'ученик: дипфейк' : 'ученик: настоящее'}`).join('; ')}. 3) Предвзятость: ответ «${BIAS.answer}»; ${m.biasOK ? 'разобрано' : 'не разобрано'}. Сейчас открыта часть «${{ msg: 'Сообщение', fake: 'Дипфейки', bias: 'Предвзятость' }[S.p4]}».`;
+  return [
+    `Раздел: информатика, 8–11 класс, тема «Работа с ИИ-ассистентами». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}». Все ответы ассистента на экране — заранее подготовленные примеры, настоящий ИИ не вызывается.`,
+    `Объяснение урока: ${Ls.text.join(' ').replace(/<[^>]+>/g, '')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { prompt: 'Чем конкретная формулировка лучше расплывчатой?', verify: 'Почему ИИ уверенно выдумывает факты?', study: 'Можно ли использовать ИИ для домашнего задания честно?', privacy: 'Как распознать дипфейк-звонок?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Как ИИ-ассистенты используют в профессиях?'];
+};
+
+resetState();
+setLesson(S.lesson);
+fit();
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

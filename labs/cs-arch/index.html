@@ -1,0 +1,1156 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по информатике, 10 класс: логические элементы и сумматор, цикл команды процессора, иерархия памяти, операционная система и параллельные вычисления.">
+<title>Как устроен компьютер изнутри</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag],.scene [data-hit]{cursor:pointer}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+.scene .sans{font-family:var(--font-body)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none;z-index:3}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none;z-index:3}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.big{font:600 15px/1 var(--font-mono);color:var(--fg);min-width:34px}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:22%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chips button:disabled{opacity:.35;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.mtab{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:8px}
+.mtab span{background:var(--surface-2);border-radius:7px;padding:6px 7px;font:500 12.5px/1.2 var(--font-mono);display:flex;justify-content:space-between;gap:4px;min-width:0}
+.mtab span b{font-weight:600;color:var(--fg)}
+.mtab span i{font-style:normal;color:var(--force);letter-spacing:.06em}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:470px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mtab{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(100vw + 180px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<script src="/luch/splash.js"></script>
+<div class="app">
+  <header>
+    <div class="brand" role="link" tabindex="0" title="Карта предметов" style="cursor:pointer" onclick="location.href='/#cs'" onkeydown="if(event.key==='Enter')location.href='/#cs'">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9.6 14.6 9.2 6.2 15 10.6Q20 9.4 25 10.6L30.8 6.2 30.4 14.6Q34.6 22 31.6 29Q27.6 36 20 36Q12.4 36 8.4 29Q5.4 22 9.6 14.6Z" fill="#ffb547"/><path d="M20 14Q15.2 10.8 10.9 13.4Q7.6 17.2 9.4 21.8Q11.6 25.8 15.9 25.4Q18.5 25.1 20 27.1Q21.5 25.1 24.1 25.4Q28.4 25.8 30.6 21.8Q32.4 17.2 29.1 13.4Q24.8 10.8 20 14Z" fill="#ffd896"/><circle cx="15" cy="18.8" r="5" fill="#fffaf0"/><circle cx="25" cy="18.8" r="5" fill="#fffaf0"/><circle cx="15.6" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="24.4" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="16.6" cy="18.1" r="1" fill="#fff"/><circle cx="25.4" cy="18.1" r="1" fill="#fff"/><path d="M18.6 23.4h2.8L20 26.6z" fill="#ff8a73"/><path d="M10.5 29.6Q15.3 27.4 20 29.7Q24.7 27.4 29.5 29.6V34.6Q24.7 32.6 20 34.8Q15.3 32.6 10.5 34.6Z" fill="#72d4e8"/><path d="M20 29.7V34.8" stroke="#0b1019" stroke-width="1.1"/><path d="M8.2 23.5Q5.6 28.6 9.4 32.6Q11.6 33.2 12.4 31Q10.4 28.4 8.2 23.5Z" fill="#e8962a"/><path d="M31.8 23.5Q34.4 28.6 30.6 32.6Q28.4 33.2 27.6 31Q29.6 28.4 31.8 23.5Z" fill="#e8962a"/><path d="M35 3.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="#86e0a8"/></svg>
+      <div><h1>OPEN SCHOOL AI</h1><small>Доступное образование для всех</small></div>
+    </div>
+    <div class="headr">
+      <div class="prog" aria-label="Прогресс"><b>Компьютер</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочий стол лаборатории">
+    <svg class="scene" id="scene" role="img" aria-label="Интерактивная сцена: переключатели, кнопки, ячейки памяти и карточки данных можно нажимать, карточки — перетаскивать."></svg>
+    <div class="task" id="taskCard" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+const nf = (v, d = 2) => v.toLocaleString('ru-RU', { maximumFractionDigits: d });
+const INK = '#04070d';
+const ON = '#ffb547', OFF = '#3a4762';
+const SUB = ['₀', '₁', '₂', '₃', '₄'];
+
+const LESSONS = [
+  { id: 'adder', title: 'Логические элементы и сумматор',
+    text: ['Внутри компьютера всего два состояния: есть напряжение — 1, нет — 0. Логические элементы (вентили) — крошечные схемы из транзисторов. Вентиль И (&) выдаёт 1, только если на обоих входах 1. ИЛИ (1) — если хотя бы на одном входе 1. НЕ переворачивает сигнал. Исключающее ИЛИ (=1, XOR) выдаёт 1, когда входы разные.',
+           'Сложим два бита: 0 + 0 = 0, 0 + 1 = 1, 1 + 0 = 1, а 1 + 1 = 10₂ — в разряде пишем 0 и переносим 1 дальше. Посмотрите на столбцы: бит суммы S совпадает с XOR, а перенос C — с И. Два вентиля — и готов полусумматор.',
+           'Чтобы складывать многоразрядные числа, нужен полный сумматор: он учитывает ещё и перенос из младшего разряда (его собирают из двух полусумматоров и вентиля ИЛИ). Цепочка из четырёх полных сумматоров складывает 4-битные числа от 0 до 15, а перенос бежит справа налево. Если сумма больше 15, загорается выходной перенос C₄ — это переполнение. В процессоре телефона такие сумматоры складывают 64-битные числа.'],
+    why: 'Из таких вентилей собраны все чипы: процессор (CPU) в смартфоне, видеокарта (GPU), на которой обучают нейросети, специальные ускорители ИИ вроде TPU и микроконтроллеры в автомобилях и роботах. В каждом из них миллиарды транзисторов. Инженер-разработчик микросхем описывает схемы на языках Verilog и VHDL, а инженер по верификации проверяет, что сумматор считает верно при любых входах. В ближайшие 10 лет чипов станет ещё больше, и даже когда ИИ помогает их проектировать, отвечать за то, что схема работает правильно, будет человек, понимающий логику.',
+    task: 'Проверьте полусумматор на всех 4 наборах A, B. Затем наберите на 4-битном сумматоре два ненулевых числа с суммой 13 и вызовите переполнение (загорится C₄).',
+    hint: 'Нажимайте переключатели A и B слева. Внизу нажимайте на биты a и b: каждый столбец — разряд со своим весом 8, 4, 2, 1. Сумма 13 = 8 + 4 + 1. Для переполнения сумма должна быть больше 15.',
+    stage: 'Нажимайте на переключатели и биты.',
+    check: m => m.half === 4 && m.got13 && m.ovf },
+  { id: 'cpu', title: 'Процессор: цикл команды',
+    text: ['Процессор состоит из устройства управления (УУ), арифметико-логического устройства (АЛУ) и регистров — сверхбыстрых ячеек внутри самого процессора. PC (счётчик команд) хранит адрес следующей команды, IR (регистр команды) — саму команду, ACC (аккумулятор) — число, с которым сейчас идёт работа.',
+           'Программа и данные лежат в одной и той же памяти в виде двоичных кодов — это принцип фон Неймана. В нашем учебном процессоре команда занимает 8 бит: первые 4 — код операции, последние 4 — адрес ячейки. Например, 0001 1101 — это LOAD 13: «взять число из ячейки 13».',
+           'Процессор без конца повторяет цикл из трёх фаз: выборка (взять команду по адресу из PC и увеличить PC на 1), декодирование (понять, что это за команда), исполнение (сделать её). Команда JUMP просто записывает в PC новый адрес — так получаются циклы. Настоящий процессор с частотой 3 ГГц делает миллиарды тактов в секунду и выполняет несколько команд одновременно, но принцип тот же.'],
+    why: 'Любое приложение — и чат-бот с ИИ тоже — в итоге превращается в поток простых команд, которые процессор выбирает, декодирует и исполняет миллиарды раз в секунду. Системные программисты пишут компиляторы, драйверы и ядра ОС, инженеры встраиваемых систем программируют микроконтроллеры в автомобилях, дронах и роботах, где каждая команда и каждый микроватт на счету. ИИ уже пишет много кода, но когда программа тормозит, падает или тратит батарею, найти причину помогает понимание того, что машина делает на самом деле. Такие специалисты будут нужны и через 10 лет — кто-то должен проверять и ускорять то, что написал ИИ.',
+    task: 'Выполните одну команду по фазам (выборка → декодирование → исполнение), а потом доведите счётчик в ячейке 13 до 3.',
+    hint: 'Нажимайте «Фаза ›» и следите, как меняются PC, IR и ACC. Потом можно ускориться кнопкой «Команда ››» или «Авто». Программа — цикл из 4 команд: каждый круг прибавляет к счётчику шаг из ячейки 14.',
+    stage: 'Ячейку 14 (шаг) можно менять нажатием.',
+    check: m => m.phases === 3 && m.counter >= 3 },
+  { id: 'mem', title: 'Память и иерархия',
+    text: ['Идеальной памяти не бывает: быстрая память дорогая и маленькая, большая — медленная. Поэтому в компьютере целая лестница: регистры внутри процессора, кэш (уровни L1, L2, L3) на том же кристалле, оперативная память (ОЗУ), SSD-накопитель и, наконец, облако — чужие диски, до которых данные идут по сети.',
+           'Разница огромная. Если представить, что обращение к кэшу длится 1 секунду, то к ОЗУ — почти 2 минуты, к SSD — больше суток, а к серверу в интернете — около полутора лет. Регистры, кэш и ОЗУ при выключении питания всё забывают, а SSD и облако хранят данные годами.',
+           'Кэш работает потому, что программы снова и снова обращаются к одним и тем же данным и к соседним с ними — это называют локальностью. Процессор сам держит в кэше копии того, что нужно прямо сейчас. Если 95 % обращений попадают в кэш, память кажется почти такой же быстрой, как кэш. Время работы программы примерно равно сумме: число обращений × задержка памяти, где лежат данные.'],
+    why: 'Скорость современных программ часто упирается не в процессор, а в память: данные надо успеть подвезти. Поэтому в каждом смартфоне есть кэш, серверы в дата-центрах держат терабайты в ОЗУ, а большие нейросети упираются в быструю память видеокарт и ускорителей (HBM) не меньше, чем в вычисления. Инженеры по производительности, разработчики баз данных и игровых движков ускоряют программы в 10–100 раз, просто правильно раскладывая данные. Эта работа останется нужной и в эпоху ИИ: сгенерированный код часто правильный, но медленный, и чтобы понять почему, нужно знать иерархию памяти.',
+    task: 'Разложите 6 наборов данных по уровням памяти так, чтобы программа работала быстрее всего.',
+    hint: 'Время = число обращений × задержка. Самые частые данные ставьте на самые быстрые уровни, но следите за размером: 4 ГБ не влезут в кэш. Перетащите карточку на уровень или нажмите на карточку, а потом на уровень.',
+    stage: 'Тащите карточки данных на уровни памяти.',
+    check: m => m.placed === m.total && m.best },
+  { id: 'os', title: 'Операционная система',
+    text: ['Без операционной системы каждой программе пришлось бы самой управлять процессором, памятью, диском, экраном и сетью. ОС — посредник между программами и железом: она запускает программы (процессы), делит между ними процессор и память, хранит файлы в файловой системе — дереве папок — и даёт программам единый способ работать с любыми устройствами.',
+           'Ядер у процессора мало, а программ много. Планировщик ОС даёт каждому процессу квант времени — несколько миллисекунд — и переключается на следующий по кругу (round robin, «карусель»). Переключения так часты, что кажется, будто всё работает одновременно. Если же выполнять программы по очереди до конца, музыка будет молчать, пока не закончится игра. Каждое переключение немного стоит, поэтому слишком мелкий квант тоже вреден.',
+           'Память ОС тоже делит: у каждого процесса свой участок, и в чужой он залезть не может — поэтому одна упавшая программа не ломает остальные. Видеокарта (GPU) устроена иначе, чем процессор: вместо нескольких мощных ядер у неё тысячи простых, которые одновременно делают одинаковые операции над разными числами. Нейросеть — это в основном умножение огромных таблиц чисел (матриц), поэтому ИИ обучают и запускают на GPU и TPU.'],
+    why: 'Операционные системы — Android, iOS, Windows, Linux — работают на миллиардах устройств. Linux управляет почти всеми серверами дата-центров и облаков, а в автомобилях и роботах стоят системы реального времени: там тормоз обязан сработать вовремя, а не «когда дойдёт очередь». ИИ обучают в дата-центрах, где десятки тысяч GPU и TPU работают параллельно, и планировать их работу — тоже задача системных программистов. Системный программист, инженер встраиваемых систем, инженер по железу и инфраструктуре ИИ — профессии на следующие 10 лет: ИИ может написать код, но нужен человек, который понимает, как машина делит время, память и ядра.',
+    task: 'На 1 ядре добейтесь, чтобы музыка ждала не больше 4 тактов подряд, и доведите все программы до конца. Потом выполните их на 2 или 4 ядрах.',
+    hint: 'Сначала запустите «по очереди» и посмотрите на строку музыки. Потом включите «карусель» и подберите квант. Настройки — справа вверху на сцене. «Авто» прокрутит такты сам.',
+    stage: 'Настройки планировщика — справа вверху.',
+    check: m => m.ok1 && m.multi },
+];
+
+const KEY = 'luch-cs-arch';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const savedIdx = typeof saved.lesson === 'number' ? saved.lesson : LESSONS.findIndex(l => l.id === saved.lesson);
+const S = { lesson: clamp(savedIdx | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: LESSONS[S.lesson].id, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// content box of every scene: x0, y0, width, height (scene units)
+const CB = { adder: [-22, 0, 568, 402], cpu: [-2, -2, 566, 386], mem: [-4, 0, 570, 396], os: [-6, -6, 570, 398] };
+
+// ---------- lesson 1: gates and adder ----------
+function addBits(a, b) {
+  let c = 0; const s = [], cs = [0];
+  for (let i = 0; i < 4; i++) { const x = (a >> i) & 1, y = (b >> i) & 1; s[i] = x ^ y ^ c; c = (x & y) | (c & (x ^ y)); cs[i + 1] = c; }
+  return { s, cs, sum: a + b };
+}
+const bin4 = v => (v & 15).toString(2).padStart(4, '0');
+const RIP = 170; // ms per stage of the ripple carry
+const settled = (i, t) => reduce || t - S.rip >= (i + 1) * RIP;
+
+// ---------- lesson 2: toy CPU ----------
+const OPC = {
+  0: { m: 'HALT', d: () => 'остановить процессор' },
+  1: { m: 'LOAD', d: a => `ACC ← ячейка ${a}` },
+  2: { m: 'ADD', d: a => `ACC ← ACC + ячейка ${a}` },
+  3: { m: 'STORE', d: a => `ячейка ${a} ← ACC` },
+  4: { m: 'JUMP', d: a => `PC ← ${a}` },
+};
+const PROG = [0x1D, 0x2E, 0x3D, 0x40];
+const bin8 = v => { const s = (v & 255).toString(2).padStart(8, '0'); return s.slice(0, 4) + ' ' + s.slice(4); };
+const opOf = v => OPC[v >> 4] || OPC[0];
+const PH = [{ k: 'F', n: 'Выборка' }, { k: 'D', n: 'Декодирование' }, { k: 'E', n: 'Исполнение' }];
+function cpuReset(step) {
+  const mem = new Array(16).fill(0); PROG.forEach((v, i) => { mem[i] = v; }); mem[14] = step || (S.cpu ? S.cpu.mem[14] : 1);
+  S.cpu = { pc: 0, ir: null, acc: 0, mem, ph: 0, last: null, dec: null, cmds: 0, phs: 0, log: [], alu: null, halted: false, hot: null, msg: 'Нажмите «Фаза ›»: процессор возьмёт команду по адресу из PC.' };
+  S.bus = null;
+}
+function phaseStep(manual) {
+  const c = S.cpu;
+  if (c.halted) { toast('Процессор остановлен командой HALT. Нажмите «Сброс».'); S.auto = false; update(); return; }
+  const now = performance.now();
+  if (c.ph === 0) {
+    const at = c.pc;
+    c.ir = c.mem[at]; c.hot = { addr: at, w: false }; c.pc = (c.pc + 1) & 15; c.last = 'F'; c.dec = null; c.alu = null;
+    c.msg = `Выборка: IR ← ячейка ${at} = ${bin8(c.ir)}, PC ← ${at} + 1 = ${c.pc}`;
+    S.bus = { a: true, d: 'in', t: now };
+  } else if (c.ph === 1) {
+    const op = c.ir >> 4, a = c.ir & 15;
+    c.dec = { op, a }; c.last = 'D'; c.hot = null;
+    c.msg = `Декодирование: ${bin4(op)} = ${opOf(c.ir).m}, адрес ${bin4(a)} = ${a} → ${opOf(c.ir).d(a)}`;
+    S.bus = null;
+  } else {
+    const { a } = c.dec, op = OPC[c.dec.op] ? c.dec.op : 0, name = OPC[op].m;
+    if (op === 1) { c.acc = c.mem[a]; c.hot = { addr: a, w: false }; c.msg = `Исполнение: ACC ← ячейка ${a} = ${c.acc}`; S.bus = { a: true, d: 'in', t: now }; }
+    else if (op === 2) { const x = c.acc, y = c.mem[a], r = (x + y) & 255; c.alu = { x, y, r }; c.acc = r; c.hot = { addr: a, w: false }; c.msg = `Исполнение: АЛУ складывает ${x} + ${y} = ${r}, результат в ACC`; S.bus = { a: true, d: 'in', t: now }; }
+    else if (op === 3) { c.mem[a] = c.acc; c.hot = { addr: a, w: true }; c.msg = `Исполнение: ячейка ${a} ← ACC = ${c.acc}`; S.bus = { a: true, d: 'out', t: now }; }
+    else if (op === 4) { c.pc = a; c.hot = null; c.msg = `Исполнение: PC ← ${a} — прыжок, цикл начнётся заново`; S.bus = null; }
+    else { c.halted = true; c.hot = null; c.msg = 'Исполнение: HALT — процессор остановлен'; S.bus = null; }
+    c.last = 'E'; c.cmds++;
+    c.log.push(`${name}${op ? ' ' + a : ''} → ACC = ${c.acc}, PC = ${c.pc}${op === 3 ? `, ячейка ${a} = ${c.acc}` : ''}`); if (c.log.length > 8) c.log.shift();
+  }
+  c.ph = (c.ph + 1) % 3; c.phs++;
+  if (manual) S.seen[c.last] = true;
+  update();
+}
+
+// ---------- lesson 3: memory hierarchy ----------
+const LV = [
+  { id: 'reg', name: 'Регистры', lat: 0.3e-9, latS: '0,3 нс', sizeS: '8 Б, их десятки', max: 8, maxS: '8 байт', cap: 1, human: '0,3 с', col: '#86e0a8' },
+  { id: 'cache', name: 'Кэш L1–L3', lat: 1e-9, latS: '≈ 1 нс', sizeS: 'до 32 МБ', max: 32e6, maxS: '32 МБ', cap: 1, human: '1 с', col: '#c2e08a' },
+  { id: 'ram', name: 'ОЗУ', lat: 1e-7, latS: '≈ 100 нс', sizeS: '16 ГБ', max: 16e9, maxS: '16 ГБ', cap: 2, human: 'почти 2 мин', col: '#ffd27a' },
+  { id: 'ssd', name: 'SSD', lat: 1e-4, latS: '≈ 100 мкс', sizeS: '1 ТБ', max: 1e12, maxS: '1 ТБ', cap: 2, human: 'больше суток', col: '#ffb547' },
+  { id: 'cloud', name: 'Облако', lat: 0.05, latS: '≈ 50 мс', sizeS: 'сколько угодно', max: Infinity, maxS: 'сколько угодно', cap: 2, human: 'около 1,5 года', col: '#ff8a73' },
+];
+const ITEMS = [
+  { id: 'i', name: 'Счётчик цикла i', short: 'Счётчик i', bytes: 4, sizeS: '4 Б', acc: 1e9, accS: '10⁹ обращений' },
+  { id: 'tile', name: 'Фрагмент фото в обработке', short: 'Фрагмент фото', bytes: 256e3, sizeS: '256 КБ', acc: 1e8, accS: '10⁸ обращений' },
+  { id: 'game', name: 'Уровень игры', short: 'Уровень игры', bytes: 4e9, sizeS: '4 ГБ', acc: 1e6, accS: '10⁶ обращений' },
+  { id: 'web', name: 'Открытые вкладки браузера', short: 'Вкладки', bytes: 2e9, sizeS: '2 ГБ', acc: 1e5, accS: '10⁵ обращений' },
+  { id: 'photos', name: 'Фотоархив за 5 лет', short: 'Фотоархив', bytes: 200e9, sizeS: '200 ГБ', acc: 100, accS: '100 обращений' },
+  { id: 'movies', name: 'Фильмотека', short: 'Фильмотека', bytes: 3e12, sizeS: '3 ТБ', acc: 1, accS: '1 обращение' },
+];
+const OPT = { i: 'reg', tile: 'cache', game: 'ram', web: 'ram', photos: 'ssd', movies: 'cloud' };
+const lvById = id => LV.find(l => l.id === id);
+const cost = (it, lv) => it.acc * lvById(lv).lat;
+const totalOf = pl => ITEMS.reduce((s, it) => s + (pl[it.id] ? cost(it, pl[it.id]) : 0), 0);
+const BEST = totalOf(OPT);
+function fmtDur(s) {
+  if (s < 60) return nf(s, s < 10 ? 2 : 1) + ' с';
+  if (s < 3600) return nf(s / 60, 1) + ' мин';
+  if (s < 86400) return nf(s / 3600, 1) + ' ч';
+  if (s < 86400 * 365) return nf(s / 86400, 1) + ' сут';
+  return nf(s / 86400 / 365, 1) + ' ' + plural(Math.round(s / 86400 / 365), 'год', 'года', 'лет');
+}
+const ROW = { y0: 26, dy: 64, h: 56, w: 384 };
+const rowY = i => ROW.y0 + i * ROW.dy;
+const slotX = k => 150 + k * 116;
+const TRAY = { x: 398, y0: 28, dy: 52, w: 162, h: 46 };
+const trayPos = k => ({ x: TRAY.x, y: TRAY.y0 + k * TRAY.dy });
+
+// ---------- lesson 4: operating system ----------
+const PROCS = [
+  { id: 'game', name: 'Игра', need: 10, col: '#ffb547', mem: 6 },
+  { id: 'av', name: 'Антивирус', need: 8, col: '#86e0a8', mem: 1 },
+  { id: 'web', name: 'Браузер', need: 5, col: '#72d4e8', mem: 3 },
+  { id: 'music', name: 'Музыка', need: 4, col: '#c3a6ff', mem: 0.5 },
+];
+const TMAX = 27, GAPMAX = 4;
+const pById = id => PROCS.find(p => p.id === id);
+function osReset() {
+  const left = {}, gap = {}, maxGap = {};
+  PROCS.forEach(p => { left[p.id] = p.need; gap[p.id] = 0; maxGap[p.id] = 0; });
+  S.os = { t: 0, left, gap, maxGap, queue: PROCS.map(p => p.id), cores: Array.from({ length: S.cores }, () => ({ p: null, sl: 0 })), runs: [], fin: {}, done: false, sw: 0 };
+  S.osAuto = false;
+}
+function osTick() {
+  const o = S.os;
+  if (o.done) { toast('Все программы уже завершены. Поменяйте настройки или нажмите «Сброс».'); S.osAuto = false; update(); return; }
+  const q = S.osMode === 'rr' ? S.q : Infinity;
+  for (const c of o.cores) if (c.p && (o.left[c.p] === 0 || c.sl >= q)) { if (o.left[c.p] > 0) o.queue.push(c.p); c.p = null; c.sl = 0; }
+  for (const c of o.cores) if (!c.p && o.queue.length) { c.p = o.queue.shift(); c.sl = 0; o.sw++; }
+  const ran = [];
+  o.cores.forEach((c, k) => { if (c.p) { o.left[c.p]--; c.sl++; ran.push([k, c.p]); if (o.left[c.p] === 0) o.fin[c.p] = o.t + 1; } });
+  for (const p of PROCS) {
+    if (ran.some(r => r[1] === p.id)) o.gap[p.id] = 0;
+    else if (o.left[p.id] > 0) { o.gap[p.id]++; o.maxGap[p.id] = Math.max(o.maxGap[p.id], o.gap[p.id]); }
+  }
+  o.runs.push(ran); o.t++;
+  if (PROCS.every(p => o.left[p.id] === 0)) {
+    o.done = true; S.osAuto = false; o.cores.forEach(c => { c.p = null; });
+    const mg = o.maxGap.music, rec = { mode: S.osMode, q: S.q, cores: S.cores, T: o.t, mg };
+    S.osRuns.push(rec); if (S.osRuns.length > 6) S.osRuns.shift();
+    if (S.cores === 1 && mg <= GAPMAX) S.ok1 = true;
+    if (S.cores > 1) S.multi = true;
+    toast(`Все программы готовы за ${o.t} ${plural(o.t, 'такт', 'такта', 'тактов')}. Музыка ждала максимум ${mg} ${plural(mg, 'такт', 'такта', 'тактов')}${mg <= GAPMAX ? ' — без заиканий.' : ' — звук прерывался.'}`);
+  }
+  update();
+}
+const modeName = () => S.osMode === 'rr' ? `карусель, квант ${S.q}` : 'по очереди до конца';
+
+function model() {
+  const id = LID();
+  if (id === 'adder') {
+    const r = addBits(S.a, S.b);
+    return { kind: 'adder', A: S.hA, B: S.hB, S: S.hA ^ S.hB, C: S.hA & S.hB, half: Object.keys(S.hTried).length, a: S.a, b: S.b, sum: r.sum, s: r.s, cs: r.cs, got13: S.got13, ovf: S.ovf };
+  }
+  if (id === 'cpu') { const c = S.cpu; return { kind: 'cpu', pc: c.pc, ir: c.ir, acc: c.acc, counter: c.mem[13], step: c.mem[14], phases: ['F', 'D', 'E'].filter(k => S.seen[k]).length, cmds: c.cmds, next: PH[c.ph].n }; }
+  if (id === 'mem') {
+    const placed = ITEMS.filter(it => S.place[it.id]).length, total = ITEMS.length, T = totalOf(S.place);
+    return { kind: 'mem', placed, total, T, best: placed === total && Math.abs(T - BEST) < 1e-12, miss: S.miss };
+  }
+  const o = S.os, work = PROCS.reduce((s, p) => s + p.need - o.left[p.id], 0), all = PROCS.reduce((s, p) => s + p.need, 0);
+  return { kind: 'os', t: o.t, work, all, mg: o.maxGap.music, done: o.done, ok1: S.ok1, multi: S.multi };
+}
+
+// ---------- drawing helpers ----------
+const ol = (d, fill, stroke, w = 2.2, extra = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+const wire = (d, on, w = 3) => `<path d="${d}" fill="none" stroke="${on ? ON : OFF}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+const dot = (x, y, on) => `<circle cx="${x}" cy="${y}" r="3.6" fill="${on ? ON : OFF}"/>`;
+const T = (x, y, s, size = 10, fill = '#e8ecf4', extra = '') => `<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+function gateR(x, y, w, hh, sym, name, out) {
+  return `<rect x="${x}" y="${y}" width="${w}" height="${hh}" rx="3" fill="#1d2940" stroke="${out ? ON : '#e8ecf4'}" stroke-width="1.8"/>` +
+    T(x + w / 2, y + 20, sym, 14, '#e8ecf4', 'text-anchor="middle" font-weight="600"') + T(x + w / 2, y + hh - 6, name, 7.5, '#8b96ad', 'text-anchor="middle" class="sans"');
+}
+const lamp = (x, y, on, r = 10) => (on ? `<circle cx="${x}" cy="${y}" r="${r + 7}" fill="#ffd27a" opacity=".18"/>` : '') + `<circle cx="${x}" cy="${y}" r="${r}" fill="${on ? '#ffd27a' : '#2a3348'}" stroke="${INK}" stroke-width="2"/>`;
+
+function drawAdder(t) {
+  const m = model(); let h = '';
+  const A = m.A, B = m.B, X = m.S, C = m.C;
+  h += T(-16, 12, 'ПОЛУСУММАТОР · складывает два бита', 9, '#8b96ad', 'letter-spacing=".5"');
+  h += wire('M44 60H100', A) + wire('M100 60V50H170', A) + wire('M100 60V120H170', A) + dot(100, 60, A);
+  h += wire('M44 140H120', B) + wire('M120 140H170', B) + wire('M120 140V70H170', B) + dot(120, 140, B);
+  h += wire('M220 60H290', X) + wire('M220 130H290', C);
+  for (const [k, y, v] of [['A', 47, A], ['B', 127, B]]) {
+    h += `<g data-hit="ha:${k}"><rect x="-14" y="${y - 12}" width="66" height="50" fill="transparent"/><rect x="0" y="${y}" width="44" height="26" rx="6" fill="${v ? '#ffb547' : '#2a3348'}" stroke="${INK}" stroke-width="1.4"/>` +
+      T(22, y + 17.5, `${k} = ${v}`, 11, v ? '#0b1019' : '#e8ecf4', 'text-anchor="middle" font-weight="600"') + `</g>`;
+  }
+  h += gateR(170, 38, 50, 44, '=1', 'XOR', X) + gateR(170, 108, 50, 44, '&amp;', 'И', C);
+  h += lamp(300, 60, X) + lamp(300, 130, C);
+  h += T(318, 58, `S = ${X}`, 12, X ? '#ffd27a' : '#e8ecf4', 'font-weight="600"') + T(318, 72, 'сумма', 8.5, '#8b96ad', 'class="sans"');
+  h += T(318, 128, `C = ${C}`, 12, C ? '#ffd27a' : '#e8ecf4', 'font-weight="600"') + T(318, 142, 'перенос', 8.5, '#8b96ad', 'class="sans"');
+  h += T(200, 180, `${A} + ${B} = ${C}${X}₂ = ${A + B}`, 12, '#e8ecf4', 'text-anchor="middle"');
+  // all gates right now
+  h += `<rect x="406" y="22" width="140" height="146" rx="9" fill="#141d2e" stroke="#26324a"/>`;
+  h += T(476, 37, `все вентили при A=${A}, B=${B}`, 8, '#8b96ad', 'text-anchor="middle" class="sans"');
+  [['И', 'A ∧ B', A & B], ['ИЛИ', 'A ∨ B', A | B], ['НЕ', '¬A', 1 - A], ['XOR', 'A ⊕ B', A ^ B]].forEach(([n, f, v], k) => {
+    const y = 56 + k * 21;
+    h += T(416, y, n, 10, '#e8ecf4', 'font-weight="600"') + T(458, y, f, 9.5, '#8b96ad');
+    h += `<rect x="514" y="${y - 12}" width="22" height="16" rx="4" fill="${v ? '#ffb547' : '#2a3348'}"/>` + T(525, y, v, 10, v ? '#0b1019' : '#e8ecf4', 'text-anchor="middle" font-weight="600"');
+  });
+  h += T(476, 146, 'проверено наборов A B:', 8, '#8b96ad', 'text-anchor="middle" class="sans"');
+  ['00', '01', '10', '11'].forEach((c, k) => {
+    const x = 414 + k * 32, ok = S.hTried[c], cur = c === `${A}${B}`;
+    h += `<rect x="${x}" y="150" width="28" height="13" rx="3" fill="${ok ? '#1f3a2f' : 'none'}" stroke="${cur ? '#ffb547' : ok ? '#86e0a8' : '#3a4762'}"/>` + T(x + 14, 160, c, 8.5, ok ? '#86e0a8' : '#8b96ad', 'text-anchor="middle"');
+  });
+  // 4-bit ripple-carry adder
+  const cx = i => 60 + (3 - i) * 105, last = settled(3, t);
+  h += `<path d="M-16 194H546" stroke="#26324a" stroke-dasharray="3 5"/>`;
+  h += T(-16, 210, '4-БИТНЫЙ СУММАТОР · перенос бежит справа налево', 9, '#8b96ad', 'letter-spacing=".5"');
+  for (let i = 3; i >= 0; i--) {
+    const x = cx(i), av = (S.a >> i) & 1, bv = (S.b >> i) & 1, ok = settled(i, t), act = !ok && (i === 0 || settled(i - 1, t));
+    h += T(x, 224, `разряд ${i} · вес ${2 ** i}`, 8, '#8b96ad', 'text-anchor="middle" class="sans"');
+    h += wire(`M${x - 17} 252V290`, av, 2.6) + wire(`M${x + 17} 252V290`, bv, 2.6);
+    for (const [k, xx, v] of [['a', x - 30, av], ['b', x + 4, bv]]) {
+      h += `<g data-hit="bit:${k}:${i}"><rect x="${xx - 2}" y="${226}" width="30" height="30" fill="transparent"/><rect x="${xx}" y="228" width="26" height="24" rx="5" fill="${v ? '#ffb547' : '#2a3348'}" stroke="${INK}" stroke-width="1.3"/>` +
+        T(xx + 13, 245, v, 13, v ? '#0b1019' : '#e8ecf4', 'text-anchor="middle" font-weight="600"') + `</g>`;
+    }
+    h += T(x - 21, 276, `a${SUB[i]}`, 8, '#8b96ad', 'text-anchor="end"') + T(x + 21, 276, `b${SUB[i]}`, 8, '#8b96ad');
+    h += `<rect x="${x - 32}" y="290" width="64" height="38" rx="5" fill="#1d2940" stroke="${act ? '#72d4e8' : '#e8ecf4'}" stroke-width="${act ? 2.4 : 1.6}"/>` + T(x, 307, 'ПС', 11, '#e8ecf4', 'text-anchor="middle" font-weight="600"') + T(x, 320, 'полный сумм.', 6.5, '#8b96ad', 'text-anchor="middle" class="sans"');
+    const co = m.cs[i + 1];
+    if (i < 3) {
+      h += wire(`M${x - 32} 309H${cx(i + 1) + 32}`, ok && co, 2.6);
+      h += T(x - 52.5, 303, `c${SUB[i + 1]}=${ok ? co : '?'}`, 8, ok && co ? '#ffd27a' : '#8b96ad', 'text-anchor="middle"');
+    } else h += wire(`M${x - 32} 309H5`, ok && co, 2.6);
+    const sv = m.s[i];
+    h += wire(`M${x} 328V342`, ok && sv, 2.6);
+    h += `<rect x="${x - 15}" y="342" width="30" height="24" rx="5" fill="${ok && sv ? '#3a2f1a' : '#141d2e'}" stroke="${ok && sv ? '#ffb547' : '#56627d'}" stroke-width="1.3"/>` + T(x, 359, ok ? sv : '·', 13, ok && sv ? '#ffd27a' : '#e8ecf4', 'text-anchor="middle" font-weight="600"');
+    h += T(x - 19, 359, `s${SUB[i]}`, 8, '#8b96ad', 'text-anchor="end"');
+  }
+  h += wire(`M425 309H${cx(0) + 32}`, 0, 2.6) + T(428, 312, 'c₀=0', 8, '#8b96ad');
+  h += lamp(-4, 309, last && m.cs[4], 9) + T(-4, 334, 'C₄', 10, last && m.cs[4] ? '#ffd27a' : '#8b96ad', 'text-anchor="middle" font-weight="600"');
+  h += T(440, 238, `A = ${bin4(S.a)}₂ = ${S.a}`, 10, '#e8ecf4') + T(440, 252, `B = ${bin4(S.b)}₂ = ${S.b}`, 10, '#e8ecf4');
+  const sum4 = m.sum & 15;
+  h += T(440, 352, `S = ${last ? bin4(sum4) : '····'}₂`, 10, '#e8ecf4') + T(440, 366, last ? `= ${sum4}${m.cs[4] ? ' и C₄ = 1' : ''}` : 'считает…', 10, last && m.cs[4] ? '#ff8a73' : '#e8ecf4');
+  const line = !last ? 'перенос бежит по цепочке…' : m.cs[4] ? `${S.a} + ${S.b} = ${m.sum} > 15 — не влезло в 4 бита: переполнение, C₄ = 1` : `${bin4(S.a)} + ${bin4(S.b)} = ${bin4(sum4)}   (${S.a} + ${S.b} = ${m.sum})`;
+  h += T(262, 392, line, 11, last && m.cs[4] ? '#ff8a73' : '#e8ecf4', 'text-anchor="middle"');
+  return h;
+}
+
+function drawCpu(t) {
+  const c = S.cpu; let h = '';
+  const bk = S.bus ? clamp((t - S.bus.t) / 650, 0, 1) : 1, busOn = S.bus && bk < 1;
+  h += `<rect x="0" y="0" width="330" height="380" rx="14" fill="#121a28" stroke="#3a4762" stroke-width="1.6"/>` + T(14, 18, 'ПРОЦЕССОР', 9, '#8b96ad', 'letter-spacing="1"');
+  // control unit
+  h += `<rect x="12" y="28" width="306" height="80" rx="9" fill="#141d2e" stroke="#26324a"/>` + T(22, 44, 'Устройство управления (УУ)', 9.5, '#e8ecf4', 'class="sans" font-weight="600"');
+  PH.forEach((p, k) => {
+    const x = 22 + k * 98, done = c.last === p.k, nxt = c.ph === k && !c.halted;
+    h += `<rect x="${x}" y="52" width="92" height="20" rx="10" fill="${done ? '#ffb547' : '#1d2940'}" stroke="${nxt ? '#72d4e8' : '#3a4762'}" ${nxt ? 'stroke-dasharray="4 3"' : ''} stroke-width="1.4"/>` +
+      T(x + 46, 66, `${k + 1} ${p.n}`, 8.5, done ? '#0b1019' : '#e8ecf4', 'text-anchor="middle" class="sans" font-weight="600"');
+  });
+  const msg = c.msg.length > 58 ? c.msg.slice(0, 57) + '…' : c.msg;
+  h += T(22, 92, msg, 8.5, '#ffd27a', 'class="sans"') ;
+  h += T(22, 103, c.halted ? 'стоп' : `следующая фаза: ${PH[c.ph].n.toLowerCase()}`, 7.5, '#8b96ad', 'class="sans"');
+  // buses
+  const bAddr = busOn && S.bus.a, bData = busOn && S.bus.d;
+  h += `<path d="M150 142H376" stroke="${bAddr ? '#72d4e8' : '#3a4762'}" stroke-width="5" stroke-linecap="round" opacity=".9"/>` + T(262, 135, 'шина адреса', 8, '#8b96ad', 'text-anchor="middle" class="sans"');
+  h += `<path d="M165 198H376M165 198V254H150" fill="none" stroke="${bData ? '#ffb547' : '#3a4762'}" stroke-width="5" stroke-linejoin="round" opacity=".9"/>` + T(262, 191, 'шина данных', 8, '#8b96ad', 'text-anchor="middle" class="sans"');
+  h += `<path d="M165 254H190" stroke="#3a4762" stroke-width="4"/>`;
+  if (busOn) {
+    const e = 1 - (1 - bk) * (1 - bk);
+    if (S.bus.a) h += `<circle cx="${150 + 226 * e}" cy="142" r="5" fill="#72d4e8"/>`;
+    if (S.bus.d) { const x = S.bus.d === 'in' ? 376 - 211 * e : 165 + 211 * e; h += `<circle cx="${x}" cy="198" r="5" fill="#ffb547"/>`; }
+  }
+  // registers
+  const reg = (y, name, val, sub, hot) => `<rect x="12" y="${y}" width="138" height="44" rx="8" fill="#1d2940" stroke="${hot ? '#ffb547' : '#56627d'}" stroke-width="${hot ? 2 : 1.3}"/>` +
+    T(20, y + 14, name, 8, '#8b96ad', 'class="sans"') + T(20, y + 33, val, 12, '#e8ecf4', 'font-weight="500"') + (sub ? T(144, y + 33, sub, 9, '#ffd27a', 'text-anchor="end"') : '');
+  const lastPh = c.last;
+  h += reg(120, 'PC · счётчик команд', bin4(c.pc), `= ${c.pc}`, lastPh === 'F' || (lastPh === 'E' && c.dec && c.dec.op === 4));
+  h += reg(176, 'IR · регистр команды', c.ir === null ? '—' : bin8(c.ir), c.ir === null ? '' : (lastPh === 'F' ? '?' : `${opOf(c.ir).m}`), lastPh === 'F' || lastPh === 'D');
+  h += reg(232, 'ACC · аккумулятор', bin8(c.acc), `= ${c.acc}`, lastPh === 'E' && c.dec && (c.dec.op === 1 || c.dec.op === 2));
+  // ALU
+  const aluHot = lastPh === 'E' && c.alu;
+  h += ol('M190 232H318L298 322H210Z', '#1d2940', aluHot ? '#ffb547' : '#e8ecf4', 1.8);
+  h += T(254, 254, 'АЛУ', 12, '#e8ecf4', 'text-anchor="middle" font-weight="600"') + T(254, 268, 'арифметика и логика', 7.5, '#8b96ad', 'text-anchor="middle" class="sans"');
+  h += T(254, 292, c.alu ? `${c.alu.x} + ${c.alu.y} = ${c.alu.r}` : '—', 12, aluHot ? '#ffd27a' : '#8b96ad', 'text-anchor="middle"');
+  h += wire('M254 322V344H81V276', aluHot, 2.6) + T(170, 356, 'результат → ACC', 8, '#8b96ad', 'text-anchor="middle" class="sans"');
+  h += T(14, 374, `команд: ${c.cmds} · фаз: ${c.phs}`, 8.5, '#8b96ad');
+  // memory
+  h += T(382, 12, 'ПАМЯТЬ (ОЗУ) · 16 ячеек', 9, '#8b96ad', 'letter-spacing=".5"');
+  for (let i = 0; i < 16; i++) {
+    const y = 20 + i * 22, v = c.mem[i], isPc = c.pc === i && !c.halted, hot = c.hot && c.hot.addr === i && busOn || (c.hot && c.hot.addr === i && c.last !== 'D');
+    const code = i < 4, lbl = code ? `${opOf(v).m} ${v & 15}` : `= ${v}${i === 13 ? ' счётчик' : i === 14 ? ' шаг ↻' : ''}`;
+    h += `<g ${i === 14 ? 'data-hit="mem:14"' : ''}><rect x="382" y="${y}" width="178" height="19" rx="4" fill="${hot ? (c.hot.w ? 'rgba(255,181,71,.2)' : 'rgba(114,212,232,.14)') : code ? '#16203a' : '#121a28'}" stroke="${isPc ? '#ffb547' : hot ? '#72d4e8' : i === 14 ? '#56627d' : '#26324a'}" stroke-width="${isPc || hot ? 1.6 : 1}"/>`;
+    h += T(398, y + 13.5, i, 8.5, isPc ? '#ffb547' : '#8b96ad', 'text-anchor="end"') + T(404, y + 13.5, bin8(v), 10, '#e8ecf4') + T(472, y + 13.5, lbl, 9, code ? '#72d4e8' : i === 13 ? '#ffd27a' : '#8b96ad') + `</g>`;
+    if (isPc) h += `<path d="M376 ${y + 4}l6 5.5-6 5.5z" fill="#ffb547"/>`;
+  }
+  h += T(470, 378, 'адреса 0–3 — программа, 13–14 — данные', 7.5, '#8b96ad', 'text-anchor="middle" class="sans"');
+  return h;
+}
+
+function drawMem(t) {
+  let h = '';
+  h += T(0, 13, '↑ быстрее, но меньше и дороже', 9, '#86e0a8', 'class="sans"');
+  h += T(372, 13, 'если 1 нс = 1 с', 8, '#8b96ad', 'text-anchor="end" class="sans"');
+  LV.forEach((lv, i) => {
+    const y = rowY(i), here = ITEMS.filter(it => S.place[it.id] === lv.id), bad = S.lastBad && S.lastBad.z === lv.id && t - S.lastBad.t < 700;
+    h += `<g data-hit="lv:${lv.id}"><rect x="0" y="${y}" width="${ROW.w}" height="${ROW.h}" rx="10" fill="${bad ? 'rgba(255,138,115,.14)' : '#141d2e'}" stroke="${bad ? '#ff8a73' : S.sel ? '#72d4e8' : '#26324a'}" stroke-width="1.5" ${S.sel && !bad ? 'stroke-dasharray="5 4"' : ''}/>`;
+    h += `<rect x="0" y="${y + 8}" width="4" height="${ROW.h - 16}" rx="2" fill="${lv.col}"/>`;
+    h += T(12, y + 18, lv.name, 11.5, '#e8ecf4', 'class="sans" font-weight="600"') + T(12, y + 33, `${lv.latS} · ${lv.sizeS}`, 8.5, '#e8ecf4');
+    h += T(12, y + 47, `→ ${lv.human}`, 8.5, '#8b96ad', 'class="sans"');
+    for (let k = 0; k < 2; k++) {
+      const x = slotX(k);
+      if (k >= lv.cap) { h += `<rect x="${x}" y="${y + 8}" width="110" height="40" rx="7" fill="none" stroke="#26324a" stroke-dasharray="2 4"/>` + T(x + 55, y + 32, 'нет места', 8.5, '#56627d', 'text-anchor="middle" class="sans"'); continue; }
+      h += `<rect x="${x}" y="${y + 8}" width="110" height="40" rx="7" fill="none" stroke="#3a4762" stroke-dasharray="4 4"/>`;
+    }
+    h += `</g>`;
+    here.forEach((it, k) => {
+      if (drag && drag.id === it.id && drag.moved) return;
+      const x = slotX(k), sel = S.sel === it.id;
+      h += `<g data-drag="${it.id}"><rect x="${x}" y="${y + 8}" width="110" height="40" rx="7" fill="${sel ? '#2a3a56' : '#1d2940'}" stroke="${sel ? '#ffb547' : '#72d4e8'}" stroke-width="1.4"/>` +
+        T(x + 55, y + 24, it.short, 10, '#e8ecf4', 'text-anchor="middle" class="sans" font-weight="600"') + T(x + 55, y + 39, `= ${fmtDur(cost(it, lv.id))}`, 8.5, '#ffd27a', 'text-anchor="middle"') + `</g>`;
+    });
+  });
+  h += T(0, 352, '↓ медленнее, но больше, дешевле и не забывает при выключении', 9, '#ff8a73', 'class="sans"');
+  // tray
+  h += T(TRAY.x, 16, 'ДАННЫЕ ПРОГРАММЫ', 9, '#8b96ad', 'letter-spacing=".5"');
+  ITEMS.forEach((it, k) => { if (S.place[it.id] || (drag && drag.id === it.id && drag.moved)) { const p = trayPos(k); h += `<rect x="${p.x}" y="${p.y}" width="${TRAY.w}" height="${TRAY.h}" rx="8" fill="none" stroke="#26324a" stroke-dasharray="4 4"/>`; } });
+  const card = (it, x, y, ghost) => {
+    const sel = S.sel === it.id;
+    return `<g ${ghost ? 'pointer-events="none" opacity=".92"' : `data-drag="${it.id}"`} transform="translate(${x.toFixed(1)} ${y.toFixed(1)})">` + ol(`M8 0H${TRAY.w - 8}Q${TRAY.w} 0 ${TRAY.w} 8V${TRAY.h - 8}Q${TRAY.w} ${TRAY.h} ${TRAY.w - 8} ${TRAY.h}H8Q0 ${TRAY.h} 0 ${TRAY.h - 8}V8Q0 0 8 0Z`, sel ? '#2a3a56' : '#1d2940', sel ? '#ffb547' : '#56627d', 1.5) +
+      T(10, 18, it.name, 10, '#e8ecf4', 'class="sans" font-weight="600"' + (it.name.length > 24 ? ` textLength="${TRAY.w - 18}" lengthAdjust="spacingAndGlyphs"` : '')) + T(10, 35, `${it.sizeS} · ${it.accS}`, 8.5, '#8b96ad') + `</g>`;
+  };
+  ITEMS.forEach((it, k) => { if (!S.place[it.id] && !(drag && drag.id === it.id && drag.moved)) { const p = trayPos(k); h += card(it, p.x, p.y); } });
+  // total
+  const m = model();
+  h += T(0, 376, m.placed === m.total ? `Время программы: ${fmtDur(m.T)}` : `Разложено ${m.placed} из ${m.total} — время посчитаем, когда разложите всё`, 12, m.best ? '#86e0a8' : '#e8ecf4', 'class="sans" font-weight="600"');
+  h += T(0, 392, m.placed === m.total ? (m.best ? 'Это самый быстрый вариант ✓' : `Можно быстрее: в ${nf(m.T / BEST, m.T / BEST < 10 ? 1 : 0)} раза дольше лучшего`) : 'время = обращения × задержка уровня', 9, '#8b96ad', 'class="sans"');
+  if (drag && drag.moved && drag.p) { const it = ITEMS.find(x => x.id === drag.id); h += card(it, drag.p.x + drag.dx, drag.p.y + drag.dy, true); }
+  return h;
+}
+
+function drawOs(t) {
+  const o = S.os; let h = '';
+  // cores
+  const n = S.cores, cw = n === 4 ? 80 : 160;
+  o.cores.forEach((c, k) => {
+    const x = k * (cw + 6), p = c.p ? pById(c.p) : null;
+    h += `<rect x="${x}" y="0" width="${cw}" height="56" rx="9" fill="${p ? '#1d2940' : '#141d2e'}" stroke="${p ? p.col : '#3a4762'}" stroke-width="${p ? 2 : 1.3}"/>`;
+    h += T(x + 8, 14, `ЯДРО ${k + 1}`, 8, '#8b96ad', 'letter-spacing=".5"');
+    h += T(x + 8, 34, p ? p.name : 'свободно', n === 4 ? 10.5 : 13, p ? p.col : '#56627d', 'class="sans" font-weight="600"');
+    if (p) h += T(x + 8, 49, S.osMode === 'rr' ? `квант ${c.sl}/${S.q}` : 'до конца', 8, '#8b96ad', 'class="sans"');
+  });
+  // settings
+  const chip = (x, y, w, label, on, hit, dim) => `<g data-hit="${hit}"><rect x="${x}" y="${y}" width="${w}" height="18" rx="9" fill="${on ? '#e8ecf4' : '#1a2438'}" stroke="${on ? '#e8ecf4' : '#3a4762'}" opacity="${dim ? .35 : 1}"/>` + T(x + w / 2, y + 12.5, label, 9, on ? '#0b1019' : '#e8ecf4', `text-anchor="middle" class="sans" font-weight="600" opacity="${dim ? .5 : 1}"`) + `</g>`;
+  h += T(352, 14, 'планировщик', 8, '#8b96ad', 'class="sans"') + chip(420, 2, 72, 'по очереди', S.osMode === 'fcfs', 'mode:fcfs') + chip(496, 2, 64, 'карусель', S.osMode === 'rr', 'mode:rr');
+  h += T(352, 36, 'квант', 8, '#8b96ad', 'class="sans"') + [1, 2, 4].map((q, k) => chip(420 + k * 32, 24, 28, q, S.osMode === 'rr' && S.q === q, 'q:' + q, S.osMode !== 'rr')).join('') + T(518, 36, 'тактов', 8, '#8b96ad', 'class="sans"');
+  h += T(352, 58, 'ядра', 8, '#8b96ad', 'class="sans"') + [1, 2, 4].map((c, k) => chip(420 + k * 32, 46, 28, c, S.cores === c, 'cores:' + c)).join('');
+  // ready queue
+  h += T(0, 88, 'очередь:', 9, '#8b96ad', 'class="sans"');
+  if (!o.queue.length) h += T(56, 88, o.done ? 'пусто — всё готово' : 'пусто', 9, '#56627d', 'class="sans"');
+  o.queue.forEach((id, k) => { const p = pById(id), x = 56 + k * 80; h += `<rect x="${x}" y="74" width="74" height="20" rx="6" fill="#141d2e" stroke="${p.col}"/>` + T(x + 37, 88, p.name, 9, p.col, 'text-anchor="middle" class="sans" font-weight="600"'); });
+  h += T(560, 88, `такт ${o.t}`, 10, '#e8ecf4', 'text-anchor="end"');
+  // gantt
+  const gx = 96, gw = 16.8;
+  for (let j = 0; j < TMAX; j++) if (j === 0 || (j + 1) % 5 === 0) h += T(gx + j * gw + gw / 2, 116, j + 1, 7.5, '#56627d', 'text-anchor="middle"');
+  PROCS.forEach((p, r) => {
+    const y = 122 + r * 36;
+    h += T(0, y + 13, p.name, 10.5, p.col, 'class="sans" font-weight="600"') + T(0, y + 26, o.left[p.id] ? `осталось ${o.left[p.id]}` : `готово на ${o.fin[p.id]}`, 8, '#8b96ad', 'class="sans"');
+    let gap = 0;
+    for (let j = 0; j < TMAX; j++) {
+      const x = gx + j * gw, run = o.runs[j] ? o.runs[j].find(e => e[1] === p.id) : null;
+      let fill = '#121a28', stroke = '#1d273b';
+      if (j < o.t) {
+        if (run) { fill = p.col; gap = 0; }
+        else if (!o.fin[p.id] || o.fin[p.id] > j) { gap++; fill = p.id === 'music' && gap > GAPMAX ? 'rgba(255,138,115,.45)' : '#1d2638'; }
+      }
+      h += `<rect x="${x + .8}" y="${y}" width="${gw - 1.6}" height="28" rx="3" fill="${fill}" stroke="${stroke}"/>`;
+      if (run && n > 1) h += T(x + gw / 2, y + 18, run[0] + 1, 8, INK, 'text-anchor="middle" font-weight="600"');
+    }
+  });
+  if (o.t < TMAX) h += `<path d="M${gx + o.t * gw} 108V266" stroke="#e8ecf4" stroke-width="1.2" stroke-dasharray="3 3" opacity=".6"/>`;
+  h += T(gx, 280, 'цветная клетка — процесс на ядре · тёмная — ждёт в очереди · красная — музыка заикается', 8, '#8b96ad', 'class="sans"');
+  // memory
+  h += T(0, 300, 'ОЗУ 16 ГБ: у каждого процесса свой участок, чужой трогать нельзя', 9, '#8b96ad', 'class="sans"');
+  const segs = [{ name: 'ОС', gb: 2, col: '#8b96ad' }].concat(PROCS.slice().sort((a, b) => b.mem - a.mem).map(p => ({ name: p.name, gb: p.mem, col: p.col, free: o.left[p.id] === 0 }))), sc = 560 / 16;
+  let x = 0;
+  for (const s of segs) {
+    const w = s.gb * sc;
+    h += `<rect x="${x + .5}" y="306" width="${w - 1}" height="28" rx="4" fill="${s.free ? 'none' : s.col}" fill-opacity="${s.free ? 0 : .85}" stroke="${s.col}" ${s.free ? 'stroke-dasharray="3 3"' : ''}/>`;
+    if (w > 40) h += T(x + w / 2, 324, `${s.name} ${nf(s.gb, 1)} ГБ`, 8.5, s.free ? s.col : INK, 'text-anchor="middle" class="sans" font-weight="600"');
+    x += w;
+  }
+  const freeGb = 16 - 2 - PROCS.reduce((s, p) => s + (o.left[p.id] ? p.mem : 0), 0);
+  h += `<rect x="${x + .5}" y="306" width="${560 - x - 1}" height="28" rx="4" fill="none" stroke="#3a4762" stroke-dasharray="3 3"/>` + T((x + 560) / 2, 324, `свободно ${nf(16 - x / sc, 1)} ГБ`, 8.5, '#8b96ad', 'text-anchor="middle" class="sans"');
+  h += T(560, 348, `сейчас свободно всего: ${nf(freeGb, 1)} ГБ`, 8, '#8b96ad', 'text-anchor="end" class="sans"');
+  // stats
+  const mg = o.maxGap.music, okNow = mg <= GAPMAX;
+  h += T(0, 368, `Музыка ждала максимум ${mg} ${plural(mg, 'такт', 'такта', 'тактов')} подряд ${okNow ? '✓' : '✗'}  (норма ≤ ${GAPMAX})`, 10.5, okNow ? '#86e0a8' : '#ff8a73', 'class="sans" font-weight="600"');
+  h += T(0, 386, `${modeName()}, ${n} ${plural(n, 'ядро', 'ядра', 'ядер')}${o.done ? ` · всё готово за ${o.t} ${plural(o.t, 'такт', 'такта', 'тактов')}` : ''} · 1 ядро без заиканий: ${S.ok1 ? '✓' : '—'} · несколько ядер: ${S.multi ? '✓' : '—'}`, 9, '#8b96ad', 'class="sans"');
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'adder') return { inputs: [-6, 40, 62, 120], xor: [164, 32, 62, 56], and: [164, 102, 62, 56], outs: [284, 42, 110, 106], panel: [402, 18, 148, 154], bits: [20, 214, 410, 50], fa: [22, 284, 392, 50], carry: [-18, 296, 450, 44], sums: [30, 338, 400, 32] }[id];
+  if (lid === 'cpu') return { cu: [8, 24, 314, 88], pc: [8, 116, 146, 52], ir: [8, 172, 146, 52], acc: [8, 228, 146, 52], alu: [184, 226, 140, 102], bus: [148, 124, 232, 82], mem: [376, 2, 188, 374] }[id];
+  if (lid === 'mem') {
+    const i = LV.findIndex(l => l.id === id);
+    if (i >= 0) return [-3, rowY(i) - 3, ROW.w + 6, ROW.h + 6];
+    return { tray: [TRAY.x - 4, 4, TRAY.w + 8, 334], total: [-4, 360, 400, 38] }[id];
+  }
+  return { cores: [-4, -4, 346, 64], settings: [348, -4, 216, 72], queue: [-4, 70, 568, 28], gantt: [-4, 104, 568, 182], ram: [-4, 288, 568, 64], stats: [-4, 354, 568, 40] }[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4560" height="4400" fill="url(#tile)"/>`;
+  if (id === 'adder') h += drawAdder(t);
+  else if (id === 'cpu') h += drawCpu(t);
+  else if (id === 'mem') h += drawMem(t);
+  else h += drawOs(t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit: place the content box beside or below the task card and the meter, whichever gives the bigger scale
+let VB = { x: 0, y: 0, w: 560, h: 400 };
+function fit() {
+  const [CX0, CY0, CW, CH] = CB[LID()];
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const tr = $('#taskCard').getBoundingClientRect(), mr = $('#meter').getBoundingClientRect();
+  const cardR = tr.right - rc.left, cardB = tr.bottom - rc.top, metL = mr.left - rc.left, metB = mr.bottom - rc.top;
+  const opts = [];
+  { const Lx = cardR + 8, R = metL - 8; if (R - Lx > 140) opts.push({ L: Lx, Tp: 8, W: R - Lx, H: hh - 16 }); }
+  { const Tp = Math.max(cardB, metB) + 8; if (hh - Tp > 140) opts.push({ L: 8, Tp, W: w - 16, H: hh - Tp - 8 }); }
+  { const Lx = cardR + 8, Tp = metB + 8; if (w - Lx > 140 && hh - Tp > 140) opts.push({ L: Lx, Tp, W: w - Lx - 8, H: hh - Tp - 8 }); }
+  let best = null;
+  for (const o of opts) { o.s = Math.min(o.W / CW, o.H / CH, 1.7); if (!best || o.s > best.s) best = o; }
+  const sAll = Math.min((w - 16) / CW, (hh - 16) / CH, 1.7);
+  if (!best || best.s < sAll * 0.6) best = { L: (w - CW * sAll) / 2, Tp: (hh - CH * sAll) / 2, W: CW * sAll, H: CH * sAll, s: sAll };
+  const s = best.s, offX = best.L + (best.W - CW * s) / 2, offY = best.Tp + Math.min((best.H - CH * s) / 2, 24);
+  VB = { x: CX0 - offX / s, y: CY0 - offY / s, w: w / s, h: hh / s };
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+const ro = new ResizeObserver(() => fit());
+ro.observe(scene); ro.observe($('#taskCard')); ro.observe($('#meter'));
+
+// ---------- interaction ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const rowAt = p => { if (p.x < -6 || p.x > ROW.w + 6) return null; const i = LV.findIndex((l, k) => p.y >= rowY(k) - 4 && p.y <= rowY(k) + ROW.h + 4); return i >= 0 ? LV[i].id : null; };
+
+scene.addEventListener('pointerdown', e => {
+  const d = e.target.closest('[data-drag]'), hit = e.target.closest('[data-hit]');
+  if (!d && !hit) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  if (d) {
+    const id = d.dataset.drag, p = toSvg(e), it = ITEMS.findIndex(x => x.id === id);
+    const tp = trayPos(it);
+    drag = { id, x: e.clientX, y: e.clientY, moved: false, dx: tp.x - p.x, dy: tp.y - p.y, p };
+    if (S.place[id]) { drag.dx = -TRAY.w / 2; drag.dy = -TRAY.h / 2; }
+    return;
+  }
+  drag = { id: 'hit', h: hit.dataset.hit };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag || drag.id === 'hit') return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) { drag.moved = true; scene.classList.add('grabbing'); }
+  if (!drag.moved) return;
+  drag.p = toSvg(e); dirty = true;
+});
+function endDrag(e, cancel) {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (cancel) return;
+  if (d.id === 'hit') { onHit(d.h); return; }
+  if (!d.moved) { if (S.sel && S.sel !== d.id && S.place[d.id]) { tryPlace(S.sel, S.place[d.id]); return; } S.sel = S.sel === d.id ? null : d.id; update(); return; }
+  const p = toSvg(e), z = rowAt(p);
+  if (z) tryPlace(d.id, z);
+  else if (p.x > TRAY.x - 10 && S.place[d.id]) { delete S.place[d.id]; S.sel = null; update(); }
+}
+scene.addEventListener('pointerup', e => endDrag(e, false));
+scene.addEventListener('pointercancel', e => endDrag(e, true));
+
+function onHit(h) {
+  const [k, v, w] = h.split(':');
+  if (k === 'ha') act('ha' + v);
+  if (k === 'bit') act(`bit-${v}-${w}`);
+  if (k === 'mem') act('step');
+  if (k === 'lv') { if (S.sel) tryPlace(S.sel, v); else toast('Сначала выберите карточку данных справа.'); }
+  if (k === 'mode') act('mode-' + v);
+  if (k === 'q') act('q-' + v);
+  if (k === 'cores') act('cores-' + v);
+}
+
+function tryPlace(id, lvId) {
+  const it = ITEMS.find(x => x.id === id), lv = lvById(lvId);
+  if (!it || !lv) return;
+  if (S.place[id] === lvId) { S.sel = null; update(); return; }
+  if (it.bytes > lv.max) { S.miss++; S.sel = null; S.lastBad = { z: lvId, t: performance.now() }; toast(`«${it.name}» (${it.sizeS}) не помещается: ${lv.name.toLowerCase().startsWith('кэш') ? 'кэш' : lv.name} вмещает ${lv.maxS}.`); update(); return; }
+  const here = ITEMS.filter(x => S.place[x.id] === lvId && x.id !== id);
+  let msg = `«${it.short}» → ${lv.name}: ${it.accS} × ${lv.latS} = ${fmtDur(cost(it, lvId))}.`;
+  if (here.length >= lv.cap) { delete S.place[here[0].id]; msg += ` «${here[0].short}» вернулся на полку.`; }
+  S.place[id] = lvId; S.sel = null;
+  const m = model();
+  if (m.placed === m.total && !m.best) msg = `Всё разложено: ${fmtDur(m.T)}. Можно быстрее — какие данные нужны чаще всего?`;
+  toast(msg); update();
+}
+
+function setBits(a, b) {
+  S.a = a & 15; S.b = b & 15; S.rip = performance.now();
+  if (S.a + S.b === 13 && S.a && S.b) S.got13 = true;
+  if (S.a + S.b > 15) S.ovf = true;
+  update();
+}
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  last = t;
+  let anim = false;
+  const id = LID();
+  if (S.hl || (S.lastBad && t - S.lastBad.t < 800)) anim = true;
+  if (id === 'adder' && !settled(3, t + 0)) anim = true;
+  if (id === 'adder' && t - S.rip < 4 * RIP + 60) anim = true;
+  if (id === 'cpu') {
+    if (S.bus && t - S.bus.t < 700) anim = true;
+    if (S.auto && t - S.autoT > 450) { S.autoT = t; phaseStep(false); }
+  }
+  if (id === 'os' && S.osAuto && t - S.osT > 330) { S.osT = t; osTick(); }
+  if (drag && drag.moved) anim = true;
+  if (dirty || anim) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3200); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    adder: B('haA', `A = ${S.hA}`, !!S.hA) + B('haB', `B = ${S.hB}`, !!S.hB) + sep + B('inc', 'A + 1 (4 бита)') + B('rnd', 'Случайные числа') + B('clr', 'Обнулить'),
+    cpu: B('ph', `Фаза: ${PH[S.cpu.ph].n} ›`) + B('cmd', 'Команда ››') + B('auto', S.auto ? 'Пауза ❚❚' : 'Авто ▶', S.auto) + sep + B('step', `Шаг = ${S.cpu.mem[14]}`) + B('reset', 'Сброс'),
+    mem: B('resetMem', 'Начать заново') + sep + B('hit', `Попадания в кэш: ${S.hit} %`),
+    os: B('tick', 'Такт ›') + B('osauto', S.osAuto ? 'Пауза ❚❚' : 'Авто ▶', S.osAuto) + B('osreset', 'Сброс') + sep + B(S.osMode === 'rr' ? 'mode-fcfs' : 'mode-rr', S.osMode === 'rr' ? 'Карусель → по очереди' : 'По очереди → карусель') + B('cores-' + (S.cores === 4 ? 1 : S.cores * 2), `Ядра: ${S.cores}`),
+  }[id];
+}
+function act(a) {
+  if (a === 'haA') { S.hA = 1 - S.hA; update(); return; }
+  if (a === 'haB') { S.hB = 1 - S.hB; update(); return; }
+  if (a.startsWith('bit-')) { const [, k, i] = a.split('-'); if (k === 'a') setBits(S.a ^ (1 << +i), S.b); else setBits(S.a, S.b ^ (1 << +i)); return; }
+  if (a === 'inc') { setBits(S.a + 1, S.b); return; }
+  if (a === 'rnd') { setBits(1 + Math.floor(Math.random() * 15), 1 + Math.floor(Math.random() * 15)); return; }
+  if (a === 'clr') { setBits(0, 0); return; }
+  if (a === 'ph') { S.auto = false; phaseStep(true); return; }
+  if (a === 'cmd') { S.auto = false; if (S.cpu.halted) return phaseStep(false); do { phaseStep(false); } while (S.cpu.ph !== 0 && !S.cpu.halted); return; }
+  if (a === 'auto') { S.auto = !S.auto; S.autoT = 0; update(); return; }
+  if (a === 'step') { const c = S.cpu; c.mem[14] = c.mem[14] % 3 + 1; toast(`Шаг (ячейка 14) = ${c.mem[14]}: каждый круг цикла прибавит к счётчику ${c.mem[14]}.`); update(); return; }
+  if (a === 'reset') { S.auto = false; cpuReset(); update(); return; }
+  if (a === 'resetMem') { S.place = {}; S.sel = null; S.miss = 0; update(); return; }
+  if (a === 'hit') { S.hit = S.hit >= 99 ? 0 : S.hit >= 95 ? 99 : S.hit >= 90 ? 95 : S.hit >= 50 ? 90 : 50; update(); return; }
+  if (a.startsWith('sel-')) { const id = a.slice(4); S.sel = S.sel === id ? null : id; update(); return; }
+  if (a.startsWith('lv-')) { if (S.sel) tryPlace(S.sel, a.slice(3)); else toast('Сначала выберите карточку данных.'); return; }
+  if (a === 'tick') { S.osAuto = false; osTick(); return; }
+  if (a === 'osauto') { if (S.os.done) osReset(); S.osAuto = !S.osAuto; S.osT = 0; update(); return; }
+  if (a === 'osreset') { osReset(); update(); return; }
+  if (a.startsWith('mode-')) { S.osMode = a.slice(5); osReset(); update(); return; }
+  if (a.startsWith('q-')) { if (S.osMode !== 'rr') { S.osMode = 'rr'; } S.q = +a.slice(2); osReset(); update(); return; }
+  if (a.startsWith('cores-')) { S.cores = +a.slice(6); osReset(); update(); return; }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const gateIC = (sym, circ) => IC(`<path d="M2 12h6M2 22h6M26 17h6" stroke="var(--force)" stroke-width="1.6"/><rect x="8" y="6" width="17" height="22" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.6"/><text x="16.5" y="21" font-size="9" fill="var(--fg)" text-anchor="middle" font-family="monospace">${sym}</text>${circ ? '<circle cx="27" cy="17" r="2.4" fill="var(--bg)" stroke="var(--fg)" stroke-width="1.3"/>' : ''}`);
+const boxIC = (txt, col) => IC(`<rect x="3" y="8" width="28" height="18" rx="4" fill="none" stroke="${col || 'var(--fg)'}" stroke-width="1.6"/><text x="17" y="21" font-size="8" fill="var(--fg)" text-anchor="middle" font-family="monospace">${txt}</text>`);
+const rowIC = col => IC(`<rect x="3" y="9" width="28" height="16" rx="4" fill="none" stroke="var(--fg)" stroke-width="1.5"/><rect x="3" y="11" width="3" height="12" rx="1.5" fill="${col}"/><rect x="10" y="13" width="17" height="8" rx="2" fill="none" stroke="var(--muted)" stroke-dasharray="2 2"/>`);
+const ICON = {
+  inputs: IC('<rect x="5" y="6" width="16" height="9" rx="2" fill="var(--force)"/><rect x="5" y="19" width="16" height="9" rx="2" fill="#2a3348" stroke="var(--fg)" stroke-width="1"/><path d="M21 10h9M21 24h9" stroke="var(--muted)" stroke-width="1.4"/>'),
+  outs: IC('<circle cx="12" cy="17" r="7" fill="#ffd27a"/><text x="25" y="21" font-size="10" fill="var(--fg)" text-anchor="middle" font-family="monospace">S</text>'),
+  panel: IC('<rect x="4" y="4" width="26" height="26" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.4"/><path d="M8 11h12M8 17h12M8 23h12" stroke="var(--muted)" stroke-width="1.4"/><rect x="22" y="9" width="5" height="4" fill="var(--force)"/><rect x="22" y="21" width="5" height="4" fill="var(--force)"/>'),
+  bits: IC('<rect x="4" y="10" width="8" height="12" rx="2" fill="var(--force)"/><rect x="13" y="10" width="8" height="12" rx="2" fill="#2a3348" stroke="var(--fg)" stroke-width=".8"/><rect x="22" y="10" width="8" height="12" rx="2" fill="var(--force)"/>'),
+  fa: boxIC('ПС'),
+  carry: IC('<path d="M30 17H4" stroke="var(--force)" stroke-width="2"/><path d="M9 12l-5 5 5 5" fill="none" stroke="var(--force)" stroke-width="2"/>'),
+  sums: IC('<rect x="4" y="10" width="8" height="12" rx="2" fill="none" stroke="var(--force)"/><rect x="13" y="10" width="8" height="12" rx="2" fill="none" stroke="var(--force)"/><rect x="22" y="10" width="8" height="12" rx="2" fill="none" stroke="var(--force)"/>'),
+  cu: IC('<rect x="3" y="9" width="28" height="16" rx="8" fill="none" stroke="var(--fg)" stroke-width="1.4"/><circle cx="11" cy="17" r="3" fill="var(--force)"/><circle cx="17" cy="17" r="3" fill="var(--muted)"/><circle cx="23" cy="17" r="3" fill="var(--muted)"/>'),
+  pc: boxIC('PC'), ir: boxIC('IR'), acc: boxIC('ACC'),
+  alu: IC('<path d="M4 8h26l-6 18H10z" fill="none" stroke="var(--fg)" stroke-width="1.6"/><text x="17" y="19" font-size="7" fill="var(--fg)" text-anchor="middle" font-family="monospace">+</text>'),
+  bus: IC('<path d="M3 12h28" stroke="var(--arm)" stroke-width="3"/><path d="M3 22h28" stroke="var(--force)" stroke-width="3"/>'),
+  mem: IC('<rect x="6" y="3" width="22" height="28" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.4"/><path d="M6 9h22M6 15h22M6 21h22M6 27h22" stroke="var(--muted)" stroke-width="1"/>'),
+  tray: IC('<rect x="6" y="5" width="22" height="9" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.4"/><rect x="6" y="19" width="22" height="9" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.4"/>'),
+  total: IC('<circle cx="17" cy="18" r="11" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M17 18V11M17 18l5 3" stroke="var(--force)" stroke-width="1.8" stroke-linecap="round"/>'),
+  cores: IC('<rect x="4" y="8" width="12" height="18" rx="2" fill="none" stroke="var(--force)" stroke-width="1.6"/><rect x="18" y="8" width="12" height="18" rx="2" fill="none" stroke="var(--arm)" stroke-width="1.6"/>'),
+  settings: IC('<rect x="3" y="7" width="12" height="7" rx="3.5" fill="var(--fg)"/><rect x="17" y="7" width="14" height="7" rx="3.5" fill="none" stroke="var(--muted)"/><rect x="3" y="19" width="8" height="7" rx="3.5" fill="none" stroke="var(--muted)"/><rect x="13" y="19" width="8" height="7" rx="3.5" fill="var(--fg)"/>'),
+  queue: IC('<rect x="2" y="12" width="9" height="10" rx="2" fill="none" stroke="#ffb547"/><rect x="12.5" y="12" width="9" height="10" rx="2" fill="none" stroke="#86e0a8"/><rect x="23" y="12" width="9" height="10" rx="2" fill="none" stroke="#c3a6ff"/>'),
+  gantt: IC('<rect x="3" y="6" width="8" height="6" fill="#ffb547"/><rect x="11" y="14" width="8" height="6" fill="#86e0a8"/><rect x="19" y="22" width="8" height="6" fill="#c3a6ff"/><rect x="27" y="6" width="4" height="6" fill="#ffb547"/>'),
+  ram: IC('<rect x="2" y="12" width="30" height="10" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.2"/><rect x="3" y="13" width="5" height="8" fill="var(--muted)"/><rect x="8" y="13" width="12" height="8" fill="#ffb547"/><rect x="20" y="13" width="6" height="8" fill="#72d4e8"/>'),
+  stats: IC('<path d="M5 26V16M13 26V9M21 26V19M29 26V12" stroke="var(--force)" stroke-width="3" stroke-linecap="round"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  if (id === 'adder') return `Наборов полусумматора: ${m.half} из 4 · сумма 13: ${m.got13 ? '✓' : '—'} · переполнение: ${m.ovf ? '✓' : '—'}`;
+  if (id === 'cpu') return `Фазы вручную: ${m.phases} из 3 · счётчик: ${m.counter} из 3`;
+  if (id === 'mem') return `Разложено ${m.placed} из ${m.total}` + (m.placed === m.total ? ` · время ${fmtDur(m.T)}${m.best ? '' : ' — можно быстрее'}` : '') + (m.miss ? ` · не влезло: ${m.miss}` : '');
+  return `1 ядро без заиканий: ${m.ok1 ? '✓' : '—'} · несколько ядер: ${m.multi ? '✓' : '—'}`;
+}
+
+// Scheme tab
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'adder') h = `<h2>Сумматор</h2>
+      <dl class="reads"><div><dt>S полусумм.</dt><dd id="r1"></dd></div><div><dt>C полусумм.</dt><dd id="r2"></dd></div><div><dt>A + B</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Полусумматор: входы</div><div class="chips" id="haChips"></div></div>
+      <div class="ctl"><div class="lbl">Число A (разряды 3 2 1 0)</div><div class="chips" id="aChips"></div></div>
+      <div class="ctl"><div class="lbl">Число B (разряды 3 2 1 0)</div><div class="chips" id="bChips"></div></div>
+      <div class="row"><button class="ghostbtn" data-a="inc">A + 1</button><button class="ghostbtn" data-a="rnd">Случайные</button><button class="ghostbtn" data-a="clr">Обнулить</button></div>`;
+  if (id === 'cpu') h = `<h2>Учебный процессор</h2>
+      <dl class="reads"><div><dt>PC</dt><dd id="r1"></dd></div><div><dt>IR</dt><dd id="r2"></dd></div><div><dt>ACC</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="ph">Фаза ›</button><button class="ghostbtn" data-a="cmd">Команда ››</button><button class="ghostbtn" data-a="auto" id="autoBtn">Авто</button><button class="ghostbtn" data-a="reset">Сброс</button></div>
+      <div class="ctl"><div class="lbl">Шаг цикла (ячейка 14)</div><div class="chips" id="stepChips"></div></div>
+      <p class="note" style="margin-top:12px" id="r4"></p>`;
+  if (id === 'mem') h = `<h2>Раскладка данных</h2>
+      <dl class="reads"><div><dt>Разложено</dt><dd id="r1"></dd></div><div><dt>Время</dt><dd id="r2"></dd></div><div><dt>Лучшее</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">1. Выберите данные</div><div class="chips" id="itemChips"></div></div>
+      <div class="ctl"><div class="lbl">2. Выберите уровень</div><div class="chips" id="lvChips">${LV.map(l => `<button data-l="${l.id}">${l.name}</button>`).join('')}</div></div>
+      <div class="row"><button class="ghostbtn" data-a="resetMem">Начать заново</button></div>
+      <h3>Зачем кэш</h3>
+      <div class="ctl"><label for="hitR">Доля обращений, попавших в кэш <output id="hitO"></output></label><input type="range" id="hitR" min="0" max="100" step="1"></div>
+      <p class="note" style="margin-top:8px" id="r4"></p>`;
+  if (id === 'os') h = `<h2>Планировщик ОС</h2>
+      <dl class="reads"><div><dt>Такт</dt><dd id="r1"></dd></div><div><dt>Музыка ждала</dt><dd id="r2"></dd></div><div><dt>Сделано</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Планировщик</div><div class="chips" id="modeChips"></div></div>
+      <div class="ctl"><div class="lbl">Квант (для карусели)</div><div class="chips" id="qChips"></div></div>
+      <div class="ctl"><div class="lbl">Ядра процессора</div><div class="chips" id="coreChips"></div></div>
+      <div class="row"><button class="ghostbtn" data-a="tick">Такт ›</button><button class="ghostbtn" data-a="osauto">Авто / пауза</button><button class="ghostbtn" data-a="osreset">Сброс</button></div>
+      <p class="note" style="margin-top:12px" id="r4"></p>`;
+  el.innerHTML = h;
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  el.querySelectorAll('#lvChips button').forEach(b => b.onclick = () => act('lv-' + b.dataset.l));
+  const hr = el.querySelector('#hitR'); if (hr) { hr.value = S.hit; hr.oninput = () => { S.hit = +hr.value; update(); }; }
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  const chips = (s, list) => { const x = el.querySelector(s); if (!x) return; x.innerHTML = list.map(c => `<button data-k="${c[0]}" aria-pressed="${c[2]}">${c[1]}</button>`).join(''); x.querySelectorAll('button').forEach(b => b.onclick = () => act(b.dataset.k)); };
+  if (id === 'adder') {
+    set('#r1', String(m.S)); set('#r2', String(m.C)); set('#r3', `${m.a}+${m.b}=${m.sum}`);
+    chips('#haChips', [['haA', `A = ${m.A}`, !!m.A], ['haB', `B = ${m.B}`, !!m.B]]);
+    chips('#aChips', [3, 2, 1, 0].map(i => [`bit-a-${i}`, `a${SUB[i]} = ${(S.a >> i) & 1}`, !!((S.a >> i) & 1)]));
+    chips('#bChips', [3, 2, 1, 0].map(i => [`bit-b-${i}`, `b${SUB[i]} = ${(S.b >> i) & 1}`, !!((S.b >> i) & 1)]));
+  } else if (id === 'cpu') {
+    const c = S.cpu;
+    set('#r1', String(c.pc)); set('#r2', c.ir === null ? '—' : `${opOf(c.ir).m} ${c.ir & 15}`); set('#r3', String(c.acc));
+    chips('#stepChips', [1, 2, 3].map(v => [`stepset-${v}`, `шаг ${v}`, c.mem[14] === v]));
+    el.querySelectorAll('[data-k^="stepset-"]').forEach(b => b.onclick = () => { S.cpu.mem[14] = +b.dataset.k.split('-')[1]; update(); });
+    set('#r4', `${c.msg}. Следующая фаза: ${PH[c.ph].n.toLowerCase()}.`);
+    const ab = el.querySelector('#autoBtn'); if (ab) ab.textContent = S.auto ? 'Пауза' : 'Авто';
+  } else if (id === 'mem') {
+    set('#r1', `${m.placed}/${m.total}`); set('#r2', m.placed === m.total ? fmtDur(m.T) : '—'); set('#r3', S.done.mem ? fmtDur(BEST) : '?');
+    chips('#itemChips', ITEMS.map(it => [`sel-${it.id}`, it.short + (S.place[it.id] ? ` → ${lvById(S.place[it.id]).name}` : ''), S.sel === it.id]));
+    const h = S.hit / 100, avg = h * 1 + (1 - h) * 100;
+    set('#hitO', `${S.hit} %`);
+    set('#r4', `Среднее время обращения = ${nf(h, 2)} × 1 нс + ${nf(1 - h, 2)} × 100 нс = ${nf(avg, 1)} нс. Без кэша — 100 нс, то есть с кэшем в ${nf(100 / avg, 1)} раза быстрее.`);
+  } else {
+    set('#r1', String(m.t)); set('#r2', `${m.mg} ${plural(m.mg, 'такт', 'такта', 'тактов')}`); set('#r3', `${m.work}/${m.all}`);
+    chips('#modeChips', [['mode-fcfs', 'по очереди до конца', S.osMode === 'fcfs'], ['mode-rr', 'карусель', S.osMode === 'rr']]);
+    chips('#qChips', [1, 2, 4].map(q => [`q-${q}`, `${q} ${plural(q, 'такт', 'такта', 'тактов')}`, S.osMode === 'rr' && S.q === q]));
+    chips('#coreChips', [1, 2, 4].map(c => [`cores-${c}`, `${c}`, S.cores === c]));
+    set('#r4', `Сейчас: ${modeName()}, ${S.cores} ${plural(S.cores, 'ядро', 'ядра', 'ядер')}. Любая смена настроек начинает прогон заново.`);
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'adder') return [
+    { id: 'inputs', icon: ICON.inputs, name: 'Входы A и B', spec: 'Два бита, которые складываем. Включено (жёлтый) — 1, выключено — 0.' },
+    { id: 'xor', icon: gateIC('=1'), name: 'Вентиль XOR (=1)', spec: 'Исключающее ИЛИ: 1, когда входы разные. Даёт бит суммы S.' },
+    { id: 'and', icon: gateIC('&amp;'), name: 'Вентиль И (&)', spec: '1, только когда оба входа 1. Даёт перенос C в следующий разряд.' },
+    { id: 'outs', icon: ICON.outs, name: 'Выходы S и C', spec: 'Вместе это двухбитный ответ: C — старший разряд, S — младший. 1 + 1 = 10₂.' },
+    { id: 'panel', icon: ICON.panel, name: 'Все вентили сразу', spec: 'Что выдают И, ИЛИ, НЕ и XOR при текущих A и B. Внизу — какие наборы вы уже проверили.' },
+    { id: 'bits', icon: ICON.bits, name: 'Биты чисел A и B', spec: 'Четыре разряда с весами 8, 4, 2, 1. Нажмите на бит, чтобы переключить его.' },
+    { id: 'fa', icon: ICON.fa, name: 'Полные сумматоры (ПС)', spec: 'Складывают три бита: aᵢ, bᵢ и перенос из младшего разряда. Внутри — два полусумматора и ИЛИ.' },
+    { id: 'carry', icon: ICON.carry, name: 'Цепочка переносов и C₄', spec: 'Перенос бежит справа налево, и каждый сумматор ждёт соседа. Горит C₄ — сумма больше 15, переполнение.' },
+    { id: 'sums', icon: ICON.sums, name: 'Биты суммы', spec: 'Результат s₃s₂s₁s₀. Пока перенос не добежал, бит не готов — отсюда задержка.' }];
+  if (id === 'cpu') return [
+    { id: 'cu', icon: ICON.cu, name: 'Устройство управления', spec: 'Дирижёр процессора: ведёт цикл выборка → декодирование → исполнение и говорит остальным, что делать.' },
+    { id: 'pc', icon: ICON.pc, name: 'PC — счётчик команд', spec: 'Адрес следующей команды. После выборки увеличивается на 1, JUMP записывает в него новый адрес.' },
+    { id: 'ir', icon: ICON.ir, name: 'IR — регистр команды', spec: 'Хранит выбранную команду, пока УУ её декодирует и исполняет.' },
+    { id: 'acc', icon: ICON.acc, name: 'ACC — аккумулятор', spec: 'Регистр для чисел: сюда загружают, к нему прибавляют, отсюда сохраняют в память.' },
+    { id: 'alu', icon: ICON.alu, name: 'АЛУ', spec: 'Арифметико-логическое устройство. Внутри — сумматоры и вентили из урока 1.' },
+    { id: 'bus', icon: ICON.bus, name: 'Шины адреса и данных', spec: 'Провода между процессором и памятью: по одной идёт номер ячейки, по другой — её содержимое.' },
+    { id: 'mem', icon: ICON.mem, name: 'Память на 16 ячеек', spec: 'И программа (0–3), и данные (13, 14) лежат здесь в одинаковом двоичном виде. Ячейку 14 можно менять.' }];
+  if (id === 'mem') return LV.map(l => ({ id: l.id, icon: rowIC(l.col), name: l.name, spec: `Задержка ${l.latS}, объём ${l.sizeS}. ${{ reg: 'Внутри процессора, работают на его частоте.', cache: 'На кристалле процессора. Хранит копии самых нужных данных из ОЗУ.', ram: 'Оперативная память: все запущенные программы и их данные. Без питания всё забывает.', ssd: 'Накопитель на флеш-памяти: программы, файлы, фото. Хранит без питания.', cloud: 'Диски в дата-центре; данные идут через интернет. Удобно и надёжно, но далеко.' }[l.id]}` }))
+    .concat([{ id: 'tray', icon: ICON.tray, name: 'Данные программы', spec: 'У каждого набора — размер и сколько раз к нему обращаются за время работы.' },
+             { id: 'total', icon: ICON.total, name: 'Время программы', spec: 'Сумма по всем данным: число обращений × задержка уровня, где они лежат.' }]);
+  return [
+    { id: 'cores', icon: ICON.cores, name: 'Ядра процессора', spec: 'Каждое ядро в каждый такт выполняет одну программу. Больше ядер — больше программ одновременно по-настоящему.' },
+    { id: 'settings', icon: ICON.settings, name: 'Настройки планировщика', spec: '«По очереди» — каждая программа до конца. «Карусель» — по кванту времени, по кругу.' },
+    { id: 'queue', icon: ICON.queue, name: 'Очередь готовых процессов', spec: 'Программы, которые ждут свободное ядро. После кванта процесс встаёт в конец очереди.' },
+    { id: 'gantt', icon: ICON.gantt, name: 'Диаграмма тактов', spec: 'Какой процесс на каком такте работал. Видно, как карусель перемешивает программы.' },
+    { id: 'ram', icon: ICON.ram, name: 'Оперативная память', spec: 'ОС выделяет каждому процессу свой участок и освобождает его, когда программа завершилась.' },
+    { id: 'stats', icon: ICON.stats, name: 'Итоги', spec: 'Сколько тактов подряд ждала музыка и за сколько тактов готово всё.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Из чего состоит опыт</h2><p class="note">Нажмите на деталь, чтобы найти её на сцене.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'adder') {
+    let h = `<h2>Сложение в столбик</h2><div class="formula" style="font-size:15px;text-align:right;white-space:pre">  перенос ${m.cs.slice(1).reverse().join('')}\n        ${bin4(m.a)}\n      + ${bin4(m.b)}\n      ─────\n       ${m.cs[4]}${bin4(m.sum & 15)}</div>`;
+    h += `<p class="note">Как в десятичной системе, только «десяток» здесь — это 2: 1 + 1 = 10₂, пишем 0, 1 в уме.</p>`;
+    h += `<h3>Формулы</h3><div class="steps">` + step('полусумматор: S', 'A ⊕ B') + step('полусумматор: C', 'A ∧ B') + step('полный: sᵢ', 'aᵢ ⊕ bᵢ ⊕ cᵢ') + step('полный: cᵢ₊₁', '(aᵢ ∧ bᵢ) ∨ (cᵢ ∧ (aᵢ ⊕ bᵢ))') + `</div>`;
+    h += `<h3>По разрядам сейчас</h3><div class="steps">` + [0, 1, 2, 3].map(i => step(`разряд ${i}: ${(S.a >> i) & 1} + ${(S.b >> i) & 1} + c${SUB[i]}=${m.cs[i]}`, `s${SUB[i]} = ${m.s[i]}, c${SUB[i + 1]} = ${m.cs[i + 1]}`)).join('') +
+      step('в десятичной', `${m.a} + ${m.b} = ${m.sum}${m.sum > 15 ? ' > 15 — переполнение' : ''}`, 'sum') + `</div>`;
+    h += `<h3>Сколько влезает</h3><div class="steps">` + step('4 бита', '0 … 2⁴ − 1 = 15') + step('8 бит', '0 … 255') + step('64 бита', '≈ 1,8 · 10¹⁹') + `</div>`;
+    return h;
+  }
+  if (id === 'cpu') {
+    const c = S.cpu;
+    let h = `<h2>Формат команды</h2><div class="formula">${c.ir === null ? '0001 1101' : bin8(c.ir)} = код | адрес</div>`;
+    h += `<div class="steps">` + [1, 2, 3, 4, 0].map(k => step(`${bin4(k)} ${OPC[k].m} a`, OPC[k].d('a'))).join('') + `</div>`;
+    h += `<h3>Программа в памяти</h3><div class="steps">` + PROG.map((v, i) => step(`${i}: ${bin8(v)}`, `${opOf(v).m} ${v & 15}`)).join('') + step('13: счётчик', String(c.mem[13])) + step('14: шаг', String(c.mem[14])) + `</div>`;
+    h += `<h3>Выполненные команды</h3>` + (c.log.length ? `<div class="steps">` + c.log.map((s, i) => step(`${c.cmds - c.log.length + i + 1}.`, s)).join('') + `</div>` : `<p class="note">Пока ни одной. Нажмите «Фаза ›» три раза.</p>`);
+    h += `<h3>Скорость настоящего процессора</h3><div class="steps">` + step('частота 3 ГГц', '3 · 10⁹ тактов в секунду') + step('один круг цикла здесь', '4 команды × 3 фазы = 12 шагов') + step('кругов в секунду (грубо)', '3 · 10⁹ / 12 = 2,5 · 10⁸', 'sum') + `</div>`;
+    h += `<p class="note" style="margin-top:10px">Настоящие процессоры выполняют фазы разных команд одновременно (конвейер), поэтому на деле ещё быстрее.</p>`;
+    return h;
+  }
+  if (id === 'mem') {
+    let h = `<h2>Время программы</h2><div class="formula">t = Σ обращения × задержка</div><div class="steps">`;
+    ITEMS.forEach(it => { const p = S.place[it.id]; h += step(it.short, p ? `${it.accS.split(' ')[0]} × ${lvById(p).latS.replace('≈ ', '')} = ${fmtDur(cost(it, p))}` : 'не разложено'); });
+    h += step('итого', m.placed === m.total ? fmtDur(m.T) : '—', 'sum') + `</div>`;
+    h += `<h3>Лестница задержек</h3><div class="steps">` + LV.map(l => step(l.name, `${l.latS} → если 1 нс = 1 с: ${l.human}`)).join('') + `</div>`;
+    const hh = S.hit / 100, avg = hh + (1 - hh) * 100;
+    h += `<h3>Почему кэш так важен</h3><div class="steps">` + step(`попаданий в кэш ${S.hit} %`, `${nf(hh, 2)} × 1 + ${nf(1 - hh, 2)} × 100 = ${nf(avg, 1)} нс`) + step('без кэша', '100 нс') + step('ускорение', `${nf(100 / avg, 1)} раза`, 'sum') + `</div>`;
+    h += `<p class="note" style="margin-top:10px">Долю попаданий можно менять во вкладке «Схема» или кнопкой на панели внизу сцены.</p>`;
+    return h;
+  }
+  const o = S.os;
+  let h = `<h2>Итоги прогона</h2><div class="formula" style="font-size:15px">${modeName()}, ${S.cores} ${plural(S.cores, 'ядро', 'ядра', 'ядер')}</div><div class="steps">`;
+  PROCS.forEach(p => { h += step(p.name, `${o.fin[p.id] ? `готово на такте ${o.fin[p.id]}` : `осталось ${o.left[p.id]}`} · ждал подряд ≤ ${o.maxGap[p.id]}`); });
+  h += step('переключений', String(o.sw)) + step('всё готово', o.done ? `за ${o.t} ${plural(o.t, 'такт', 'такта', 'тактов')}` : '—', 'sum') + `</div>`;
+  h += `<h3>Прошлые прогоны</h3>` + (S.osRuns.length ? `<div class="steps">` + S.osRuns.map(r => step(`${r.mode === 'rr' ? `карусель q=${r.q}` : 'по очереди'}, ядер ${r.cores}`, `${r.T} т. · музыка ждала ${r.mg} ${r.mg <= GAPMAX ? '✓' : '✗'}`)).join('') + `</div>` : `<p class="note">Пока нет завершённых прогонов.</p>`);
+  h += `<h3>Почему ИИ считают на GPU</h3><div class="steps">` + step('умножение матриц 4096 × 4096', '4096³ ≈ 6,9 · 10¹⁰ умножений') + step('1 ядро, 10⁹ операций/с', '≈ 69 с') + step('16 ядер CPU', '≈ 4,3 с') + step('10 000 ядер GPU', '≈ 0,007 с', 'sum') + `</div>`;
+  h += `<p class="note" style="margin-top:10px">Это идеальный подсчёт: каждое умножение не зависит от других, поэтому их можно делать одновременно. На деле мешают передача данных и память, но выигрыш GPU всё равно в десятки и сотни раз.</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), id = LID(), ok = !!S.done[id];
+  if (m.kind === 'adder') { const g = (m.half / 4 + (m.got13 ? 1 : 0) + (m.ovf ? 1 : 0)) / 3; el.innerHTML = `<div class="k">Сумматор</div><div class="v ${ok ? 'ok' : ''}">${m.a} + ${m.b} = ${m.sum}</div><div class="gauge"><b style="width:${(g * 100).toFixed(1)}%"></b></div><div class="lr"><span>полусумм.</span><span>${m.half}/4</span></div>`; }
+  else if (m.kind === 'cpu') el.innerHTML = `<div class="k">Счётчик · ячейка 13</div><div class="v ${ok ? 'ok' : ''}">${m.counter}</div><div class="gauge"><b style="width:${Math.min(100, m.counter / 3 * 100).toFixed(1)}%"></b></div><div class="lr"><span>далее</span><span>${m.next.toLowerCase()}</span></div>`;
+  else if (m.kind === 'mem') el.innerHTML = `<div class="k">Время программы</div><div class="v ${ok || m.best ? 'ok' : ''}">${m.placed === m.total ? fmtDur(m.T) : '—'}</div><div class="gauge"><b style="width:${(m.placed / m.total * 100).toFixed(1)}%;background:${m.best ? 'var(--ok)' : 'var(--arm)'}"></b></div><div class="lr"><span>разложено</span><span>${m.placed}/${m.total}</span></div>`;
+  else el.innerHTML = `<div class="k">Такт ${m.t}</div><div class="v ${ok ? 'ok' : ''}" style="color:${m.mg <= GAPMAX ? '' : 'var(--warn)'}">музыка ждёт ≤ ${m.mg}</div><div class="gauge"><b style="width:${(m.work / m.all * 100).toFixed(1)}%"></b></div><div class="lr"><span>сделано</span><span>${m.work}/${m.all}</span></div>`;
+}
+
+function update() {
+  if (LID() === 'adder') S.hTried[`${S.hA}${S.hB}`] = 1;
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Отличная работа!'), 600);
+  }
+  renderMeter(m); renderTools();
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  adder: '<path d="M2 9h12M2 21h12M30 15h8" stroke="#ffb547" stroke-width="1.4"/><rect x="14" y="5" width="16" height="20" rx="2" fill="none" stroke="#e8ecf4" stroke-width="1.3"/><text x="22" y="18" font-size="7" fill="#e8ecf4" text-anchor="middle" font-family="monospace">=1</text><text x="52" y="19" font-size="9" fill="#ffd27a" text-anchor="middle" font-family="monospace">10</text>',
+  cpu: '<rect x="18" y="5" width="30" height="20" rx="3" fill="none" stroke="#e8ecf4" stroke-width="1.3"/>' + [9, 15, 21].map(y => `<path d="M12 ${y}h6M48 ${y}h6" stroke="#ffb547" stroke-width="1.3"/>`).join('') + '<text x="33" y="18" font-size="7" fill="#72d4e8" text-anchor="middle" font-family="monospace">CPU</text>',
+  mem: [0, 1, 2, 3].map(i => `<rect x="${24 - i * 5}" y="${4 + i * 6.2}" width="${18 + i * 10}" height="4.6" rx="1.5" fill="${['#86e0a8', '#c2e08a', '#ffd27a', '#ff8a73'][i]}"/>`).join(''),
+  os: '<rect x="4" y="5" width="10" height="5" fill="#ffb547"/><rect x="14" y="12" width="10" height="5" fill="#86e0a8"/><rect x="24" y="19" width="10" height="5" fill="#c3a6ff"/><rect x="34" y="5" width="10" height="5" fill="#ffb547"/><rect x="44" y="12" width="10" height="5" fill="#86e0a8"/><rect x="54" y="19" width="8" height="5" fill="#c3a6ff"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Ls, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Ls.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Ls.title}</span></span>
+      ${S.done[Ls.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.hl = null; S.lastBad = null; drag = null;
+  S.hA = 0; S.hB = 0; S.hTried = {}; S.a = 5; S.b = 3; S.rip = -1e9; S.got13 = false; S.ovf = false;
+  S.cpu = null; cpuReset(1); S.seen = {}; S.auto = false; S.autoT = 0;
+  S.place = {}; S.sel = null; S.miss = 0; S.hit = 95;
+  S.osMode = 'fcfs'; S.q = 2; S.cores = 1; S.ok1 = false; S.multi = false; S.osRuns = []; osReset(); S.osT = 0;
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderStrip(); buildScheme(); update();
+  requestAnimationFrame(fit);
+  const cur = $('#lessons .lesson[aria-current="true"]'), ls = $('#lessons'); if (cur) { const dx = cur.getBoundingClientRect().left - ls.getBoundingClientRect().left; if (dx < 0 || dx + cur.offsetWidth > ls.clientWidth) ls.scrollLeft += dx - 8; }
+}
+window.addEventListener('resize', () => requestAnimationFrame(fit));
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '', guide = '';
+  if (id === 'adder') {
+    now = `Полусумматор из вентилей XOR и И: входы A = ${m.A}, B = ${m.B}, выходы S = ${m.S}, C = ${m.C}. Проверено наборов A B: ${Object.keys(S.hTried).sort().join(', ')} (${m.half} из 4). 4-битный сумматор из четырёх полных сумматоров: A = ${bin4(S.a)}₂ = ${S.a}, B = ${bin4(S.b)}₂ = ${S.b}, сумма ${m.sum}${m.sum > 15 ? ' — переполнение, горит C₄' : ` = ${bin4(m.sum)}₂`}. Переносы c₁…c₄: ${m.cs.slice(1).join(', ')}. Сумма 13 из двух ненулевых чисел уже получалась: ${m.got13 ? 'да' : 'нет'}. Переполнение уже вызывалось: ${m.ovf ? 'да' : 'нет'}.`;
+    guide = 'Не называй готовые числа для суммы 13: помоги разложить 13 по весам разрядов 8, 4, 2, 1 и спроси, как разделить эти разряды между A и B. Про полусумматор спроси, что должно получиться при 1 + 1.';
+  }
+  if (id === 'cpu') {
+    const c = S.cpu;
+    now = `Учебный процессор с регистрами PC = ${c.pc}, IR = ${c.ir === null ? 'пусто' : `${bin8(c.ir)} (${opOf(c.ir).m} ${c.ir & 15})`}, ACC = ${c.acc}. Память: 0: LOAD 13, 1: ADD 14, 2: STORE 13, 3: JUMP 0; ячейка 13 (счётчик) = ${c.mem[13]}, ячейка 14 (шаг) = ${c.mem[14]}. Последняя фаза: ${c.last ? PH.find(p => p.k === c.last).n : 'ещё не было'}, следующая: ${PH[c.ph].n}. Что произошло: ${c.msg}. Выполнено команд: ${c.cmds}. Фазы, пройденные вручную по одной: ${['F', 'D', 'E'].filter(k => S.seen[k]).map(k => PH.find(p => p.k === k).n).join(', ') || 'нет'}. Автозапуск: ${S.auto ? 'включён' : 'выключен'}.`;
+    guide = 'Попроси ученика перед каждой фазой предсказать, что изменится: какой регистр, какая ячейка. Не выполняй программу за него.';
+  }
+  if (id === 'mem') {
+    const pl = ITEMS.filter(it => S.place[it.id]).map(it => `«${it.name}» → ${lvById(S.place[it.id]).name}`), left = ITEMS.filter(it => !S.place[it.id]).map(it => `«${it.name}» (${it.sizeS}, ${it.accS})`);
+    now = `Лестница памяти: ${LV.map(l => `${l.name} (${l.latS}, мест ${l.cap}, вмещает ${l.maxS})`).join('; ')}. Разложено ${m.placed} из ${m.total}: ${pl.join('; ') || 'пока ничего'}. Осталось: ${left.join(', ') || 'ничего'}. ${m.placed === m.total ? `Время программы ${fmtDur(m.T)}${m.best ? ' — это лучший вариант' : ', лучший вариант быстрее'}.` : ''} Попыток положить не по размеру: ${m.miss}.`;
+    guide = 'Не говори, куда класть каждую карточку: предложи сравнить вклад «обращения × задержка» и подумать, какие данные нужны чаще всего и что влезает по размеру.';
+  }
+  if (id === 'os') {
+    const o = S.os;
+    now = `Симулятор планировщика: ${modeName()}, ядер ${S.cores}. Такт ${o.t}. Процессы и сколько тактов работы осталось: ${PROCS.map(p => `${p.name} ${o.left[p.id]} из ${p.need}`).join(', ')}. Очередь: ${o.queue.map(x => pById(x).name).join(', ') || 'пусто'}. На ядрах: ${o.cores.map((c, k) => `ядро ${k + 1} — ${c.p ? pById(c.p).name : 'свободно'}`).join(', ')}. Музыка пока ждала максимум ${o.maxGap.music} тактов подряд (норма — не больше ${GAPMAX}). Прогон завершён: ${o.done ? `да, за ${o.t} тактов` : 'нет'}. Цели: 1 ядро без заиканий — ${S.ok1 ? 'выполнено' : 'нет'}, прогон на нескольких ядрах — ${S.multi ? 'выполнено' : 'нет'}. Прошлые прогоны: ${S.osRuns.map(r => `${r.mode === 'rr' ? 'карусель q=' + r.q : 'по очереди'}, ядер ${r.cores}: ${r.T} тактов, музыка ждала ${r.mg}`).join('; ') || 'нет'}.`;
+    guide = 'Не называй сразу нужный квант: спроси, почему музыка долго ждёт при «по очереди», и как размер кванта влияет на ожидание при четырёх программах.';
+  }
+  return [
+    `Раздел: информатика, 10 класс, тема «Как устроен компьютер изнутри» (устройство компьютера, логические основы). Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    S.done[id] ? 'Задание уже выполнено — можно обсуждать свободно.' : guide,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = {
+    adder: 'Как из полусумматоров собрать полный сумматор?',
+    cpu: 'Зачем процессору счётчик команд PC?',
+    mem: 'Почему нельзя сделать всю память такой же быстрой, как кэш?',
+    os: 'Почему нейросети обучают на видеокартах, а не на процессоре?',
+  }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

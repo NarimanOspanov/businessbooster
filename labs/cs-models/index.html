@@ -1,0 +1,1142 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по информатике, 9 и 11 класс: моделирование и формализация, модели роста, метод Монте-Карло, компьютерная симуляция.">
+<link rel="icon" href="data:,">
+<title>Моделирование и симуляции</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. SVG stage on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:pointer}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none;z-index:3}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none;z-index:3}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.meter .v.ok{color:var(--ok)}
+.meter .v.bad{color:var(--warn)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--arm)}100%{box-shadow:0 0 0 0 transparent}}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px);z-index:3}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.tools button:hover{color:var(--fg)}
+.tools button.go{background:var(--fg);color:var(--bg);font-weight:600}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg);box-shadow:inset 0 0 0 1px var(--force)}
+.tools button:disabled{opacity:.35;cursor:default}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.tools .val{font:500 12px var(--font-mono);color:var(--force);padding:0 4px;white-space:nowrap;min-width:34px;text-align:center}
+.tools button.val{padding:6px 6px;color:var(--force)}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:22%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--fg)}
+.chips button:hover{border-color:var(--muted)}
+.chips button[aria-pressed="true"]{border-color:var(--force)}
+.chips button:disabled{opacity:.35;cursor:default}
+.listing{font:500 13px/1.6 var(--font-mono);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);margin-top:10px;overflow-wrap:anywhere}
+.listing .cur{color:var(--force)}
+.listing .bad{color:var(--warn)}
+.listing .dim{color:var(--muted)}
+
+.formula{font:500 16px/1.35 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px;overflow-wrap:anywhere}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+.step.okk span{color:var(--ok)}
+.step.badd span{color:var(--warn)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1760px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:520px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 380px);min-height:0}
+  .stage.tall{height:calc(80vw + 470px)}
+  .stage.xtall{height:calc(80vw + 620px)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<script src="/luch/splash.js"></script>
+<div class="app">
+  <header>
+    <div class="brand" role="link" tabindex="0" title="Карта предметов" style="cursor:pointer" onclick="location.href='/#cs'" onkeydown="if(event.key==='Enter')location.href='/#cs'">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9.6 14.6 9.2 6.2 15 10.6Q20 9.4 25 10.6L30.8 6.2 30.4 14.6Q34.6 22 31.6 29Q27.6 36 20 36Q12.4 36 8.4 29Q5.4 22 9.6 14.6Z" fill="#ffb547"/><path d="M20 14Q15.2 10.8 10.9 13.4Q7.6 17.2 9.4 21.8Q11.6 25.8 15.9 25.4Q18.5 25.1 20 27.1Q21.5 25.1 24.1 25.4Q28.4 25.8 30.6 21.8Q32.4 17.2 29.1 13.4Q24.8 10.8 20 14Z" fill="#ffd896"/><circle cx="15" cy="18.8" r="5" fill="#fffaf0"/><circle cx="25" cy="18.8" r="5" fill="#fffaf0"/><circle cx="15.6" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="24.4" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="16.6" cy="18.1" r="1" fill="#fff"/><circle cx="25.4" cy="18.1" r="1" fill="#fff"/><path d="M18.6 23.4h2.8L20 26.6z" fill="#ff8a73"/><path d="M10.5 29.6Q15.3 27.4 20 29.7Q24.7 27.4 29.5 29.6V34.6Q24.7 32.6 20 34.8Q15.3 32.6 10.5 34.6Z" fill="#72d4e8"/><path d="M20 29.7V34.8" stroke="#0b1019" stroke-width="1.1"/><path d="M8.2 23.5Q5.6 28.6 9.4 32.6Q11.6 33.2 12.4 31Q10.4 28.4 8.2 23.5Z" fill="#e8962a"/><path d="M31.8 23.5Q34.4 28.6 30.6 32.6Q28.4 33.2 27.6 31Q29.6 28.4 31.8 23.5Z" fill="#e8962a"/><path d="M35 3.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="#86e0a8"/></svg>
+      <div><h1>OPEN SCHOOL AI</h1><small>Доступное образование для всех</small></div>
+    </div>
+    <div class="headr">
+      <div class="prog" aria-label="Прогресс"><b>Модели</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage tall" id="stage" aria-label="Рабочий стол лаборатории">
+    <svg class="scene" id="scene" role="img" aria-label="Интерактивная сцена: модель, график роста, случайные точки или симуляция дороги"></svg>
+    <div class="task" id="taskBox" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Команды" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SANS = 'Golos Text, system-ui, sans-serif';
+const fx = (x, d = 1) => isFinite(x) ? (+x).toFixed(d).replace('.', ',') : '—';
+const big = x => !isFinite(x) ? '—' : x >= 1e6 ? '> 1 млн' : String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
+const LESSONS = [
+  { id: 'model', title: 'Что такое модель',
+    text: ['Модель — это упрощённое подобие объекта, процесса или явления, которое заменяет его для определённой цели. Глобус — модель Земли, чертёж — модель детали, формула s = v · t — модель равномерного движения. Сам изучаемый объект называют оригиналом.',
+           'Модель всегда беднее оригинала, и в этом её сила. Мы оставляем только существенные свойства — те, от которых зависит ответ на наш вопрос, — и отбрасываем остальные. Для одного и того же самолёта модель конструктора, модель кассира авиабилетов и модель художника будут совсем разными. Выделить существенное и записать его строго — формулами, таблицей, программой — называют формализацией.',
+           'По форме модели бывают натурные (физические) — макет, уменьшенная копия, манекен для краш-теста — и информационные: описание, таблица, схема. Среди информационных важны математические — формулы и уравнения — и компьютерные: программы, которые шаг за шагом воспроизводят поведение объекта. Компьютерная модель нужна, когда частей слишком много и одной формулой ответ не получить; внутри она обычно опирается на математическую.',
+           'Любая модель верна только в своих рамках. Макет самолёта в трубе правильно показывает обтекание, но ничего не скажет об удобстве кресел. Сравнить предсказания модели с реальностью — значит проверить её адекватность.'],
+    why: 'Авиаконструкторы и автопроизводители по всему миру продувают уменьшенные модели в аэродинамических трубах, а затем строят цифровые двойники — компьютерные копии двигателей, турбин и целых заводов, которые обновляются по данным датчиков. Климатологи моделируют атмосферу и океан, экономисты — рынки. Посчитать модель ИИ поможет всё быстрее, но решить, что в задаче существенно, а что можно отбросить, остаётся работой человека: от этого выбора зависит, будет ли ответ верным.',
+    task: 'Для каждой из трёх целей оставьте только существенные свойства объекта, выберите подходящий тип модели и нажмите «Проверить».',
+    hint: 'Для каждого свойства спросите себя: изменится ли ответ на вопрос цели, если это свойство поменять? Если нет — его можно убрать из модели.',
+    stage: 'Нажимайте на свойства, чтобы убрать или вернуть их, и выберите тип модели справа.',
+    check: m => m.solved === 3 },
+  { id: 'growth', title: 'Модель роста',
+    text: ['Многие процессы растут шаг за шагом: число бактерий, заболевших, деньги на вкладе. Самая простая модель: за каждый шаг величина увеличивается на одну и ту же долю r. Новое значение = старое + r · старое. Это экспоненциальный рост: при r = 0,1 за 7 шагов величина почти удваивается, а за 70 шагов вырастает почти в 800 раз.',
+           'Так растут сложные проценты по вкладу и число заражённых в начале эпидемии. Но бесконечно это продолжаться не может: у дрожжей кончается сахар, у вируса — люди без иммунитета. Модель ограниченного (логистического) роста добавляет множитель (1 − N/K): пока N мало, рост почти экспоненциальный, а возле предела K он останавливается. K называют ёмкостью среды.',
+           'На сцене — настоящие измерения: количество дрожжей в пробирке каждый час (опыт Т. Карлсона, 1913 год; по этим данным биолог Р. Пирл проверял логистическую модель). Модель тем лучше, чем ближе её значения к данным. Меру близости здесь считаем как среднюю ошибку — среднее расстояние между моделью и измерениями. Подбор параметров под данные называют калибровкой модели.',
+           'Помните о границах: модель, хорошо описавшая 18 часов, ничего не гарантирует на сотом часу. Съев весь сахар, дрожжи начнут гибнуть, а этого правила в модели нет.'],
+    why: 'Эпидемиологи по таким моделям оценивали, когда заболеваемость COVID-19 достигнет пика и хватит ли больничных коек. Финансисты считают сложные проценты по кредитам и вкладам, демографы — рост населения городов, экологи — сколько рыбы можно вылавливать, чтобы популяция не исчезла. Data scientist и количественный аналитик (quant) калибруют модели по данным каждый день. Подобрать r и K компьютер сумеет за секунду, но решить, какая модель подходит и где она перестаёт работать, — задача человека.',
+    task: 'Подберите модель и параметры так, чтобы она описывала опыт с дрожжами: средняя ошибка по всем 19 часам — не больше 25 единиц. Модель нужно досчитать до 18-го часа.',
+    hint: 'Сначала запустите экспоненту: начало совпадает, а дальше? Потом включите ограниченный рост. K — уровень, на котором рост останавливается: посмотрите, на какую «полку» выходят данные.',
+    stage: 'Нажмите на ячейку параметра, меняйте его кнопками «−» и «+», запускайте модель.',
+    check: m => m.full && m.type === 'log' && m.err <= 25 },
+  { id: 'monte', title: 'Метод Монте-Карло',
+    text: ['Метод Монте-Карло — способ получить ответ с помощью случайных чисел. Он назван в честь города, знаменитого казино. Метод придумали в 1940-х годах математики С. Улам и Дж. фон Нейман для расчётов, которые не решались формулами.',
+           'Классический пример — оценка числа π. В квадрат со стороной 2 вписан круг радиуса 1. Площадь квадрата 4, круга — π. Бросаем точки в квадрат наугад: доля точек внутри круга примерно равна π/4. Значит, π ≈ 4 · M / N, где N — всего точек, M — попавших в круг. Точка (x, y) внутри круга, если x² + y² ≤ 1.',
+           'Каждая серия бросков даёт немного другой ответ — это случайная ошибка. Чем больше точек, тем она меньше, но медленно: типичная ошибка обратно пропорциональна корню из числа точек, 1/√N. Поэтому ответ метода всегда записывают с оценкой точности.',
+           'Случайность здесь не помеха, а инструмент. Когда точную формулу не вывести, можно разыграть тысячи случайных вариантов и посмотреть, что получается чаще всего.'],
+    why: 'Банки и инвестиционные фонды прогоняют десятки тысяч случайных сценариев рынка, чтобы оценить риск портфеля, — это работа количественного аналитика. Методом Монте-Карло считают освещение в анимационных фильмах и играх (трассировка лучей), прохождение излучения при лучевой терапии, надёжность мостов и самолётов. Метеослужбы запускают ансамбль из десятков прогнозов с чуть разными начальными данными и по их разбросу говорят, насколько уверен прогноз. Компьютер бросит миллиарды точек, но понять, сколько бросков достаточно и можно ли доверять ответу, — работа специалиста.',
+    task: 'Проведите по 3 серии из 100 точек и по 3 серии из 10 000 точек, сравните разброс оценок π на графике и ответьте на вопрос под ним.',
+    hint: 'Выберите размер серии и нажмите «▶ Серия». Смотрите, насколько далеко точки на графике уходят от линии π в каждом столбце, и сравните со столбцом в 100 раз правее.',
+    stage: 'Выберите число точек в серии и нажмите «▶ Серия».',
+    check: m => m.c100 >= 3 && m.c10k >= 3 && m.ans === 100 },
+  { id: 'world', title: 'Симуляция мира',
+    text: ['Компьютерная симуляция — модель, в которой много простых участников (агентов) действуют по своим правилам, а программа шаг за шагом показывает, что получится в целом. Перед вами модель Нагеля — Шрекенберга (1992): кольцевая дорога из 100 клеток по 7,5 м, один шаг — 1 секунда, в клетке не больше одной машины.',
+           'Каждый водитель на каждом шаге выполняет четыре правила. 1) Разгон: скорость +1 клетка/с, но не больше 5 (это 135 км/ч). 2) Дистанция: скорость не больше числа свободных клеток до машины впереди. 3) Случайность: с вероятностью p водитель зазевался и сбросил скорость на 1. 4) Движение: машина проезжает столько клеток, какая у неё скорость. Больше ничего: ни аварий, ни светофоров, ни сужений.',
+           'И всё же при достаточном числе машин возникают «пробки из ничего»: кто-то притормозил, следующий тормозит сильнее, и волна торможения ползёт назад, против движения. На диаграмме «место — время» это видно как наклонные тёмные полосы. Когда поведение целого не следует прямо из правил частей, говорят об эмерджентности.',
+           'На том же принципе устроены прогнозы погоды: атмосферу делят на миллионы ячеек и шаг за шагом применяют законы физики. Так же работают среды для обучения ИИ: роботы и беспилотные автомобили миллионы раз «ездят» в симуляторе, прежде чем выйти на настоящую дорогу. Но симуляция знает только те правила, которые в неё заложили, — всё остальное в ней просто не может случиться.'],
+    why: 'Инженеры по моделированию рассчитывают транспортные потоки, эвакуацию стадионов и аэропортов, работу заводов через цифровые двойники. Разработчики беспилотных автомобилей проверяют свои системы на миллиардах километров в симуляции, а роботов учат ходить и брать предметы в виртуальных мирах и потом переносят навыки в реальность. Метеослужбы мира каждый день запускают глобальные модели атмосферы на суперкомпьютерах. Через 10 лет считать будут ещё быстрее, но выбрать правила и проверить, совпадает ли симуляция с жизнью, — по-прежнему задача человека.',
+    task: 'Замерьте поток машин не меньше 4 раз при разном числе машин: среди замеров должны быть ≤ 10 и ≥ 40 машин. Найдите, где поток наибольший, и ответьте, откуда берётся пробка.',
+    hint: 'Меняйте число машин кнопками «−» и «+» и нажимайте «Замерить поток». На диаграмме «место — время» ищите, где начинается тёмная полоса и куда она ползёт.',
+    stage: 'Запустите симуляцию, меняйте число машин и замеряйте поток.',
+    check: m => m.meas >= 4 && m.lo && m.hi && m.ans === 'a' },
+];
+
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+const KEY = 'luch-cs-models';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const savedIdx = typeof saved.lesson === 'string' ? LESSONS.findIndex(l => l.id === saved.lesson) : (saved.lesson | 0);
+const S = { lesson: clamp(savedIdx < 0 ? 0 : savedIdx, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: LID(), done: S.done })); } catch (e) {} };
+
+// ---------- lesson 1: what to keep in a model ----------
+const GOALS = [
+  { obj: 'Самолёт', goal: 'Проверить, как воздух обтекает крыло нового самолёта, ещё до того, как его построят.', type: 'phys',
+    props: [['Форма крыла и корпуса', 1], ['Пропорции частей', 1], ['Настоящий размер — 60 м', 0], ['Цвет окраски', 0], ['Кресла в салоне', 0], ['Логотип авиакомпании', 0]],
+    note: 'Уменьшенную копию ставят в аэродинамическую трубу. Предел модели: маленький макет обтекается чуть иначе, чем настоящий самолёт, поэтому результаты пересчитывают на полный размер.' },
+  { obj: 'Мяч', goal: 'Рассчитать, на каком расстоянии упадёт мяч, брошенный под углом к земле.', type: 'math',
+    props: [['Начальная скорость', 1], ['Угол броска', 1], ['Ускорение свободного падения g', 1], ['Цвет мяча', 0], ['Имя игрока', 0], ['Рисунок на мяче', 0]],
+    note: 'Формула дальности L = v² · sin 2α / g. Упрощение: сопротивление воздуха не учтено. Для тяжёлого мяча на коротком броске ошибка мала, для волана в бадминтоне — огромна.' },
+  { obj: 'Перекрёсток', goal: 'Подобрать длительность зелёного сигнала, чтобы в час пик у светофора не копилась очередь.', type: 'comp',
+    props: [['Машин в минуту на подходе', 1], ['Время зелёного и красного', 1], ['Число полос', 1], ['Как быстро машины трогаются', 1], ['Цвет машин', 0], ['Марки машин', 0]],
+    note: 'Сотни машин подъезжают в случайные моменты и трогаются по очереди — одной формулой это не описать, поэтому программа «проигрывает» час пик шаг за шагом.' },
+];
+const MTYPES = { phys: 'Физическая', math: 'Математическая', comp: 'Компьютерная' };
+const MSUB = { phys: 'копия из материала', math: 'формулы и уравнения', comp: 'программа, шаг за шагом' };
+const MWHY = { phys: 'Физическая модель — копия из материала, обычно уменьшенная. Её ставят в трубу, бассейн или на стенд.',
+               math: 'Математическая модель — формулы и уравнения. Ответ получают расчётом, если формула известна.',
+               comp: 'Компьютерная модель — программа, которая шаг за шагом повторяет поведение многих объектов, когда одной формулы не хватает.' };
+const wrongProps = g => GOALS[g].props.filter((p, i) => !!S.keep[g][i] !== !!p[1]).length;
+const goalRight = g => !wrongProps(g) && S.type[g] === GOALS[g].type;
+const goalDone = g => S.ok[g] && goalRight(g);
+function toggleProp(i) { S.keep[S.g][i] = !S.keep[S.g][i]; S.fb[S.g] = null; update(); }
+function chooseType(k) { S.type[S.g] = k; S.fb[S.g] = null; update(); }
+function checkGoal() {
+  const g = S.g; S.tries++;
+  const wp = wrongProps(g), t = S.type[g];
+  if (!wp && t === GOALS[g].type) {
+    S.ok[g] = true; S.fb[g] = null;
+    const next = GOALS.findIndex((x, i) => !goalDone(i));
+    toast(next < 0 ? 'Верно! Все три модели подходят к своим целям.' : 'Верно: модель подходит к цели.');
+    if (next >= 0) setTimeout(() => { if (LID() === 'model' && S.g === g) { S.g = next; update(); } }, reduce ? 300 : 1500);
+  } else {
+    S.ok[g] = false;
+    S.fb[g] = !t ? 'Выберите тип модели справа.' : wp ? `Свойств выбрано неверно: ${wp}. Про каждое спросите: изменится ли ответ, если это свойство поменять?` : `${MWHY[t]} Подходит ли это к цели?`;
+    toast(S.fb[g]);
+  }
+  update();
+}
+
+// ---------- lesson 2: growth ----------
+// T. Carlson (1913), yeast in a test tube, amount every hour (as published by R. Pearl, 1927)
+const YEAST = [9.6, 18.3, 29.0, 47.2, 71.1, 119.1, 174.6, 257.3, 350.7, 441.0, 513.3, 559.7, 594.8, 629.4, 640.8, 651.1, 655.9, 659.6, 661.8];
+const NH = YEAST.length - 1;
+function growth(type = S.gtype, r = S.r, K = S.K) {
+  const a = [YEAST[0]];
+  for (let n = 1; n <= NH; n++) { const N = a[n - 1]; a.push(type === 'exp' ? N + r * N : N + r * N * (1 - N / K)); }
+  return a;
+}
+const meanErr = (a, upto) => { let s = 0; for (let i = 0; i <= upto; i++) s += Math.abs(a[i] - YEAST[i]); return s / (upto + 1); };
+function setG(k, v) {
+  if (k === 'r') v = clamp(Math.round(v * 20) / 20, 0.05, 1);
+  if (k === 'K') v = clamp(Math.round(v / 20) * 20, 100, 1000);
+  S[k] = v; update();
+}
+function bump(dir) {
+  if (S.sel === 'r') setG('r', S.r + dir * 0.05);
+  else if (S.sel === 'K') { if (S.gtype === 'exp') toast('У экспоненты нет предела K. Включите «Ограниченный рост».'); setG('K', S.K + dir * 20); }
+}
+
+// ---------- lesson 3: Monte Carlo ----------
+const SIZES = [10, 100, 1000, 10000];
+const PMAX = 4000; // points drawn on the square
+const sigma = n => 4 * Math.sqrt(Math.PI / 4 * (1 - Math.PI / 4) / n);
+function startSeries() {
+  if (S.adding) return;
+  S.pts = []; S.n = 0; S.inside = 0; S.target = S.size; S.adding = true;
+  if (reduce) { while (S.n < S.target) addPoint(); finishSeries(); }
+  update();
+}
+function addPoint() {
+  const x = Math.random() * 2 - 1, y = Math.random() * 2 - 1, inn = x * x + y * y <= 1;
+  S.n++; if (inn) S.inside++;
+  if (S.pts.length < PMAX) S.pts.push([x, y, inn]);
+}
+function finishSeries() {
+  S.adding = false;
+  const est = 4 * S.inside / S.n;
+  S.series.push({ size: S.target, est });
+  toast(`Серия из ${big(S.target)}: π ≈ ${fx(est, 4)}, ошибка ${fx(Math.abs(est - Math.PI), 4)}`);
+  update();
+}
+function answer3(v) {
+  S.ans3 = v;
+  if (v === 100) toast('Верно: ошибка ~ 1/√N, а √100 = 10. Точности даются дорого.');
+  else toast(v === 10 ? 'Сравните столбцы 100 и 1000: точек в 10 раз больше, а ошибка уменьшилась примерно в 3 раза.' : 'Столько не нужно: сравните столбцы 100 и 10 000 — ошибка там отличается примерно в 10 раз.');
+  update();
+}
+
+// ---------- lesson 4: Nagel–Schreckenberg traffic ----------
+const RL = 100, VMAX = 5, HT = 64;
+const SPC = v => v === 0 ? '#ff8a73' : v <= 2 ? '#ffb547' : v <= 4 ? '#72d4e8' : '#86e0a8';
+function initCars() {
+  S.cars = []; for (let i = 0; i < S.N; i++) S.cars.push({ x: Math.floor(i * RL / S.N), v: 0 });
+  S.t = 0; S.hist = []; S.flows = []; record();
+}
+function simStep() {
+  const c = S.cars, n = c.length;
+  const nv = c.map((car, i) => {
+    const gap = n === 1 ? RL - 1 : (c[(i + 1) % n].x - car.x - 1 + RL) % RL;
+    let v = Math.min(car.v + 1, VMAX, gap);
+    if (v > 0 && Math.random() < S.p) v--;
+    return v;
+  });
+  let sv = 0;
+  c.forEach((car, i) => { car.v = nv[i]; car.x = (car.x + car.v) % RL; sv += car.v; });
+  S.t++; S.flows.push(sv / RL); if (S.flows.length > 30) S.flows.shift();
+  record();
+}
+function record() { S.hist.unshift(S.cars.map(c => [c.x, c.v])); if (S.hist.length > HT) S.hist.pop(); }
+function setN(n) { S.N = clamp(n, 2, 60); initCars(); update(); }
+function measure() {
+  for (let i = 0; i < 50; i++) simStep();
+  let q = 0; for (let i = 0; i < 150; i++) { simStep(); q += S.flows[S.flows.length - 1]; }
+  q = q / 150 * 3600;
+  S.meas.push({ N: S.N, p: S.p, q });
+  toast(`${S.N} машин, p = ${fx(S.p, 2)}: поток ≈ ${big(q)} машин в час`);
+  update();
+}
+const ANS4 = [['a', 'Кто-то случайно притормозил, а задние тормозят ещё сильнее'], ['b', 'В одном месте кольцо уже, чем в остальных'], ['c', 'В программе задано: «здесь будет пробка»']];
+function answer4(k) {
+  S.ans4 = k;
+  toast(k === 'a' ? 'Верно: случайное торможение одного водителя усиливается и волной идёт назад.' : k === 'b' ? 'На кольце все 100 клеток одинаковые — сужения в модели нет.' : 'Правил всего четыре, и ни одно не говорит о месте. Пробка появляется сама.');
+  update();
+}
+
+function resetLesson() {
+  S.g = 0; S.keep = GOALS.map(G => G.props.map(() => true)); S.type = [null, null, null]; S.ok = [false, false, false]; S.fb = [null, null, null]; S.tries = 0;
+  S.gtype = 'exp'; S.r = 0.3; S.K = 400; S.sel = 'r'; S.shown = 0; S.playing = false; S.acc = 0;
+  S.size = 100; S.pts = []; S.n = 0; S.inside = 0; S.target = 0; S.adding = false; S.series = []; S.ans3 = null;
+  S.N = 20; S.p = 0.3; S.run = false; S.meas = []; S.ans4 = null; S.simAcc = 0; initCars();
+}
+
+function model() {
+  const id = LID();
+  if (id === 'model') return { kind: 'model', solved: GOALS.filter((x, i) => goalDone(i)).length, wrong: wrongProps(S.g), type: S.type[S.g] };
+  if (id === 'growth') {
+    const a = growth();
+    return { kind: 'growth', a, type: S.gtype, shown: S.shown, full: S.shown >= NH, err: meanErr(a, S.shown), errAll: meanErr(a, NH) };
+  }
+  if (id === 'monte') {
+    const est = S.n ? 4 * S.inside / S.n : NaN;
+    return { kind: 'monte', est, n: S.n, c100: S.series.filter(s => s.size === 100).length, c10k: S.series.filter(s => s.size === 10000).length, ans: S.ans3 };
+  }
+  const flow = S.flows.length ? S.flows.reduce((s, x) => s + x, 0) / S.flows.length * 3600 : 0;
+  const vmean = S.cars.reduce((s, c) => s + c.v, 0) / Math.max(1, S.cars.length);
+  return { kind: 'world', flow, vmean, stopped: S.cars.filter(c => c.v === 0).length, meas: S.meas.length,
+           lo: S.meas.some(x => x.N <= 10), hi: S.meas.some(x => x.N >= 40), ans: S.ans4 };
+}
+
+// ---------- geometry. Wide: content x 8…516, y from 80. Narrow (phone): x 0…302. ----------
+let NAR = false;
+const BOUNDS = () => {
+  if (!NAR) return { x0: 8, x1: 516, y1: { model: 424, growth: 414, monte: 414, world: 474 }[LID()] };
+  return { x0: 0, x1: 302, y1: { model: 528, growth: 498, monte: 538, world: 762 }[LID()] };
+};
+const L1 = () => NAR
+  ? { tab: i => ({ x: i * 103, y: 86, w: 96, h: 22 }), gx: 0, gy: 124, gmax: 44, glh: 15, ph: 192, row: i => ({ x: 0, y: 200 + i * 28, w: 302, h: 25 }),
+      th: 386, card: j => ({ x: j * 103, y: 394, w: 96, h: 46 }), fy: 462, fmax: 52 }
+  : { tab: i => ({ x: 8 + i * 170, y: 86, w: 164, h: 22 }), gx: 8, gy: 124, gmax: 80, glh: 16, ph: 182, row: i => ({ x: 8, y: 190 + i * 30, w: 292, h: 26 }),
+      th: 182, card: j => ({ x: 314, y: 190 + j * 60, w: 202, h: 54 }), fy: 390, fmax: 88 };
+const L2 = () => NAR
+  ? { cell: i => ({ x: i * 76, y: 100, w: 72, h: 40 }), fy: 160, P: { x: 30, y: 182, w: 266, h: 150 }, ty: 376, trh: 11.5 }
+  : { cell: i => ({ x: 8 + i * 127, y: 100, w: 121, h: 40 }), fy: 164, P: { x: 254, y: 192, w: 258, h: 190 }, ty: 186, trh: 11.6 };
+const L3 = () => NAR
+  ? { Q: { x: 0, y: 100, s: 170 }, rx: 184, ry: 118, P: { x: 30, y: 310, w: 266, h: 136 }, qy: 488, chip: k => ({ x: k * 103, y: 506, w: 96, h: 26 }) }
+  : { Q: { x: 8, y: 100, s: 240 }, rx: 8, ry: 362, P: { x: 300, y: 112, w: 212, h: 196 }, qy: 358, chip: k => ({ x: 270 + k * 84, y: 384, w: 78, h: 26 }) };
+const L4 = () => NAR
+  ? { C: { cx: 151, cy: 194, r: 84 }, ST: { x: 0, y: 324, w: 302, h: 118 }, lg: 470, FD: { x: 36, y: 504, w: 262, h: 100 }, qy: 652, btn: k => ({ x: 0, y: 662 + k * 33, w: 302, h: 29 }), qmax: 54 }
+  : { C: { cx: 128, cy: 222, r: 100 }, ST: { x: 270, y: 118, w: 242, h: 136 }, lg: 284, FD: { x: 302, y: 318, w: 210, h: 104 }, qy: 364, btn: k => ({ x: 8, y: 374 + k * 33, w: 244, h: 29 }), qmax: 42 };
+
+function wrap(s, max) { const out = []; let cur = ''; for (const w of s.split(' ')) { if ((cur + ' ' + w).trim().length > max) { out.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); } if (cur) out.push(cur); return out; }
+function niceStep(r, n) { const raw = r / n, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; }
+
+// ---------- drawing ----------
+const scene = $('#scene');
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+const T = (x, y, s, o = {}) => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${o.fs || 10}" fill="${o.c || '#e8ecf4'}"${o.a ? ` text-anchor="${o.a}"` : ''}${o.w ? ` font-weight="${o.w}"` : ''}${o.ls ? ` letter-spacing="${o.ls}"` : ''}${o.sans ? ` style="font-family:${SANS}"` : ''}${o.extra || ''}>${esc(s)}</text>`;
+const CAP = (x, y, s) => T(x, y, s, { fs: 9, c: '#8b96ad', ls: 1 });
+
+function typeIcon(k, x, y) {
+  if (k === 'phys') return `<g fill="#ffb547"><rect x="${x}" y="${y + 7.2}" width="27" height="3.6" rx="1.8"/><path d="M${x + 10} ${y + 8}L${x + 15} ${y - 2}h3L${x + 16} ${y + 8}zM${x + 10} ${y + 10}L${x + 15} ${y + 20}h3L${x + 16} ${y + 10}zM${x + 1} ${y + 8}l2 -5h2.4l-.8 5zM${x + 1} ${y + 10}l2 5h2.4l-.8 -5z"/></g>`;
+  if (k === 'math') return T(x, y + 13, 'f(x)', { fs: 12, c: '#72d4e8', w: 500 });
+  return `<rect x="${x}" y="${y}" width="26" height="17" rx="2" fill="none" stroke="#86e0a8" stroke-width="1.4"/><path d="M${x + 10} ${y + 21}h6" stroke="#86e0a8" stroke-width="1.4"/><circle cx="${x + 7}" cy="${y + 9}" r="1.6" fill="#86e0a8"/><circle cx="${x + 13}" cy="${y + 6}" r="1.6" fill="#ffb547"/><circle cx="${x + 19}" cy="${y + 11}" r="1.6" fill="#72d4e8"/>`;
+}
+function drawModel() {
+  const Y = L1(), G = GOALS[S.g];
+  let h = '';
+  GOALS.forEach((x, i) => {
+    const r = Y.tab(i), cur = i === S.g, ok = goalDone(i);
+    h += `<g data-drag="g-${i}"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="7" fill="${cur ? '#26324a' : 'rgba(26,36,56,.7)'}" stroke="${cur ? '#ffb547' : ok ? '#86e0a8' : '#3a4762'}" stroke-width="${cur ? 1.8 : 1.2}"/>` +
+      T(r.x + r.w / 2, r.y + 15, `Цель ${i + 1}${NAR ? '' : ' · ' + x.obj}${ok ? ' ✓' : ''}`, { fs: NAR ? 9.5 : 10, c: ok ? '#86e0a8' : cur ? '#e8ecf4' : '#8b96ad', a: 'middle' }) + `</g>`;
+  });
+  const gl = wrap(G.goal, Y.gmax);
+  h += `<g data-part="goal">` + CAP(Y.gx, Y.gy, `ОРИГИНАЛ: ${G.obj.toUpperCase()} · ЦЕЛЬ МОДЕЛИ:`) +
+    gl.map((l, k) => T(Y.gx, Y.gy + 17 + k * Y.glh, l, { fs: NAR ? 12 : 12.5, sans: true, w: 500 })).join('') + `</g>`;
+  h += CAP(Y.row(0).x, Y.ph, NAR ? 'СВОЙСТВА — НАЖМИТЕ, ЧТОБЫ УБРАТЬ' : 'СВОЙСТВА ОРИГИНАЛА — НАЖМИТЕ, ЧТОБЫ УБРАТЬ');
+  G.props.forEach((p, i) => {
+    const r = Y.row(i), on = S.keep[S.g][i], yb = r.y + r.h / 2 + 4;
+    h += `<g data-drag="p-${i}"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="7" fill="${on ? 'rgba(26,36,56,.85)' : 'rgba(18,26,40,.5)'}" stroke="${on ? '#3a4762' : '#26324a'}"/>`;
+    h += on ? `<path d="M${r.x + 9} ${yb - 4}l3.5 3.5 6 -7" fill="none" stroke="#86e0a8" stroke-width="1.8" stroke-linecap="round"/>` : `<path d="M${r.x + 10} ${yb - 7}l6 6M${r.x + 16} ${yb - 7}l-6 6" stroke="#56627d" stroke-width="1.6" stroke-linecap="round"/>`;
+    h += T(r.x + 26, yb, p[0], { fs: NAR ? 10.5 : 11, c: on ? '#e8ecf4' : '#56627d', sans: true, extra: on ? '' : ' text-decoration="line-through"' });
+    const pw = 64, px = r.x + r.w - pw - 5;
+    h += `<rect x="${px}" y="${r.y + 4}" width="${pw}" height="${r.h - 8}" rx="${(r.h - 8) / 2}" fill="${on ? 'rgba(134,224,168,.14)' : 'none'}" stroke="${on ? '#86e0a8' : '#56627d'}" stroke-width="1.1"/>` +
+      T(px + pw / 2, yb - 0.5, on ? 'в модели' : 'убрано', { fs: 9, c: on ? '#86e0a8' : '#8b96ad', a: 'middle' }) + `</g>`;
+  });
+  h += CAP(Y.card(0).x, Y.th, 'ТИП МОДЕЛИ');
+  Object.keys(MTYPES).forEach((k, j) => {
+    const r = Y.card(j), on = S.type[S.g] === k;
+    h += `<g data-drag="t-${k}"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="9" fill="${on ? '#26324a' : 'rgba(26,36,56,.7)'}" stroke="${on ? '#ffb547' : '#3a4762'}" stroke-width="${on ? 1.8 : 1.2}"/>`;
+    if (NAR) h += typeIcon(k, r.x + r.w / 2 - 13, r.y + 6) + T(r.x + r.w / 2, r.y + r.h - 7, MTYPES[k], { fs: 9.5, c: on ? '#ffb547' : '#e8ecf4', a: 'middle', sans: true, w: 600 });
+    else h += typeIcon(k, r.x + 12, r.y + 16) + T(r.x + 50, r.y + 23, MTYPES[k], { fs: 12.5, c: on ? '#ffb547' : '#e8ecf4', sans: true, w: 600 }) + T(r.x + 50, r.y + 40, MSUB[k], { fs: 9.5, c: '#8b96ad' });
+    h += `</g>`;
+  });
+  // feedback line
+  let fb, col;
+  if (goalDone(S.g)) { fb = '✓ Модель подходит к цели. ' + G.note; col = '#86e0a8'; }
+  else if (S.fb[S.g]) { fb = S.fb[S.g]; col = '#ff8a73'; }
+  else { fb = 'Уберите лишние свойства, выберите тип модели и нажмите «Проверить».'; col = '#8b96ad'; }
+  h += `<g data-part="fb">` + wrap(fb, Y.fmax).map((l, k) => T(NAR ? 0 : 8, Y.fy + k * 14, l, { fs: 10.5, c: col, sans: true })).join('') + `</g>`;
+  return h;
+}
+
+function drawGrowth() {
+  const Y = L2(), a = growth(), P = Y.P;
+  let h = CAP(NAR ? 0 : 8, 91, NAR ? 'ДРОЖЖИ В ПРОБИРКЕ · ОПЫТ 1913 г.' : 'ДРОЖЖИ В ПРОБИРКЕ · ИЗМЕРЕНИЯ КАЖДЫЙ ЧАС · ОПЫТ 1913 г.');
+  const cells = [
+    ['type', NAR ? 'МОДЕЛЬ' : 'МОДЕЛЬ', S.gtype === 'exp' ? (NAR ? 'экспон.' : 'экспонента') : (NAR ? 'огранич.' : 'ограниченный')],
+    ['N0', NAR ? 'N₀' : 'N₀ · НАЧАЛО', '9,6'],
+    ['r', NAR ? 'r' : 'r · ПРИРОСТ/ЧАС', fx(S.r, 2)],
+    ['K', NAR ? 'K' : 'K · ПРЕДЕЛ', S.gtype === 'exp' ? '—' : String(S.K)]];
+  h += `<g data-part="params">`;
+  cells.forEach((c, i) => {
+    const r = Y.cell(i), sel = S.sel === c[0], dim = c[0] === 'N0' || (c[0] === 'K' && S.gtype === 'exp');
+    h += `<g data-drag="c-${c[0]}"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="7" fill="${sel ? 'rgba(255,181,71,.10)' : 'rgba(26,36,56,.8)'}" stroke="${sel ? '#ffb547' : '#3a4762'}" stroke-width="${sel ? 1.8 : 1.2}"/>` +
+      T(r.x + 8, r.y + 13, c[1], { fs: 8.5, c: '#8b96ad' }) + T(r.x + 8, r.y + 31, c[2], { fs: NAR ? 12 : 13.5, c: dim ? '#56627d' : sel ? '#ffb547' : '#e8ecf4', w: 500 }) + `</g>`;
+  });
+  h += `</g>`;
+  h += `<g data-part="formula">` + T(NAR ? 0 : 8, Y.fy, S.gtype === 'exp' ? 'N(n+1) = N(n) + r·N(n)' : 'N(n+1) = N(n) + r·N(n)·(1 − N(n)/K)', { fs: NAR ? 10 : 11.5, c: '#ffb547', w: 500 }) + `</g>`;
+  // step table
+  const rowTxt = (n, x, y, wide) => {
+    const shown = n <= S.shown, cur = n === S.shown && S.shown > 0 && S.shown < NH;
+    let s = cur ? `<rect x="${x - 3}" y="${y - 9}" width="${wide ? 206 : 146}" height="${Y.trh}" rx="3" fill="rgba(255,181,71,.12)"/>` : '';
+    s += T(x, y, String(n), { fs: 9, c: '#56627d' }) + T(x + (wide ? 30 : 20), y, fx(YEAST[n], 1), { fs: 9.5, c: '#72d4e8' }) +
+      T(x + (wide ? 86 : 66), y, shown ? (a[n] >= 1e6 ? '> 1 млн' : fx(a[n], 1)) : '·', { fs: 9.5, c: shown ? '#ffb547' : '#3a4762' });
+    if (wide) s += T(x + 158, y, shown ? (Math.abs(a[n] - YEAST[n]) >= 1e5 ? '…' : fx(Math.abs(a[n] - YEAST[n]), 1)) : '', { fs: 9, c: '#8b96ad' });
+    return s;
+  };
+  h += `<g data-part="table">`;
+  if (NAR) {
+    [0, 1].forEach(b => { const x = b * 156 + 2; h += T(x, Y.ty, 'ЧАС', { fs: 8, c: '#56627d' }) + T(x + 20, Y.ty, 'ОПЫТ', { fs: 8, c: '#72d4e8' }) + T(x + 66, Y.ty, 'МОДЕЛЬ', { fs: 8, c: '#ffb547' }); });
+    for (let n = 0; n <= NH; n++) { const b = n < 10 ? 0 : 1, k = n % 10 + (b ? 0 : 0); h += rowTxt(n, b * 156 + 2, Y.ty + 14 + (b ? n - 10 : n) * Y.trh, false); }
+  } else {
+    h += T(12, Y.ty, 'ЧАС', { fs: 8, c: '#56627d' }) + T(42, Y.ty, 'ОПЫТ', { fs: 8, c: '#72d4e8' }) + T(98, Y.ty, 'МОДЕЛЬ', { fs: 8, c: '#ffb547' }) + T(170, Y.ty, '|РАЗН.|', { fs: 8, c: '#8b96ad' });
+    for (let n = 0; n <= NH; n++) h += rowTxt(n, 12, Y.ty + 14 + n * Y.trh, true);
+  }
+  h += `</g>`;
+  // chart
+  const hi = 800, X = n => P.x + n / NH * P.w, YY = v => P.y + P.h - v / hi * P.h;
+  h += `<defs><clipPath id="gclip"><rect x="${P.x - 4}" y="${P.y - 2}" width="${P.w + 8}" height="${P.h + 4}"/></clipPath></defs>`;
+  h += `<g data-part="chart">` + T(P.x - (NAR ? 30 : 34), P.y - 10, 'КОЛИЧЕСТВО, ЕД.', { fs: 8.5, c: '#8b96ad', ls: 0.5 });
+  for (let v = 0; v <= hi; v += 200) h += `<path d="M${P.x} ${YY(v).toFixed(1)}H${P.x + P.w}" stroke="${v === 0 ? '#56627d' : 'rgba(139,150,173,.16)'}" stroke-width="${v === 0 ? 1.4 : 1}"/>` + T(P.x - 5, YY(v) + 3, String(v), { fs: 8.5, c: '#8b96ad', a: 'end' });
+  for (let n = 0; n <= NH; n += 3) h += T(X(n), P.y + P.h + 13, String(n), { fs: 8.5, c: '#8b96ad', a: 'middle' });
+  h += T(P.x + P.w, P.y + P.h + 26, 'часы', { fs: 8.5, c: '#8b96ad', a: 'end' });
+  if (S.gtype === 'log') h += `<path d="M${P.x} ${YY(S.K).toFixed(1)}H${P.x + P.w}" stroke="#ffb547" stroke-width="1" stroke-dasharray="4 4" opacity=".55" clip-path="url(#gclip)"/>` + (S.K <= hi ? T(P.x + 4, YY(S.K) - 4, `K = ${S.K}`, { fs: 8.5, c: '#ffb547' }) : '');
+  h += `</g><g data-part="data">`;
+  YEAST.forEach((v, n) => { h += `<circle cx="${X(n).toFixed(1)}" cy="${YY(v).toFixed(1)}" r="3.4" fill="#72d4e8" stroke="#0b1019" stroke-width="1"/>`; });
+  h += `</g><g data-part="curve">`;
+  if (S.shown > 0) {
+    h += `<path d="M${a.slice(0, S.shown + 1).map((v, n) => X(n).toFixed(1) + ' ' + YY(Math.min(v, 5000)).toFixed(1)).join('L')}" fill="none" stroke="#ffb547" stroke-width="2.2" stroke-linejoin="round" clip-path="url(#gclip)"/>`;
+    const ln = S.shown, lv = a[ln];
+    if (lv <= hi) h += `<circle cx="${X(ln).toFixed(1)}" cy="${YY(lv).toFixed(1)}" r="3.6" fill="#ffb547" stroke="#0b1019"/>`;
+    else h += T(P.x + 8, P.y + 12, `↑ ушло за график: N(${ln}) = ${big(lv)}`, { fs: 9, c: '#ff8a73' });
+  } else h += T(P.x + P.w / 2, P.y + P.h / 2, 'нажмите «▶ Пуск» или «Шаг»', { fs: 10, c: '#8b96ad', a: 'middle', sans: true });
+  h += `</g>`;
+  // legend
+  const lx = P.x + P.w - 106, ly = P.y - 13;
+  h += `<circle cx="${lx + 3}" cy="${ly}" r="3" fill="#72d4e8"/>` + T(lx + 10, ly + 3, 'опыт', { fs: 8.5, c: '#8b96ad' }) +
+    `<path d="M${lx + 44} ${ly}h14" stroke="#ffb547" stroke-width="2.2"/>` + T(lx + 62, ly + 3, 'модель', { fs: 8.5, c: '#8b96ad' });
+  return h;
+}
+
+function drawMonte() {
+  const Y = L3(), Q = Y.Q, s = Q.s, P = Y.P;
+  const px = x => Q.x + (x + 1) / 2 * s, py = y => Q.y + (1 - y) / 2 * s;
+  let h = CAP(Q.x, 91, NAR ? 'КВАДРАТ 2×2 И КРУГ R = 1' : 'КВАДРАТ 2×2, ВНУТРИ КРУГ РАДИУСА 1');
+  h += `<g data-part="square"><rect x="${Q.x}" y="${Q.y}" width="${s}" height="${s}" fill="rgba(11,16,25,.7)" stroke="#56627d" stroke-width="1.4"/></g>`;
+  h += `<g data-part="circle"><circle cx="${Q.x + s / 2}" cy="${Q.y + s / 2}" r="${s / 2}" fill="rgba(255,181,71,.06)" stroke="#ffb547" stroke-width="1.4"/></g>`;
+  const pts = S.pts;
+  if (pts.length <= 200) pts.forEach(p => { h += `<circle cx="${px(p[0]).toFixed(1)}" cy="${py(p[1]).toFixed(1)}" r="${NAR ? 2.2 : 2.8}" fill="${p[2] ? '#ffb547' : '#72d4e8'}"/>`; });
+  else {
+    let pi = '', po = '';
+    for (const p of pts) { const seg = `M${px(p[0]).toFixed(1)} ${py(p[1]).toFixed(1)}h0`; if (p[2]) pi += seg; else po += seg; }
+    const sw = pts.length <= 1500 ? 2.6 : 1.7;
+    h += `<path d="${pi}" stroke="#ffb547" stroke-width="${sw}" stroke-linecap="round"/><path d="${po}" stroke="#72d4e8" stroke-width="${sw}" stroke-linecap="round"/>`;
+  }
+  if (!S.n) h += T(Q.x + s / 2, Q.y + s / 2 + 4, 'точек пока нет', { fs: 10, c: '#8b96ad', a: 'middle', sans: true });
+  if (S.n > PMAX) h += T(Q.x + s, Q.y + s + 12, `на рисунке ${big(PMAX)} из ${big(S.n)}`, { fs: 8, c: '#56627d', a: 'end' });
+  // readout
+  const est = S.n ? 4 * S.inside / S.n : NaN;
+  h += `<g data-part="readout">`;
+  if (NAR) {
+    const it = [['ТОЧЕК N', big(S.n), '#e8ecf4'], ['ВНУТРИ M', big(S.inside), '#ffb547'], ['π ≈ 4·M/N', S.n ? fx(est, 4) : '—', '#e8ecf4'], ['ОШИБКА', S.n ? fx(Math.abs(est - Math.PI), 4) : '—', '#8b96ad']];
+    it.forEach((r, k) => { h += T(Y.rx, Y.ry + k * 36, r[0], { fs: 8.5, c: '#8b96ad' }) + T(Y.rx, Y.ry + 16 + k * 36, r[1], { fs: 13, c: r[2], w: 500 }); });
+  } else {
+    h += T(Y.rx, Y.ry, `точек N = ${big(S.n)} · внутри круга M = ${big(S.inside)}`, { fs: 10.5 });
+    h += T(Y.rx, Y.ry + 18, S.n ? `π ≈ 4 · ${big(S.inside)} / ${big(S.n)} = ${fx(est, 4)}` : 'π ≈ 4 · M / N', { fs: 12, c: '#ffb547', w: 500 });
+    h += T(Y.rx, Y.ry + 36, S.n ? `ошибка |π − ${fx(est, 4)}| = ${fx(Math.abs(est - Math.PI), 4)}` : 'выберите размер серии и нажмите «▶ Серия»', { fs: 10, c: '#8b96ad' });
+  }
+  h += `</g>`;
+  // chart of series estimates
+  const lo = 1.9, hi = 4.1, YY = v => P.y + P.h - (clamp(v, lo, hi) - lo) / (hi - lo) * P.h, cw = P.w / 4, CX = k => P.x + (k + 0.5) * cw;
+  h += `<g data-part="chart">` + T(P.x - 28, P.y - 12, 'ОЦЕНКИ π ПО СЕРИЯМ', { fs: 8.5, c: '#8b96ad', ls: 0.5 });
+  for (const v of [2, 2.5, 3, 3.5, 4]) h += `<path d="M${P.x} ${YY(v).toFixed(1)}H${P.x + P.w}" stroke="rgba(139,150,173,.16)"/>` + T(P.x - 4, YY(v) + 3, fx(v, 1), { fs: 8.5, c: '#8b96ad', a: 'end' });
+  h += `<path d="M${P.x} ${P.y}V${P.y + P.h}H${P.x + P.w}" fill="none" stroke="#56627d" stroke-width="1.3"/>`;
+  SIZES.forEach((n, k) => {
+    const sg = 2 * sigma(n), y1 = YY(Math.PI + sg), y2 = YY(Math.PI - sg);
+    h += `<rect x="${(CX(k) - cw * 0.34).toFixed(1)}" y="${y1.toFixed(1)}" width="${(cw * 0.68).toFixed(1)}" height="${Math.max(1.5, y2 - y1).toFixed(1)}" rx="3" fill="rgba(114,212,232,.10)" stroke="rgba(114,212,232,.35)" stroke-width=".8"/>`;
+    h += T(CX(k), P.y + P.h + 13, big(n), { fs: 8.5, c: S.size === n ? '#ffb547' : '#8b96ad', a: 'middle' });
+  });
+  h += `<path d="M${P.x} ${YY(Math.PI).toFixed(1)}H${P.x + P.w}" stroke="#ffb547" stroke-width="1.3" stroke-dasharray="5 4"/>` + T(P.x + P.w, YY(Math.PI) - 4, 'π = 3,1416', { fs: 8.5, c: '#ffb547', a: 'end' });
+  const cnt = {};
+  S.series.forEach((sr, i) => {
+    const k = SIZES.indexOf(sr.size), j = cnt[k] = (cnt[k] || 0) + 1, last = i === S.series.length - 1;
+    const x = CX(k) + (((j - 1) % 7) - 3) * cw * 0.09;
+    h += `<circle cx="${x.toFixed(1)}" cy="${YY(sr.est).toFixed(1)}" r="${last ? 4.4 : 3.3}" fill="${last ? '#e8ecf4' : '#72d4e8'}" stroke="#0b1019" stroke-width="1"/>`;
+  });
+  h += T(P.x + P.w, P.y + P.h + 26, 'точек в серии · полоса — 95 % серий', { fs: 8, c: '#8b96ad', a: 'end' }) + `</g>`;
+  // question
+  h += `<g data-part="question">` + T(NAR ? 0 : 270, Y.qy, 'Чтобы ошибка стала в 10 раз меньше,', { fs: 10.5, sans: true, w: 500 }) + T(NAR ? 0 : 270, Y.qy + 14, 'точек нужно больше в …', { fs: 10.5, sans: true, w: 500 });
+  [10, 100, 1000].forEach((v, k) => {
+    const r = Y.chip(k), on = S.ans3 === v, ok = on && v === 100, bad = on && v !== 100;
+    h += `<g data-drag="a-${v}"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="8" fill="${on ? (ok ? 'rgba(134,224,168,.14)' : 'rgba(255,138,115,.12)') : 'rgba(26,36,56,.8)'}" stroke="${ok ? '#86e0a8' : bad ? '#ff8a73' : '#3a4762'}" stroke-width="1.3"/>` +
+      T(r.x + r.w / 2, r.y + 17, `${big(v)} раз${ok ? ' ✓' : ''}`, { fs: 10.5, c: ok ? '#86e0a8' : bad ? '#ff8a73' : '#e8ecf4', a: 'middle' }) + `</g>`;
+  });
+  h += `</g>`;
+  return h;
+}
+
+function drawWorld() {
+  const Y = L4(), C = Y.C;
+  let h = CAP(NAR ? 0 : 8, 91, NAR ? 'КОЛЬЦО 750 м · ШАГ 1 с' : 'КОЛЬЦО: 100 КЛЕТОК × 7,5 м · ШАГ 1 с');
+  // ring road
+  h += `<g data-drag="ring"><g data-part="ring"><circle cx="${C.cx}" cy="${C.cy}" r="${C.r}" fill="none" stroke="#1a2438" stroke-width="20"/><circle cx="${C.cx}" cy="${C.cy}" r="${C.r + 10}" fill="none" stroke="#3a4762" stroke-width="1"/><circle cx="${C.cx}" cy="${C.cy}" r="${C.r - 10}" fill="none" stroke="#3a4762" stroke-width="1"/>`;
+  h += `<circle cx="${C.cx}" cy="${C.cy}" r="${C.r}" fill="none" stroke="#3a4762" stroke-width="1" stroke-dasharray="3 ${(2 * Math.PI * C.r / RL - 3).toFixed(2)}"/></g>`;
+  const ang = x => -Math.PI / 2 + (x + 0.5) / RL * 2 * Math.PI;
+  h += `<g data-part="car">`;
+  S.cars.forEach(c => {
+    const a = ang(c.x), x = C.cx + C.r * Math.cos(a), y = C.cy + C.r * Math.sin(a), deg = a * 180 / Math.PI + 90;
+    h += `<rect x="${(x - 3.3).toFixed(1)}" y="${(y - 5.4).toFixed(1)}" width="6.6" height="10.8" rx="2.2" fill="${SPC(c.v)}" stroke="#0b1019" stroke-width=".8" transform="rotate(${deg.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)})"/>`;
+  });
+  h += `</g>`;
+  const m = model();
+  h += T(C.cx, C.cy - 22, `t = ${S.t} с`, { fs: 10, c: '#8b96ad', a: 'middle' }) + T(C.cx, C.cy, `${Math.round(m.vmean * 27)} км/ч`, { fs: NAR ? 15 : 17, c: '#e8ecf4', a: 'middle', w: 500 }) +
+    T(C.cx, C.cy + 15, 'средняя скорость', { fs: 8.5, c: '#8b96ad', a: 'middle', sans: true }) + T(C.cx, C.cy + 34, `стоят: ${m.stopped} из ${S.cars.length}`, { fs: 9.5, c: m.stopped ? '#ff8a73' : '#86e0a8', a: 'middle' });
+  h += T(C.cx, C.cy + C.r + 22, S.run ? 'нажмите на кольцо — пауза' : 'нажмите на кольцо — пуск', { fs: 8.5, c: '#56627d', a: 'middle' }) + `</g>`;
+  // space-time diagram
+  const ST = Y.ST, cw = ST.w / RL, rh = ST.h / HT;
+  h += `<g data-part="st">` + T(ST.x, ST.y - 8, NAR ? 'МЕСТО — ВРЕМЯ · СВЕРХУ — СЕЙЧАС' : 'МЕСТО — ВРЕМЯ (СВЕРХУ — СЕЙЧАС)', { fs: 8.5, c: '#8b96ad', ls: 0.5 });
+  h += `<rect x="${ST.x}" y="${ST.y}" width="${ST.w}" height="${ST.h}" fill="rgba(11,16,25,.8)" stroke="#3a4762"/>`;
+  const paths = { '#ff8a73': '', '#ffb547': '', '#72d4e8': '', '#86e0a8': '' };
+  S.hist.forEach((row, k) => { const y = (ST.y + k * rh).toFixed(1); row.forEach(([x, v]) => { paths[SPC(v)] += `M${(ST.x + x * cw).toFixed(1)} ${y}h${Math.max(1.2, cw).toFixed(1)}v${Math.max(1, rh - 0.2).toFixed(1)}h-${Math.max(1.2, cw).toFixed(1)}z`; }); });
+  for (const col in paths) if (paths[col]) h += `<path d="${paths[col]}" fill="${col}"/>`;
+  h += T(ST.x + ST.w, ST.y + ST.h + 11, 'место на кольце →', { fs: 8, c: '#8b96ad', a: 'end' }) + `</g>`;
+  // legend
+  [[0, 'стоит'], [2, '1–2'], [4, '3–4'], [5, '5 = 135 км/ч']].forEach((l, k) => {
+    const x = ST.x + k * (NAR ? 66 : 54);
+    h += `<rect x="${x}" y="${Y.lg - 7}" width="7" height="7" rx="1.5" fill="${SPC(l[0])}"/>` + T(x + 10, Y.lg, l[1], { fs: 8, c: '#8b96ad' });
+  });
+  // fundamental diagram
+  const F = Y.FD, xm = 60, ym = 3000, FX = n => F.x + n / xm * F.w, FY = q => F.y + F.h - q / ym * F.h;
+  h += `<g data-part="fd">` + T(F.x - 32, F.y - 10, 'ПОТОК, МАШИН/Ч · ЗАМЕРЫ', { fs: 8.5, c: '#8b96ad', ls: 0.5 });
+  for (const q of [0, 1000, 2000, 3000]) h += `<path d="M${F.x} ${FY(q).toFixed(1)}H${F.x + F.w}" stroke="rgba(139,150,173,.16)"/>` + T(F.x - 4, FY(q) + 3, big(q), { fs: 8, c: '#8b96ad', a: 'end' });
+  for (const n of [0, 10, 20, 30, 40, 50, 60]) h += T(FX(n), F.y + F.h + 12, String(n), { fs: 8, c: '#8b96ad', a: 'middle' });
+  h += `<path d="M${F.x} ${F.y}V${F.y + F.h}H${F.x + F.w}" fill="none" stroke="#56627d" stroke-width="1.3"/>`;
+  h += `<path d="M${FX(S.N).toFixed(1)} ${F.y}V${F.y + F.h}" stroke="#ffb547" stroke-width="1" stroke-dasharray="3 3" opacity=".6"/>`;
+  S.meas.forEach(pt => { const same = Math.abs(pt.p - S.p) < 1e-9; h += `<circle cx="${FX(pt.N).toFixed(1)}" cy="${FY(pt.q).toFixed(1)}" r="3.6" fill="${same ? '#ffb547' : 'none'}" stroke="${same ? '#0b1019' : '#ffb547'}" stroke-width="1.2"/>`; });
+  if (!S.meas.length) h += T(F.x + F.w / 2, F.y + F.h / 2, 'нажмите «Замерить поток»', { fs: 9.5, c: '#8b96ad', a: 'middle', sans: true });
+  h += T(F.x + F.w, F.y + F.h + 24, 'машин на кольце', { fs: 8, c: '#8b96ad', a: 'end' }) + `</g>`;
+  // question
+  h += `<g data-part="question">` + CAP(NAR ? 0 : 8, Y.qy, 'ОТКУДА ПРОБКА, ЕСЛИ АВАРИИ НЕТ?');
+  ANS4.forEach(([k, txt], i) => {
+    const r = Y.btn(i), on = S.ans4 === k, ok = on && k === 'a', bad = on && k !== 'a';
+    const lines = wrap(txt, Y.qmax);
+    h += `<g data-drag="w-${k}"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="8" fill="${ok ? 'rgba(134,224,168,.14)' : bad ? 'rgba(255,138,115,.12)' : 'rgba(26,36,56,.8)'}" stroke="${ok ? '#86e0a8' : bad ? '#ff8a73' : '#3a4762'}" stroke-width="1.2"/>`;
+    lines.forEach((l, j) => { h += T(r.x + 9, r.y + (lines.length === 1 ? 18.5 : 12.5 + j * 11.5), l, { fs: 9.8, c: ok ? '#86e0a8' : bad ? '#ff8a73' : '#e8ecf4', sans: true }); });
+    h += `</g>`;
+  });
+  h += `</g>`;
+  return h;
+}
+
+function hlBoxes(id) {
+  const id0 = LID();
+  if (id0 === 'model') {
+    const Y = L1();
+    if (id === 'tabs') { const a = Y.tab(0), b = Y.tab(2); return [[a.x - 3, a.y - 3, b.x + b.w - a.x + 6, a.h + 6]]; }
+    if (id === 'goal') return [[Y.gx - 4, Y.gy - 12, NAR ? 306 : 512, 18 + 3 * Y.glh]];
+    if (id === 'props') { const a = Y.row(0), b = Y.row(5); return [[a.x - 3, a.y - 3, a.w + 6, b.y + b.h - a.y + 6]]; }
+    if (id === 'types') { const a = Y.card(0), b = Y.card(2); return [[a.x - 3, a.y - 3, b.x + b.w - a.x + 6, b.y + b.h - a.y + 6]]; }
+    if (id === 'fb') return [[(NAR ? 0 : 8) - 4, Y.fy - 13, NAR ? 306 : 512, 48]];
+    return [];
+  }
+  if (id0 === 'growth') {
+    const Y = L2(), P = Y.P;
+    if (id === 'params') { const a = Y.cell(0), b = Y.cell(3); return [[a.x - 3, a.y - 3, b.x + b.w - a.x + 6, a.h + 6]]; }
+    if (id === 'formula') return [[(NAR ? 0 : 8) - 4, Y.fy - 13, NAR ? 240 : 290, 19]];
+    if (id === 'table') return NAR ? [[-3, Y.ty - 11, 306, 10 * Y.trh + 18]] : [[6, Y.ty - 11, 216, 19 * Y.trh + 18]];
+    if (id === 'data' || id === 'curve') return [[P.x - 4, P.y - 4, P.w + 8, P.h + 8]];
+    return [];
+  }
+  if (id0 === 'monte') {
+    const Y = L3(), Q = Y.Q, P = Y.P;
+    if (id === 'square' || id === 'circle') return [[Q.x - 4, Q.y - 4, Q.s + 8, Q.s + 8]];
+    if (id === 'readout') return NAR ? [[Y.rx - 4, Y.ry - 12, 120, 150]] : [[Y.rx - 4, Y.ry - 13, 250, 56]];
+    if (id === 'chart') return [[P.x - 30, P.y - 4, P.w + 34, P.h + 22]];
+    if (id === 'question') { const a = Y.chip(0), b = Y.chip(2); return [[(NAR ? 0 : 270) - 4, Y.qy - 13, b.x + b.w - (NAR ? 0 : 270) + 8, a.y + a.h - Y.qy + 17]]; }
+    return [];
+  }
+  const Y = L4(), C = Y.C;
+  if (id === 'ring' || id === 'car') return [[C.cx - C.r - 14, C.cy - C.r - 14, 2 * C.r + 28, 2 * C.r + 28]];
+  if (id === 'st') return [[Y.ST.x - 4, Y.ST.y - 4, Y.ST.w + 8, Y.ST.h + 8]];
+  if (id === 'fd') return [[Y.FD.x - 34, Y.FD.y - 4, Y.FD.w + 38, Y.FD.h + 22]];
+  if (id === 'question') { const a = Y.btn(0), b = Y.btn(2); return [[a.x - 4, Y.qy - 13, a.w + 8, b.y + b.h - Y.qy + 17]]; }
+  return [];
+}
+
+function drawScene(t) {
+  const id = LID();
+  let h = bg() + (id === 'model' ? drawModel() : id === 'growth' ? drawGrowth() : id === 'monte' ? drawMonte() : drawWorld());
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1);
+    if (k === 0) S.hl = null;
+    else for (const b of hlBoxes(S.hl.id)) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  NAR = w < 560;
+  const B = BOUNDS(), cw = B.x1 - B.x0 + 8, ch = B.y1 - 80 + 4;
+  const tb = $('#taskBox').getBoundingClientRect(), mt = $('#meter').getBoundingClientRect();
+  const topPx = Math.max(tb.bottom, mt.bottom) - rc.top + 8;
+  const s = Math.min(w / cw, Math.max((hh - topPx) / ch, hh / (ch * 1.6)), 1.5);
+  VB = { w: w / s, h: hh / s }; VB.x = (B.x0 + B.x1) / 2 - VB.w / 2;
+  VB.y = 80 - topPx / s;
+  const slack = VB.y + VB.h - (B.y1 + 2);
+  VB.y = slack < 0 ? B.y1 + 2 - VB.h : VB.y - slack / 2;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+// the task card grows when the shell adds its buttons and formulas — keep the scene below it
+new ResizeObserver(() => requestAnimationFrame(fit)).observe($('#taskBox'));
+
+// ---------- pointer: taps on scene controls ----------
+let dirty = true, tap = null;
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  tap = { tag: el.dataset.drag, x: e.clientX, y: e.clientY };
+});
+scene.addEventListener('pointerup', e => {
+  if (!tap) return;
+  const d = tap; tap = null;
+  if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12) return;
+  const tag = d.tag, kind = tag.slice(0, 2), arg = tag.slice(2);
+  if (kind === 'g-') { S.g = +arg; update(); }
+  if (kind === 'p-') toggleProp(+arg);
+  if (kind === 't-') chooseType(arg);
+  if (kind === 'c-') {
+    if (arg === 'type') act(S.gtype === 'exp' ? 'm-log' : 'm-exp');
+    else if (arg === 'N0') toast('N₀ = 9,6 — первое измерение опыта. Его не подбирают: модель стартует с того же значения.');
+    else { S.sel = arg; update(); flashEl('#tools'); }
+  }
+  if (kind === 'a-') answer3(+arg);
+  if (kind === 'w-') answer4(arg);
+  if (tag === 'ring') act('run');
+});
+scene.addEventListener('pointercancel', () => { tap = null; });
+
+let last = performance.now(), liteT = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.1, (t - last) / 1000); last = t;
+  const id = LID();
+  if (id === 'growth' && S.playing) {
+    S.acc += dt;
+    while (S.acc >= 0.14) {
+      S.acc -= 0.14; S.shown = Math.min(NH, S.shown + 1);
+      if (S.shown >= NH) { S.playing = false; S.acc = 0; update(); break; }
+      lite();
+    }
+  }
+  if (id === 'monte' && S.adding) {
+    const k = Math.max(1, Math.ceil(S.target / 50));
+    for (let i = 0; i < k && S.n < S.target; i++) addPoint();
+    if (S.n >= S.target) finishSeries(); else lite();
+  }
+  if (id === 'world' && S.run) {
+    S.simAcc += dt;
+    let stepped = false;
+    while (S.simAcc >= 1 / 6) { S.simAcc -= 1 / 6; simStep(); stepped = true; }
+    if (stepped) lite();
+  }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3400); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, aria, cls, dis, pressed) => `<button data-a="${k}"${aria ? ` aria-label="${aria}"` : ''}${cls ? ` class="${cls}"` : ''}${dis ? ' disabled' : ''}${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  if (id === 'model') tb.innerHTML = B('prevg', '‹', 'Предыдущая цель') + B('check', 'Проверить', '', 'go') + B('nextg', '›', 'Следующая цель') + sep + B('reset', 'Заново');
+  else if (id === 'growth') tb.innerHTML = B('m-exp', 'Экспонента', 'Модель: экспоненциальный рост', '', false, S.gtype === 'exp') + B('m-log', 'Ограниченный', 'Модель: ограниченный рост', '', false, S.gtype === 'log') + sep +
+    B('dec', '−', 'Уменьшить параметр') + B('sel', S.sel === 'r' ? `r = ${fx(S.r, 2)}` : `K = ${S.K}`, 'Сменить параметр: r или K', 'val') + B('inc', '+', 'Увеличить параметр') + sep +
+    B('step', 'Шаг', 'Посчитать один час', '', S.shown >= NH) + B('play', S.playing ? '❚❚ Пауза' : '▶ Пуск', '', 'go') + B('reset', 'Сброс');
+  else if (id === 'monte') tb.innerHTML = SIZES.map(n => B('s-' + n, big(n), `Серия из ${n} точек`, '', S.adding, S.size === n)).join('') + sep + B('series', '▶ Серия', '', 'go', S.adding) + B('clear', 'Очистить', '', '', S.adding);
+  else tb.innerHTML = B('n-', '−', 'Меньше машин', '', S.N <= 2) + `<span class="val">${S.N} машин</span>` + B('n+', '+', 'Больше машин', '', S.N >= 60) + sep +
+    B('step', 'Шаг', 'Один шаг симуляции', '', S.run) + B('run', S.run ? '❚❚ Пауза' : '▶ Пуск', '', S.run ? '' : 'go') + sep + B('meas', 'Замерить поток', 'Замерить поток машин', S.run ? 'go' : '');
+}
+function act(a) {
+  const id = LID();
+  if (id === 'model') {
+    if (a === 'check') checkGoal();
+    if (a === 'prevg' || a === 'nextg') { S.g = (S.g + (a === 'nextg' ? 1 : 2)) % 3; update(); }
+    if (a.startsWith('g-')) { S.g = +a.slice(2); update(); }
+    if (a.startsWith('t-')) chooseType(a.slice(2));
+    if (a.startsWith('p-')) toggleProp(+a.slice(2));
+    if (a === 'reset') { const g = S.g; S.keep[g] = GOALS[g].props.map(() => true); S.type[g] = null; S.ok[g] = false; S.fb[g] = null; update(); }
+    return;
+  }
+  if (id === 'growth') {
+    if (a === 'm-exp' || a === 'm-log') { S.gtype = a.slice(2); if (S.gtype === 'exp' && S.sel === 'K') S.sel = 'r'; update(); }
+    if (a === 'sel') { S.sel = S.sel === 'r' ? 'K' : 'r'; update(); }
+    if (a === 'sel-r' || a === 'sel-K') { S.sel = a.slice(4); update(); }
+    if (a === 'dec' || a === 'inc') bump(a === 'inc' ? 1 : -1);
+    if (a === 'step') { S.playing = false; S.shown = Math.min(NH, S.shown + 1); update(); }
+    if (a === 'play') { if (S.playing) S.playing = false; else { if (S.shown >= NH) S.shown = 0; S.playing = true; S.acc = 0; if (reduce) { S.shown = NH; S.playing = false; } } update(); }
+    if (a === 'reset') { S.playing = false; S.shown = 0; update(); }
+    return;
+  }
+  if (id === 'monte') {
+    if (a.startsWith('s-')) { S.size = +a.slice(2); update(); }
+    if (a === 'series') startSeries();
+    if (a === 'clear') { S.pts = []; S.n = 0; S.inside = 0; S.series = []; update(); }
+    if (a.startsWith('a-')) answer3(+a.slice(2));
+    return;
+  }
+  if (a === 'n-' || a === 'n+') setN(S.N + (a === 'n+' ? 1 : -1));
+  if (a === 'step') { simStep(); update(); }
+  if (a === 'run') { S.run = !S.run; S.simAcc = 0; update(); }
+  if (a === 'meas') measure();
+  if (a === 'reset') { S.run = false; initCars(); update(); }
+  if (a === 'clearm') { S.meas = []; update(); }
+  if (a.startsWith('w-')) answer4(a.slice(2));
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+
+function taskState(m) {
+  if (S.done[LID()]) return '✓ Выполнено';
+  if (m.kind === 'model') return `Целей выполнено: ${m.solved} из 3`;
+  if (m.kind === 'growth') return !m.full ? `Модель посчитана на ${m.shown} из ${NH} ч` : `Средняя ошибка: ${m.err > 1e5 ? 'огромная' : fx(m.err, 1)} (нужно ≤ 25)${m.type === 'exp' ? ' · экспонента' : ''}`;
+  if (m.kind === 'monte') return `Серий по 100: ${Math.min(3, m.c100)}/3 · по 10 000: ${Math.min(3, m.c10k)}/3 · ответ: ${m.ans === 100 ? '✓' : m.ans ? '✗' : '—'}`;
+  return `Замеров: ${m.meas} · ≤10 машин ${m.lo ? '✓' : '—'} · ≥40 ${m.hi ? '✓' : '—'} · ответ ${m.ans === 'a' ? '✓' : m.ans ? '✗' : '—'}`;
+}
+
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'model') h = `<h2>Конструктор модели</h2><p class="note">То же, что на сцене: оставьте существенные свойства и выберите тип.</p>
+    <dl class="reads"><div><dt>Цель</dt><dd id="r1"></dd></div><div><dt>Свойств</dt><dd id="r2"></dd></div><div><dt>Готово</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><div class="lbl">Цель</div><div class="chips">${GOALS.map((g, i) => `<button data-a="g-${i}">${i + 1}. ${g.obj}</button>`).join('')}</div></div>
+    <div class="ctl"><div class="lbl">Свойства в модели</div><div class="chips" id="propChips"></div></div>
+    <div class="ctl"><div class="lbl">Тип модели</div><div class="chips">${Object.keys(MTYPES).map(k => `<button data-a="t-${k}">${MTYPES[k]}</button>`).join('')}</div></div>
+    <div style="margin-top:14px"><button class="ghostbtn" data-a="check">Проверить</button></div>
+    <h3>Описание модели</h3><div class="listing" id="lst"></div>`;
+  if (id === 'growth') h = `<h2>Параметры модели</h2><p class="note">Ползунки меняют те же ячейки, что на сцене.</p>
+    <dl class="reads"><div><dt>Ошибка</dt><dd id="r1"></dd></div><div><dt>N(18)</dt><dd id="r2"></dd></div><div><dt>Шагов</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><div class="lbl">Модель</div><div class="chips"><button data-a="m-exp">Экспонента</button><button data-a="m-log">Ограниченный рост</button></div></div>
+    <div class="ctl"><label for="inR">r — прирост за час <output id="inRO"></output></label><input type="range" id="inR" min="0.05" max="1" step="0.05"></div>
+    <div class="ctl"><label for="inK">K — ёмкость среды <output id="inKO"></output></label><input type="range" id="inK" min="100" max="1000" step="20"></div>
+    <div class="ctl"><div class="chips"><button data-a="step">Шаг</button><button data-a="play">▶ Пуск</button><button data-a="reset">Сброс</button></div></div>
+    <h3>Таблица: час — опыт — модель</h3><div class="listing" id="lst"></div>`;
+  if (id === 'monte') h = `<h2>Серии бросков</h2><p class="note">Каждая серия начинается заново и даёт свою оценку π.</p>
+    <dl class="reads"><div><dt>Точек</dt><dd id="r1"></dd></div><div><dt>π ≈</dt><dd id="r2"></dd></div><div><dt>Серий</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><div class="lbl">Точек в серии</div><div class="chips">${SIZES.map(n => `<button data-a="s-${n}">${big(n)}</button>`).join('')}</div></div>
+    <div class="ctl"><div class="chips"><button data-a="series">▶ Серия</button><button data-a="clear">Очистить</button></div></div>
+    <div class="ctl"><div class="lbl">Ошибка в 10 раз меньше — точек больше в …</div><div class="chips">${[10, 100, 1000].map(v => `<button data-a="a-${v}">${big(v)} раз</button>`).join('')}</div></div>
+    <h3>Результаты серий</h3><div class="listing" id="lst"></div>`;
+  if (id === 'world') h = `<h2>Пульт симуляции</h2><p class="note">Правила одни и те же — меняются только число машин и вероятность притормозить.</p>
+    <dl class="reads"><div><dt>Машин</dt><dd id="r1"></dd></div><div><dt>Поток/ч</dt><dd id="r2"></dd></div><div><dt>Стоят</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><label for="inN">Машин на кольце <output id="inNO"></output></label><input type="range" id="inN" min="2" max="60" step="1"></div>
+    <div class="ctl"><label for="inP">p — вероятность зазеваться <output id="inPO"></output></label><input type="range" id="inP" min="0" max="0.5" step="0.05"></div>
+    <div class="ctl"><div class="chips"><button data-a="step">Шаг</button><button data-a="run">▶ Пуск / пауза</button><button data-a="meas">Замерить поток</button><button data-a="reset">Сначала</button><button data-a="clearm">Стереть замеры</button></div></div>
+    <div class="ctl"><div class="lbl">Откуда пробка, если аварии нет?</div><div class="chips">${ANS4.map(([k, t]) => `<button data-a="w-${k}">${esc(t)}</button>`).join('')}</div></div>
+    <h3>Замеры</h3><div class="listing" id="lst"></div>`;
+  el.innerHTML = h;
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  const bind = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', e => fn(+e.target.value)); };
+  bind('#inR', v => setG('r', v)); bind('#inK', v => setG('K', v));
+  bind('#inN', v => setN(v)); bind('#inP', v => { S.p = Math.round(v * 20) / 20; update(); });
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  const rng = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  const press = f => el.querySelectorAll('.chips [data-a]').forEach(b => b.setAttribute('aria-pressed', !!f(b.dataset.a)));
+  const lst = el.querySelector('#lst');
+  if (m.kind === 'model') {
+    const G = GOALS[S.g];
+    set('#r1', `${S.g + 1}. ${G.obj}`); set('#r2', `${S.keep[S.g].filter(Boolean).length}/6`); set('#r3', `${m.solved}/3`);
+    const pc = el.querySelector('#propChips');
+    if (pc) { pc.innerHTML = G.props.map((p, i) => `<button data-p="${i}" aria-pressed="${!!S.keep[S.g][i]}">${S.keep[S.g][i] ? '✓ ' : '✗ '}${esc(p[0])}</button>`).join(''); pc.querySelectorAll('[data-p]').forEach(b => b.onclick = () => toggleProp(+b.dataset.p)); }
+    press(a => a === 'g-' + S.g || a === 't-' + S.type[S.g]);
+    if (lst) lst.innerHTML = `<div class="dim">Оригинал: ${esc(G.obj)}</div><div>Цель: ${esc(G.goal)}</div><div>Свойства: ${G.props.filter((p, i) => S.keep[S.g][i]).map(p => esc(p[0])).join('; ') || '—'}</div><div class="cur">Тип: ${S.type[S.g] ? MTYPES[S.type[S.g]] : 'не выбран'}</div>`;
+  } else if (m.kind === 'growth') {
+    set('#r1', m.shown ? (m.err > 1e5 ? '> 100 000' : fx(m.err, 1)) : '—'); set('#r2', big(m.a[NH])); set('#r3', `${m.shown}/${NH}`);
+    set('#inRO', fx(S.r, 2)); set('#inKO', S.gtype === 'exp' ? 'не нужен' : String(S.K)); rng('#inR', S.r); rng('#inK', S.K);
+    const k = el.querySelector('#inK'); if (k) k.disabled = S.gtype === 'exp';
+    press(a => a === 'm-' + S.gtype);
+    if (lst) lst.innerHTML = YEAST.map((v, n) => `<div${n === S.shown && S.shown ? ' class="cur"' : ''}>${String(n).padStart(2, ' ')} ч: ${fx(v, 1)} · ${n <= S.shown ? fx(m.a[n] > 1e6 ? 1e6 : m.a[n], 1) : '…'}</div>`).join('');
+  } else if (m.kind === 'monte') {
+    set('#r1', big(m.n)); set('#r2', m.n ? fx(m.est, 4) : '—'); set('#r3', String(S.series.length));
+    press(a => a === 's-' + S.size || a === 'a-' + S.ans3);
+    if (lst) lst.innerHTML = S.series.length ? S.series.map((s, i) => `<div>${i + 1}) ${big(s.size)} точек → π ≈ ${fx(s.est, 4)} <span class="dim">(ошибка ${fx(Math.abs(s.est - Math.PI), 4)})</span></div>`).join('') : '<span class="note">Серий пока нет.</span>';
+  } else {
+    set('#r1', String(S.N)); set('#r2', big(m.flow)); set('#r3', String(m.stopped));
+    set('#inNO', String(S.N)); set('#inPO', fx(S.p, 2)); rng('#inN', S.N); rng('#inP', S.p);
+    press(a => a === 'w-' + S.ans4);
+    if (lst) lst.innerHTML = S.meas.length ? S.meas.map((x, i) => `<div>${i + 1}) ${x.N} машин (${Math.round(x.N / 0.75)} на км), p = ${fx(x.p, 2)} → ${big(x.q)} машин/ч</div>`).join('') : '<span class="note">Замеров пока нет.</span>';
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'model') return [
+    { id: 'goal', icon: IC('<circle cx="17" cy="17" r="12" fill="none" stroke="var(--force)" stroke-width="1.8"/><circle cx="17" cy="17" r="6" fill="none" stroke="var(--force)" stroke-width="1.8"/><circle cx="17" cy="17" r="1.8" fill="var(--force)"/>'), name: 'Оригинал и цель', spec: 'Модель строят не «вообще», а для вопроса. Сменилась цель — меняется и модель.' },
+    { id: 'props', icon: IC('<path d="M5 10l3 3 5-6M5 22l3 3 5-6" fill="none" stroke="var(--ok)" stroke-width="1.8"/><path d="M17 10h12M17 22h12" stroke="var(--fg)" stroke-width="1.8"/>'), name: 'Существенные свойства', spec: 'Те, от которых зависит ответ. Остальные отбрасывают — это и есть упрощение.' },
+    { id: 'types', icon: IC('<rect x="3" y="6" width="8" height="22" rx="2" fill="none" stroke="var(--force)" stroke-width="1.6"/><rect x="13" y="6" width="8" height="22" rx="2" fill="none" stroke="var(--arm)" stroke-width="1.6"/><rect x="23" y="6" width="8" height="22" rx="2" fill="none" stroke="var(--ok)" stroke-width="1.6"/>'), name: 'Тип модели', spec: 'Физическая — копия из материала, математическая — формулы, компьютерная — программа-симуляция.' },
+    { id: 'fb', icon: IC('<path d="M6 18l7 7 15-16" fill="none" stroke="var(--ok)" stroke-width="2.2"/>'), name: 'Проверка и пределы', spec: 'После проверки появляется, где модель перестаёт работать. У каждой модели есть такая граница.' },
+    { id: 'tabs', icon: IC('<rect x="2" y="12" width="9" height="10" rx="3" fill="none" stroke="var(--ok)" stroke-width="1.6"/><rect x="12.5" y="12" width="9" height="10" rx="3" fill="none" stroke="var(--muted)" stroke-width="1.6"/><rect x="23" y="12" width="9" height="10" rx="3" fill="none" stroke="var(--muted)" stroke-width="1.6"/>'), name: 'Три цели', spec: 'Три разных вопроса — три разных типа моделей.' }];
+  if (id === 'growth') return [
+    { id: 'params', icon: IC('<rect x="3" y="10" width="13" height="14" rx="2" fill="none" stroke="var(--force)" stroke-width="1.6"/><rect x="18" y="10" width="13" height="14" rx="2" fill="none" stroke="var(--muted)" stroke-width="1.6"/>'), name: 'Параметры', spec: 'N₀ — старт, r — доля прироста за час, K — предел, ёмкость среды. Их подбирают под данные.' },
+    { id: 'formula', icon: IC('<text x="3" y="22" font-size="12" fill="var(--force)" font-family="monospace">N+rN</text>'), name: 'Правило шага', spec: 'Как из значения на этом часе получить следующее. Модель — это правило, а не готовый ответ.' },
+    { id: 'table', icon: IC('<path d="M4 8h26M4 15h26M4 22h26M4 29h26M13 5v26" stroke="var(--muted)" stroke-width="1.4"/>'), name: 'Таблица шагов', spec: 'Каждая строка считается из предыдущей — так же, как в электронной таблице с формулой вниз.' },
+    { id: 'data', icon: IC('<circle cx="8" cy="24" r="3" fill="var(--arm)"/><circle cx="16" cy="14" r="3" fill="var(--arm)"/><circle cx="26" cy="9" r="3" fill="var(--arm)"/>'), name: 'Данные опыта', spec: 'Настоящие измерения. Модель проверяют, сравнивая с ними.' },
+    { id: 'curve', icon: IC('<path d="M3 29C12 28 14 6 31 5" fill="none" stroke="var(--force)" stroke-width="2.2"/>'), name: 'Кривая модели', spec: 'S-образная у ограниченного роста, уходящая вверх у экспоненты.' }];
+  if (id === 'monte') return [
+    { id: 'square', icon: IC('<rect x="4" y="4" width="26" height="26" fill="none" stroke="var(--muted)" stroke-width="1.8"/>'), name: 'Квадрат 2 × 2', spec: 'Площадь 4. Точки падают в него равномерно: x и y — случайные числа от −1 до 1.' },
+    { id: 'circle', icon: IC('<circle cx="17" cy="17" r="12" fill="none" stroke="var(--force)" stroke-width="1.8"/>'), name: 'Круг радиуса 1', spec: 'Площадь π. Точка внутри, если x² + y² ≤ 1.' },
+    { id: 'readout', icon: IC('<text x="3" y="22" font-size="11" fill="var(--force)" font-family="monospace">4M/N</text>'), name: 'Оценка', spec: 'Доля точек в круге ≈ π/4, поэтому π ≈ 4 · M / N.' },
+    { id: 'chart', icon: IC('<path d="M4 17h26" stroke="var(--force)" stroke-dasharray="3 2"/><circle cx="8" cy="9" r="2" fill="var(--arm)"/><circle cx="9" cy="25" r="2" fill="var(--arm)"/><circle cx="26" cy="16" r="2" fill="var(--arm)"/><circle cx="27" cy="18" r="2" fill="var(--arm)"/>'), name: 'Разброс серий', spec: 'Точки — оценки разных серий, полоса — где окажутся 95 % серий такого размера.' },
+    { id: 'question', icon: IC('<text x="10" y="25" font-size="20" fill="var(--ok)" font-family="monospace">?</text>'), name: 'Вопрос о точности', spec: 'Сколько стоит лишняя цифра точности?' }];
+  return [
+    { id: 'ring', icon: IC('<circle cx="17" cy="17" r="11" fill="none" stroke="var(--muted)" stroke-width="4"/>'), name: 'Кольцевая дорога', spec: '100 клеток по 7,5 м. Все клетки одинаковые: ни сужений, ни светофоров.' },
+    { id: 'car', icon: IC('<rect x="12" y="7" width="10" height="20" rx="3" fill="var(--ok)"/>'), name: 'Агент — машина', spec: 'Четыре правила: разгон до 5, дистанция, случайное торможение с вероятностью p, движение. Цвет — скорость.' },
+    { id: 'st', icon: IC('<rect x="3" y="4" width="28" height="26" fill="none" stroke="var(--muted)"/><path d="M26 6L10 28" stroke="var(--warn)" stroke-width="3"/>'), name: 'Диаграмма «место — время»', spec: 'Каждая строка — снимок дороги. Красные наклонные полосы — пробки, ползущие назад.' },
+    { id: 'fd', icon: IC('<path d="M4 29V5M4 29h26" stroke="var(--muted)"/><path d="M5 28L13 9L30 22" fill="none" stroke="var(--force)" stroke-width="1.8"/>'), name: 'Замеры потока', spec: 'Сколько машин в час проезжает точку кольца. Это главный показатель дороги.' },
+    { id: 'question', icon: IC('<text x="10" y="25" font-size="20" fill="var(--ok)" font-family="monospace">?</text>'), name: 'Откуда пробка', spec: 'Объясните, почему пробка появляется без аварии.' }];
+}
+function flashEl(sel) { const el = $(sel); if (!el) return; el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    const head = { model: 'Из чего состоит модель', growth: 'Из чего состоит модель роста', monte: 'Из чего состоит опыт', world: 'Из чего состоит симуляция' }[Ls.id];
+    $('#pane-parts').innerHTML = `<h2>${head}</h2><p class="note">Нажмите на пункт, чтобы найти его на сцене.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'model') {
+    const G = GOALS[S.g];
+    let h = `<h2>Как строят модель</h2><div class="steps">` + step('1. оригинал', esc(G.obj)) + step('2. цель', 'вопрос, на который нужен ответ') + step('3. существенные свойства', 'влияют на ответ') + step('4. форма модели', 'копия, формулы или программа') + step('5. проверка', 'сравнить с реальностью', 'sum') + `</div>`;
+    h += `<h3>Сейчас · цель ${S.g + 1}</h3><div class="steps">` + step('оставлено свойств', `${S.keep[S.g].filter(Boolean).length} из 6`) + step('убрано', `${S.keep[S.g].filter(x => !x).length} из 6`) + step('тип', S.type[S.g] ? MTYPES[S.type[S.g]] : 'не выбран') +
+      step('проверка', goalDone(S.g) ? '✓ подходит' : S.fb[S.g] ? '✗ есть ошибки' : 'не проверено', goalDone(S.g) ? 'okk' : S.fb[S.g] ? 'badd' : '') + `</div>`;
+    if (S.g === 1) h += `<h3>Математическая модель броска</h3><div class="formula">L = v² · sin 2α / g</div><p class="note">Например, v = 15 м/с, α = 45°, g = 9,8 м/с²: L = 225 · 1 / 9,8 ≈ 23 м. Цвет мяча в формулу не входит — поэтому его и убирают.</p>`;
+    else h += `<h3>Масштаб</h3><div class="steps">` + step('самолёт', '60 м') + step('модель 1 : 50', '60 / 50 = 1,2 м') + `</div><p class="note">Пропорции сохраняются, размер — нет. Поэтому «настоящий размер» в физическую модель не переносят, а результаты продувки пересчитывают на полный масштаб.</p>`;
+    return h;
+  }
+  if (m.kind === 'growth') {
+    const a = m.a, r = fx(S.r, 2);
+    let h = `<h2>Расчёт по шагам</h2><div class="formula">${S.gtype === 'exp' ? 'N(n+1) = N(n) + r · N(n)' : 'N(n+1) = N(n) + r · N(n) · (1 − N(n) / K)'}</div><div class="steps">`;
+    for (let n = 0; n < 3; n++) {
+      const N = fx(a[n], 1);
+      h += step(`N(${n + 1})`, S.gtype === 'exp' ? `${N} + ${r} · ${N} = ${fx(a[n + 1], 1)}` : `${N} + ${r} · ${N} · (1 − ${N}/${S.K}) = ${fx(a[n + 1], 1)}`);
+    }
+    h += step(`N(${NH})`, big(a[NH]), 'sum') + `</div>`;
+    h += `<h3>Средняя ошибка</h3><div class="formula">E = ( |M₀ − D₀| + … + |M₁₈ − D₁₈| ) / 19</div><div class="steps">` +
+      step('по посчитанным часам', m.shown ? (m.err > 1e5 ? '> 100 000' : fx(m.err, 1)) : '—') + step('по всем 19 часам', m.errAll > 1e5 ? '> 100 000' : fx(m.errAll, 1), m.errAll <= 25 ? 'okk sum' : 'sum') + step('нужно', '≤ 25') + `</div>`;
+    if (S.gtype === 'exp') h += `<p class="note" style="margin-top:10px">Время удвоения экспоненты: T = ln 2 / ln(1 + r) = ${fx(Math.log(2) / Math.log(1 + S.r), 2)} ч. Каждые T часов величина удваивается — бесконечно.</p>`;
+    else h += `<p class="note" style="margin-top:10px">При N = K/2 = ${S.K / 2} прирост наибольший: r · K / 4 = ${fx(S.r * S.K / 4, 1)} за час. Дальше рост замедляется.</p>`;
+    return h;
+  }
+  if (m.kind === 'monte') {
+    let h = `<h2>Оценка π</h2><div class="formula">π ≈ 4 · M / N</div><div class="steps">` + step('N, точек', big(m.n)) + step('M, в круге', big(S.inside)) + step('4 · M / N', m.n ? fx(m.est, 4) : '—', 'sum') + step('настоящее π', '3,1416') + `</div>`;
+    h += `<h3>Типичная ошибка серии</h3><div class="formula">σ ≈ 4 · √(p(1 − p) / N) ≈ 1,64 / √N</div><div class="steps">`;
+    SIZES.forEach(n => {
+      const ser = S.series.filter(s => s.size === n), worst = ser.length ? Math.max(...ser.map(s => Math.abs(s.est - Math.PI))) : NaN;
+      h += step(`N = ${big(n)}`, `σ ≈ ${fx(sigma(n), 3)}${ser.length ? ` · у вас худшая ${fx(worst, 3)} (${ser.length} сер.)` : ''}`);
+    });
+    h += `</div><p class="note" style="margin-top:10px">Здесь p = π/4 — вероятность попасть в круг. Примерно 95 % серий отклоняются от π меньше чем на 2σ.</p>`;
+    return h;
+  }
+  const kmh = m.vmean * 7.5 * 3.6;
+  let h = `<h2>Единицы симуляции</h2><div class="steps">` + step('клетка', '7,5 м') + step('шаг', '1 с') + step('скорость 1 клетка/с', '7,5 м/с = 27 км/ч') + step('максимум 5 клеток/с', '135 км/ч') + `</div>`;
+  h += `<h3>Сейчас</h3><div class="steps">` + step('машин', `${S.N} → ${fx(S.N / 0.75, 0)} на км`) + step('средняя скорость', `${fx(m.vmean, 2)} клетки/с = ${fx(kmh, 0)} км/ч`) + step('стоят', `${m.stopped} из ${S.cars.length}`) + `</div>`;
+  h += `<h3>Поток</h3><div class="formula">q = (сумма скоростей / 100 клеток) · 3600</div><div class="steps">` + step('за последние 30 с', `${big(m.flow)} машин/ч`, 'sum') + `</div>`;
+  h += `<p class="note" style="margin-top:10px">Поток = плотность × скорость. Мало машин — все едут быстро, но их мало. Много — машин много, но они стоят. Где-то посередине поток наибольший. Настоящая полоса шоссе пропускает около 2000 машин в час — модель даёт близкие числа, хотя правил в ней всего четыре.</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), ok = !!S.done[LID()];
+  if (m.kind === 'model') el.innerHTML = `<div class="k">Модели</div><div class="v ${ok ? 'ok' : ''}">${m.solved} / 3</div><div class="gauge"><b style="width:${m.solved / 3 * 100}%"></b></div><div class="lr"><span>цель</span><span>${S.g + 1}</span></div><div class="lr"><span>тип</span><span>${m.type ? MTYPES[m.type].slice(0, 6) + '.' : '—'}</span></div>`;
+  else if (m.kind === 'growth') el.innerHTML = `<div class="k">Средняя ошибка</div><div class="v ${ok ? 'ok' : m.full && m.err > 25 ? 'bad' : ''}">${m.shown ? (m.err > 1e5 ? '> 10⁵' : fx(m.err, 1)) : '—'}</div><div class="lr"><span>часов</span><span>${m.shown}/${NH}</span></div><div class="lr"><span>модель</span><span>${m.type === 'exp' ? 'экспон.' : 'огранич.'}</span></div>`;
+  else if (m.kind === 'monte') el.innerHTML = `<div class="k">Оценка π</div><div class="v ${ok ? 'ok' : ''}">${m.n ? fx(m.est, 4) : '—'}</div><div class="lr"><span>точек</span><span>${big(m.n)}</span></div><div class="lr"><span>ошибка</span><span>${m.n ? fx(Math.abs(m.est - Math.PI), 3) : '—'}</span></div>`;
+  else el.innerHTML = `<div class="k">Поток, машин/ч</div><div class="v ${ok ? 'ok' : ''}">${big(m.flow)}</div><div class="lr"><span>машин</span><span>${S.N}</span></div><div class="lr"><span>p</span><span>${fx(S.p, 2)}</span></div><div class="lr"><span>замеров</span><span>${m.meas}</span></div>`;
+}
+
+// light refresh while a model runs: no pane rebuild
+function lite() {
+  const m = model(); renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  if (S.tab === 'scheme') updateScheme(m);
+  const now = performance.now();
+  if (S.tab === 'calc' && now - liteT > 400) { liteT = now; $('#pane-calc').innerHTML = calcHTML(m); }
+  dirty = true;
+}
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы знаете, как устроены модели, на которых держатся прогнозы!'), 1300);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderTools();
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  model: '<path d="M6 17l9-1.4 4-5h2l-2 5 5-.7 2-2h1.4l-.7 2.9.7 2.9h-1.4l-2-2-5-.7 2 5h-2l-4-5z" fill="#ffb547"/><path d="M33 15h4" stroke="#56627d"/><path d="M40 21l2 -6 2 6M48 22v-8h5" fill="none" stroke="#72d4e8" stroke-width="1.4"/><text x="54" y="22" font-size="7" fill="#86e0a8" font-family="monospace">x</text>',
+  growth: '<path d="M6 26h54M6 26V4" stroke="#56627d"/><path d="M7 25C22 25 26 6 58 6" fill="none" stroke="#ffb547" stroke-width="1.6"/><path d="M7 25C30 25 40 18 48 3" fill="none" stroke="#ff8a73" stroke-width="1.2" stroke-dasharray="2 2"/><circle cx="20" cy="21" r="1.6" fill="#72d4e8"/><circle cx="32" cy="11" r="1.6" fill="#72d4e8"/><circle cx="46" cy="7" r="1.6" fill="#72d4e8"/>',
+  monte: '<rect x="5" y="3" width="24" height="24" fill="none" stroke="#56627d"/><circle cx="17" cy="15" r="12" fill="none" stroke="#ffb547"/><circle cx="11" cy="10" r="1.2" fill="#ffb547"/><circle cx="20" cy="19" r="1.2" fill="#ffb547"/><circle cx="7" cy="25" r="1.2" fill="#72d4e8"/><circle cx="27" cy="5" r="1.2" fill="#72d4e8"/><text x="34" y="19" font-size="9" fill="#e8ecf4" font-family="monospace">3,14</text>',
+  world: '<circle cx="16" cy="15" r="10" fill="none" stroke="#26324a" stroke-width="4"/><circle cx="16" cy="5" r="2" fill="#86e0a8"/><circle cx="25" cy="18" r="2" fill="#ff8a73"/><circle cx="22" cy="23" r="2" fill="#ff8a73"/><path d="M34 4h26v22H34z" fill="none" stroke="#3a4762"/><path d="M56 6L42 24" stroke="#ff8a73" stroke-width="2.4"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.hl = null; tap = null;
+  resetLesson();
+  save();
+  $('#stage').classList.toggle('tall', Ls.id !== 'world');
+  $('#stage').classList.toggle('xtall', Ls.id === 'world');
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderStrip(); buildScheme(); update();
+  requestAnimationFrame(fit);
+  const cur = $('#lessons .lesson[aria-current="true"]'), ls = $('#lessons'); if (cur) { const dx = cur.getBoundingClientRect().left - ls.getBoundingClientRect().left; if (dx < 0 || dx + cur.offsetWidth > ls.clientWidth) ls.scrollLeft += dx - 8; }
+}
+window.addEventListener('resize', () => requestAnimationFrame(fit));
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'model') {
+    now = `Три цели моделирования. ${GOALS.map((G, i) => `Цель ${i + 1} (оригинал: ${G.obj}): «${G.goal}» — в модели оставлены свойства: ${G.props.filter((p, j) => S.keep[i][j]).map(p => p[0]).join(', ') || 'ничего'}; убраны: ${G.props.filter((p, j) => !S.keep[i][j]).map(p => p[0]).join(', ') || 'ничего'}; тип модели: ${S.type[i] ? MTYPES[S.type[i]] : 'не выбран'}; ${goalDone(i) ? 'проверено, верно' : S.fb[i] ? 'проверка не пройдена' : 'не проверено'}`).join('. ')}. Сейчас открыта цель ${S.g + 1}. Типы: физическая (копия из материала), математическая (формулы), компьютерная (программа-симуляция). Не называй, какие именно свойства убрать и какой тип выбрать, — спрашивай: «изменится ли ответ, если поменять цвет?», «можно ли тут обойтись одной формулой?», «нужно ли что-то потрогать или продуть?».`;
+  }
+  if (id === 'growth') {
+    now = `Данные опыта (дрожжи, количество в условных единицах по часам 0…18): ${YEAST.map(v => fx(v, 1)).join('; ')}. Модель: ${S.gtype === 'exp' ? 'экспоненциальная N(n+1) = N + r·N' : 'ограниченный (логистический) рост N(n+1) = N + r·N·(1 − N/K)'}, N₀ = 9,6, r = ${fx(S.r, 2)}${S.gtype === 'log' ? `, K = ${S.K}` : ''}. Посчитано ${S.shown} из 18 часов; модель на 18-м часу даёт ${big(m.a[NH])}. Средняя ошибка по всем часам ${m.errAll > 1e5 ? 'больше 100 000' : fx(m.errAll, 1)} (нужно ≤ 25 при досчитанной до конца логистической модели). Не называй готовые значения r и K — наводи: «где данные выходят на полку?», «что будет, если r больше — кривая круче или положе?», «почему экспонента не может остановиться?».`;
+  }
+  if (id === 'monte') {
+    now = `Квадрат 2×2 с вписанным кругом радиуса 1, случайные точки. Текущая серия: ${big(m.n)} точек, в круге ${big(S.inside)}, оценка π ≈ ${m.n ? fx(m.est, 4) : '—'}. Выбран размер серии ${big(S.size)}. Проведённые серии: ${S.series.map(s => `${big(s.size)} → ${fx(s.est, 4)}`).join('; ') || 'нет'}. На графике видно разброс оценок по размерам серий 10, 100, 1000, 10 000 и полосу 95 %. Вопрос на сцене: «чтобы ошибка стала в 10 раз меньше, точек нужно больше в … раз» (варианты 10, 100, 1000), ответ ученика: ${S.ans3 ? S.ans3 : 'нет'}. Не говори ответ на вопрос — предложи сравнить ширину разброса в столбцах 100 и 10 000 и вспомнить, что ошибка ~ 1/√N.`;
+  }
+  if (id === 'world') {
+    now = `Симуляция Нагеля — Шрекенберга: кольцо 100 клеток по 7,5 м, шаг 1 с, правила: разгон до 5 клеток/с, дистанция, случайное торможение с вероятностью p, движение. Сейчас: ${S.N} машин, p = ${fx(S.p, 2)}, t = ${S.t} с, ${S.run ? 'идёт' : 'на паузе'}, средняя скорость ${Math.round(m.vmean * 27)} км/ч, стоят ${m.stopped} машин, поток за последние 30 с ≈ ${big(m.flow)} машин/ч. Замеры: ${S.meas.map(x => `${x.N} машин, p ${fx(x.p, 2)} → ${big(x.q)} машин/ч`).join('; ') || 'нет'}. Вопрос на сцене: откуда пробка, если аварии нет (варианты: случайное торможение усиливается; кольцо где-то уже; в программе задано место пробки), ответ ученика: ${S.ans4 ? ANS4.find(a => a[0] === S.ans4)[1] : 'нет'}. Не называй правильный вариант — спроси, есть ли в четырёх правилах что-то про место на дороге и что делает водитель позади того, кто притормозил.`;
+  }
+  return [
+    `Раздел: информатика, 9 и 11 класс, тема «Моделирование и симуляции». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { model: 'Чем модель отличается от оригинала?', growth: 'Почему экспонента не может расти вечно?', monte: 'Зачем считать π случайными точками?', world: 'Как модели помогают прогнозу погоды?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

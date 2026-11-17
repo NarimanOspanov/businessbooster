@@ -1,0 +1,1322 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по информатике, 9–10 класс: графы, обход в ширину, алгоритм Дейкстры, графы в навигации, сетях и рекомендациях.">
+<title>Графы и поиск пути</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. SVG stage on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-v]{cursor:grab}
+.scene [data-hit]{cursor:pointer}
+.scene.grabbing,.scene.grabbing [data-v]{cursor:grabbing}
+.scene.addmode [data-hit="bg"]{cursor:crosshair}
+.scene text{font-family:var(--font-mono)}
+.scene .sans{font-family:var(--font-body)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none;z-index:3}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none;z-index:3}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.meter .v.ok{color:var(--ok)}
+.meter .v.bad{color:var(--warn)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr span:last-child{color:var(--fg);text-align:right}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--arm)}100%{box-shadow:0 0 0 0 transparent}}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px);z-index:3}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line)}
+.tools button.go{background:var(--fg);color:var(--bg);font-weight:600}
+.tools button:disabled{opacity:.35;cursor:default}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:22%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--fg)}
+.chips button:hover{border-color:var(--muted)}
+.chips button:disabled{opacity:.35;cursor:default}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.listing{font:500 13px/1.6 var(--font-mono);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);margin-top:10px;overflow-wrap:anywhere}
+.listing.code{white-space:pre;overflow-x:auto;overflow-wrap:normal;font-size:12.5px}
+.listing .cur{color:var(--force)}
+.listing .cm{color:var(--muted)}
+
+.formula{font:500 16px/1.35 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+.step.okk span{color:var(--ok)}
+.step.badd span{color:var(--warn)}
+.step.cur{outline:1px solid var(--force)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:470px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .stage{height:calc(70vw + 330px);min-height:0}
+}
+@keyframes pulse{from{opacity:.35}to{opacity:1}}
+.scene .pulse{animation:pulse 1.1s ease-in-out infinite alternate}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<script src="/luch/splash.js"></script>
+<div class="app">
+  <header>
+    <div class="brand" role="link" tabindex="0" title="Карта предметов" style="cursor:pointer" onclick="location.href='/#cs'" onkeydown="if(event.key==='Enter')location.href='/#cs'">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9.6 14.6 9.2 6.2 15 10.6Q20 9.4 25 10.6L30.8 6.2 30.4 14.6Q34.6 22 31.6 29Q27.6 36 20 36Q12.4 36 8.4 29Q5.4 22 9.6 14.6Z" fill="#ffb547"/><path d="M20 14Q15.2 10.8 10.9 13.4Q7.6 17.2 9.4 21.8Q11.6 25.8 15.9 25.4Q18.5 25.1 20 27.1Q21.5 25.1 24.1 25.4Q28.4 25.8 30.6 21.8Q32.4 17.2 29.1 13.4Q24.8 10.8 20 14Z" fill="#ffd896"/><circle cx="15" cy="18.8" r="5" fill="#fffaf0"/><circle cx="25" cy="18.8" r="5" fill="#fffaf0"/><circle cx="15.6" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="24.4" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="16.6" cy="18.1" r="1" fill="#fff"/><circle cx="25.4" cy="18.1" r="1" fill="#fff"/><path d="M18.6 23.4h2.8L20 26.6z" fill="#ff8a73"/><path d="M10.5 29.6Q15.3 27.4 20 29.7Q24.7 27.4 29.5 29.6V34.6Q24.7 32.6 20 34.8Q15.3 32.6 10.5 34.6Z" fill="#72d4e8"/><path d="M20 29.7V34.8" stroke="#0b1019" stroke-width="1.1"/><path d="M8.2 23.5Q5.6 28.6 9.4 32.6Q11.6 33.2 12.4 31Q10.4 28.4 8.2 23.5Z" fill="#e8962a"/><path d="M31.8 23.5Q34.4 28.6 30.6 32.6Q28.4 33.2 27.6 31Q29.6 28.4 31.8 23.5Z" fill="#e8962a"/><path d="M35 3.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="#86e0a8"/></svg>
+      <div><h1>OPEN SCHOOL AI</h1><small>Доступное образование для всех</small></div>
+    </div>
+    <div class="headr">
+      <div class="prog" aria-label="Прогресс"><b>Графы</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочий стол лаборатории">
+    <svg class="scene" id="scene" role="img" aria-label="Интерактивная сцена: вершины графа можно перетаскивать и нажимать, клетки лабиринта — нажимать."></svg>
+    <div class="task" id="taskBox" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d', CY = '#72d4e8', AM = '#ffb547', GR = '#86e0a8', WR = '#ff8a73', MU = '#8b96ad', DIM = '#56627d', LN = '#3a4762', FG = '#e8ecf4', NF = '#1d2940';
+const INF = Infinity;
+const fmtD = d => d === INF ? '∞' : String(d);
+const minutes = n => `${n} ${plural(n, 'минута', 'минуты', 'минут')}`;
+
+const LESSONS = [
+  { id: 'graph', title: 'Что такое граф',
+    text: ['Граф — это набор вершин и рёбер, которые соединяют пары вершин. Вершины — это объекты: станции, люди, веб-страницы. Рёбра — связи между ними. В графе важно только, что с чем соединено, а не где нарисована вершина: перетащите её — граф останется тем же.',
+           'Граф бывает неориентированным: дружба взаимна, поэтому ребро рисуют простой линией. Бывает ориентированным: ссылка ведёт с одной страницы на другую, и ребро рисуют стрелкой — его называют дугой. Если у рёбер есть числа (длина, время, цена), граф называют взвешенным. Схема метро с минутами в пути — взвешенный граф.',
+           'Степень вершины — число рёбер, которые к ней подходят. В ориентированном графе отдельно считают входящие и исходящие дуги. Сумма степеней всех вершин неориентированного графа равна удвоенному числу рёбер: каждое ребро посчитано дважды, у обоих концов.'],
+    why: 'Графами описывают всё, где есть связи. Картографические сервисы хранят дороги и станции как граф, соцсети — людей и дружбу, поисковики — страницы и ссылки. Графы знаний связывают факты вида «Париж — столица — Франции», и ИИ-ассистенты опираются на них, чтобы меньше ошибаться. В ближайшие 10 лет инженер-программист и аналитик данных будут всё чаще проектировать такие графы, а рутинный код допишет ИИ. Поэтому главное умение — увидеть граф в задаче.',
+    task: 'В «Соцсети» найдите человека с наибольшей степенью (больше всех друзей), а в «Вебе» — страницу, на которую ведёт больше всего ссылок. Выберите вершину и нажмите «Это ответ».',
+    hint: 'Переключайте графы кнопками внизу. Считайте линии у каждой вершины, а в «Вебе» — только стрелки, которые входят в вершину. В «Метро» степени подписаны для примера.',
+    stage: 'Нажмите на вершину, чтобы выбрать её. Вершины можно перетаскивать.',
+    check: m => m.okSocial && m.okWeb },
+  { id: 'bfs', title: 'Обход в ширину',
+    text: ['Обход в ширину (BFS, breadth-first search) исследует граф волнами. Сначала старт — до него 0 шагов. Потом все его соседи — 1 шаг. Потом соседи соседей — 2 шага, и так далее. Так расходятся круги по воде.',
+           'Лабиринт — тоже граф. Свободные клетки — вершины, а соседние по стороне клетки соединены рёбрами. BFS хранит очередь: берёт клетку из её начала, а новых соседей ставит в конец. Поэтому все клетки на расстоянии k обрабатываются раньше клеток на расстоянии k + 1.',
+           'Когда волна дошла до финиша, число на нём — длина кратчайшего пути в шагах. Сам путь восстанавливают от финиша назад: каждый раз переходят к соседу, у которого число на 1 меньше. BFS находит кратчайший путь, только когда все рёбра равноценны, то есть граф без весов.'],
+    why: 'Роботы на складах и роботы-доставщики планируют путь по сетке клеток, а персонажи в играх обходят препятствия. Соцсети так же считают, через сколько рукопожатий вы знакомы с человеком, а веб-краулеры поисковиков обходят интернет по ссылкам слой за слоем. Инженер робототехники и разработчик игр пользуются BFS постоянно. ИИ уже пишет такой код за секунды, но решить, где граф без весов и BFS подходит, а где нужен другой алгоритм, должен человек.',
+    task: 'Запустите волну от старта до финиша. Затем восстановите кратчайший путь сами: нажимайте клетки от финиша к старту, каждый раз соседнюю клетку с числом на 1 меньше.',
+    hint: '«Шаг волны» добавляет один слой, «Запуск» идёт до финиша. До запуска можно рисовать стены, а кнопки «Старт» и «Финиш» переносят точки. Когда финиш найден, нажатия по клеткам строят путь назад.',
+    stage: 'Нажимайте клетки: до запуска — стены, после — путь от финиша назад.',
+    check: m => m.traced },
+  { id: 'dijkstra', title: 'Алгоритм Дейкстры',
+    text: ['Когда у рёбер есть веса (минуты, километры, цена), путь с наименьшим числом рёбер не обязательно самый быстрый. Алгоритм Дейкстры находит путь с наименьшим суммарным весом. Он работает, если веса не отрицательные.',
+           'У каждой вершины есть метка — лучшее известное расстояние от старта. Сначала у старта 0, у остальных ∞. На каждом шаге из очереди с приоритетом достают вершину с наименьшей меткой и фиксируют её. Потом пробуют улучшить метки её соседей: если d(v) + w < d(u), то d(u) = d(v) + w. Это называется релаксацией ребра.',
+           'Зафиксированную метку уже ничто не улучшит: любой другой путь проходит через вершину с меткой не меньше, а веса не отрицательны. Жадный способ «каждый раз иди по самой дешёвой дороге» так не работает: дешёвое ребро в начале может завести на дорогой участок в конце.'],
+    why: 'Картографические сервисы и приложения такси считают быстрейший маршрут на графе дорог, где вес ребра — время с учётом пробок, и пересчитывают его каждую минуту. Службы доставки строят маршруты курьеров и роботов, а маршрутизаторы интернета по протоколу OSPF выбирают путь пакетов тем же алгоритмом Дейкстры. Инженер-программист, аналитик логистики и сетевой инженер работают с этим каждый день. Через 10 лет маршруты будет предлагать ИИ, а людям останется понимать, что именно он оптимизирует и где может ошибиться, как жадный выбор.',
+    task: 'Проведите алгоритм Дейкстры сами: на каждом шаге нажимайте вершину, которую алгоритм достанет из очереди. Дойдите до финиша, а потом нажмите «Жадный» и сравните маршруты.',
+    hint: 'Из очереди берут вершину с наименьшей меткой. Метки — над вершинами, очередь — внизу сцены. «Шаг ▶» сделает ход за вас, но тогда для зачёта придётся нажать «Сброс» и пройти самому.',
+    stage: 'Нажмите вершину, которую алгоритм возьмёт из очереди следующей.',
+    check: m => m.handDone && m.greedySeen },
+  { id: 'world', title: 'Графы вокруг нас',
+    text: ['Навигатор в телефоне хранит город как взвешенный граф: перекрёстки — вершины, участки улиц — рёбра, вес — время в пути с учётом пробок. Маршрутизаторы интернета тоже знают граф сети и считают кратчайшие пути для пакетов.',
+           'Соцсети предлагают «возможно, вы знакомы» — это вершины на расстоянии 2 от вас: друзья друзей, которые ещё не ваши друзья. Их находит тот же обход в ширину. Поисковики оценивали важность страниц по идее PageRank: страница важна, если на неё ссылаются важные страницы.',
+           'Графы знаний связывают факты: «Мария Кюри — получила — Нобелевскую премию». Их подключают к языковым моделям, чтобы ИИ-ассистент опирался на проверенные связи. Алгоритм выбирают по задаче: BFS — когда важно число пересадок, Дейкстра — когда важны время или цена.'],
+    why: 'Почти каждый крупный сервис держится на графах. Это навигация и такси, доставка и логистика, маршрутизация в интернете, рекомендации друзей, товаров и видео, графы знаний рядом с ИИ. Инженер-программист, аналитик логистики и операций и сетевой инженер — профессии, которые в эпоху ИИ не исчезнут, а станут сильнее. ИИ напишет алгоритм, но поставить задачу (что вершины, что рёбра, какой вес) и проверить ответ должен человек.',
+    task: 'Постройте свой граф: не меньше 6 вершин и 7 рёбер. Подберите веса так, чтобы маршрут Дейкстры от старта до финиша содержал больше рёбер, чем путь BFS, и запустите оба алгоритма.',
+    hint: 'В режиме «Строить» нажатие на пустое место создаёт вершину, нажатия на две вершины подряд — ребро, нажатие на число на ребре — вес +1. «Старт·финиш» задаёт концы маршрута. Сделайте короткий по рёбрам путь дорогим, а обходной — дешёвым.',
+    stage: '«Строить»: пустое место — вершина, две вершины — ребро, число — вес +1.',
+    check: m => m.nV >= 6 && m.nE >= 7 && m.contrast },
+];
+
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+const KEY = 'luch-cs-graphs';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: Math.max(0, LESSONS.findIndex(l => l.id === saved.lesson)), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: LID(), done: S.done })); } catch (e) {} };
+
+// ---------- shared graph helpers (edges: [a, b, w]) ----------
+const nbrsOf = (E, v) => E.filter(e => e[0] === v || e[1] === v).map(e => ({ u: e[0] === v ? e[1] : e[0], w: e[2] }));
+function bfsGraph(Vs, E, s, t) {
+  const dist = { [s]: 0 }, prev = {}, q = [s];
+  while (q.length) {
+    const v = q.shift();
+    for (const { u } of nbrsOf(E, v).sort((a, b) => a.u < b.u ? -1 : 1)) if (dist[u] === undefined) { dist[u] = dist[v] + 1; prev[u] = v; q.push(u); }
+  }
+  if (dist[t] === undefined) return { dist, path: null };
+  const path = [t]; while (path[0] !== s) path.unshift(prev[path[0]]);
+  return { dist, path };
+}
+function dijGraph(Vs, E, s, t) { // ties: fewer edges wins
+  const d = {}, hops = {}, prev = {}, done = new Set();
+  Vs.forEach(v => { d[v] = INF; hops[v] = INF; }); d[s] = 0; hops[s] = 0;
+  for (;;) {
+    let v = null;
+    for (const x of Vs) if (!done.has(x) && d[x] < INF && (v === null || d[x] < d[v] || (d[x] === d[v] && hops[x] < hops[v]))) v = x;
+    if (v === null) break;
+    done.add(v);
+    for (const { u, w } of nbrsOf(E, v)) if (d[v] + w < d[u] || (d[v] + w === d[u] && hops[v] + 1 < hops[u])) { d[u] = d[v] + w; hops[u] = hops[v] + 1; prev[u] = v; }
+  }
+  if (d[t] === INF) return { d, path: null };
+  const path = [t]; while (path[0] !== s) path.unshift(prev[path[0]]);
+  return { d, path, cost: d[t] };
+}
+const pathCost = (E, p) => p.slice(1).reduce((s, v, i) => { const e = E.find(e => (e[0] === p[i] && e[1] === v) || (e[1] === p[i] && e[0] === v)); return s + (e ? e[2] : 0); }, 0);
+
+// ---------- lesson 1: three ready-made graphs ----------
+const G1 = {
+  metro: { name: 'Метро', kind: 'взвешенный неориентированный граф', directed: false, weighted: true,
+    V: { c: ['Центр', 262, 168], p: ['Парк', 150, 66], v: ['Вокзал', 392, 60], r: ['Порт', 462, 206], m: ['Музей', 120, 256], a: ['Арена', 300, 292], u: ['Университет', 58, 160] },
+    E: [['c', 'p', 4], ['c', 'v', 5], ['c', 'm', 3], ['c', 'a', 4], ['p', 'u', 3], ['u', 'm', 5], ['v', 'r', 6], ['r', 'a', 5], ['p', 'v', 7]] },
+  social: { name: 'Соцсеть', kind: 'неориентированный граф дружбы', directed: false,
+    V: { an: ['Аня', 92, 72], ben: ['Бен', 60, 236], li: ['Ли', 242, 168], om: ['Омар', 236, 44], sa: ['Сара', 404, 92], tom: ['Том', 322, 290], yu: ['Юки', 470, 240] },
+    E: [['an', 'ben'], ['an', 'li'], ['an', 'om'], ['ben', 'li'], ['li', 'om'], ['li', 'sa'], ['li', 'tom'], ['sa', 'yu'], ['tom', 'yu'], ['om', 'sa']] },
+  web: { name: 'Веб', kind: 'ориентированный граф ссылок', directed: true,
+    V: { home: ['Главная', 262, 48], blog: ['Блог', 92, 150], news: ['Новости', 432, 150], wiki: ['Вики', 262, 258], shop: ['Магазин', 458, 292], forum: ['Форум', 70, 292] },
+    E: [['home', 'blog'], ['home', 'news'], ['home', 'shop'], ['blog', 'wiki'], ['news', 'wiki'], ['forum', 'wiki'], ['shop', 'home'], ['wiki', 'home'], ['forum', 'blog'], ['blog', 'news'], ['shop', 'wiki']] },
+};
+const deg1 = (k, id) => { let i = 0, o = 0; for (const e of G1[k].E) { if (e[0] === id) o++; if (e[1] === id) i++; } return { in: i, out: o, all: i + o }; };
+const score1 = (k, id) => k === 'web' ? deg1(k, id).in : deg1(k, id).all;
+const pillW = name => name.length * 6.9 + 20;
+function resetL1() {
+  S.p1 = 'metro'; S.pos1 = {}; S.sel1 = null; S.ans1 = { social: false, web: false }; S.miss1 = 0;
+  for (const k in G1) { S.pos1[k] = {}; for (const id in G1[k].V) S.pos1[k][id] = { x: G1[k].V[id][1], y: G1[k].V[id][2] }; }
+}
+
+// ---------- lesson 2: BFS on a grid ----------
+const COLS = 13, ROWS = 8, CS = 36;
+const MAZE = ['...#.....#...',
+              '.#.#.###.#.#.',
+              '.#...#...#.#.',
+              '.####.#.##.#.',
+              '......#....#.',
+              '.####.####.#.',
+              '....#....#...',
+              '.##...##...#.'];
+const ci = (c, r) => r * COLS + c, cc = i => i % COLS, cr = i => Math.floor(i / COLS);
+const cellNbrs = i => { const c = cc(i), r = cr(i), out = []; if (r > 0) out.push(i - COLS); if (c < COLS - 1) out.push(i + 1); if (r < ROWS - 1) out.push(i + COLS); if (c > 0) out.push(i - 1); return out; };
+const adj = (a, b) => Math.abs(cc(a) - cc(b)) + Math.abs(cr(a) - cr(b)) === 1;
+function resetMaze() { S.walls = new Set(); MAZE.forEach((row, r) => [...row].forEach((ch, c) => { if (ch === '#') S.walls.add(ci(c, r)); })); S.st = ci(0, 0); S.fin = ci(12, 7); }
+function resetWave() { S.wave = null; S.trace = null; S.run2 = null; }
+function resetL2() { resetMaze(); resetWave(); S.mode2 = 'wall'; }
+function waveInit() {
+  const dist = new Array(ROWS * COLS).fill(-1); dist[S.st] = 0;
+  S.wave = { dist, front: [S.st], layer: 0, layers: [[S.st]], found: false, dead: false, visited: 1 };
+}
+function waveStep() {
+  if (!S.wave) waveInit();
+  const W = S.wave; if (W.found || W.dead) return;
+  const next = [];
+  for (const v of W.front) for (const u of cellNbrs(v)) if (!S.walls.has(u) && W.dist[u] < 0) { W.dist[u] = W.layer + 1; next.push(u); }
+  W.layer++; W.front = next; W.layers.push(next); W.visited += next.length;
+  if (W.dist[S.fin] >= 0) { W.found = true; S.trace = [S.fin]; toast(`Волна дошла до финиша: ${W.dist[S.fin]} ${plural(W.dist[S.fin], 'шаг', 'шага', 'шагов')}. Теперь ведите путь от финиша назад.`); }
+  else if (!next.length) { W.dead = true; toast('Волна остановилась: до финиша не добраться. Уберите часть стен.'); }
+}
+function wavePath() { // one shortest path, for the calc tab
+  const W = S.wave; if (!W || !W.found) return null;
+  const p = [S.fin];
+  while (p[0] !== S.st) { const v = p[0]; p.unshift(cellNbrs(v).find(u => W.dist[u] === W.dist[v] - 1)); }
+  return p;
+}
+const cellName = i => `(${cr(i)}, ${cc(i)})`;
+
+// ---------- lesson 3: Dijkstra ----------
+const G3 = { V: { A: [44, 166], B: [152, 62], C: [152, 272], D: [292, 62], E: [306, 258], F: [420, 98], G: [488, 214] },
+  E: [['A', 'B', 1], ['A', 'C', 4], ['B', 'C', 4], ['B', 'D', 2], ['C', 'E', 3], ['D', 'E', 6], ['D', 'F', 3], ['E', 'F', 5], ['E', 'G', 2], ['F', 'G', 9]] };
+const V3 = Object.keys(G3.V);
+function resetL3() { S.pos3 = {}; for (const v of V3) S.pos3[v] = { x: G3.V[v][0], y: G3.V[v][1] }; S.s3 = 'A'; S.t3 = 'G'; S.ends3 = null; resetDij(); }
+function resetDij() {
+  const dist = {}; V3.forEach(v => dist[v] = INF); dist[S.s3] = 0;
+  S.dj = { dist, prev: {}, done: [], seen: [S.s3], last: null, log: [], auto: false, errors: 0, run: null };
+  S.greedy = null; S.greedySeen = false;
+}
+const pq3 = () => S.dj.seen.filter(v => !S.dj.done.includes(v));
+const pqMin = () => Math.min(...pq3().map(v => S.dj.dist[v]));
+const djFinished = () => S.dj.done.includes(S.t3);
+function djTake(v, hand) {
+  const D = S.dj;
+  if (djFinished()) { toast(`Финиш ${S.t3} уже зафиксирован: маршрут найден.`); return false; }
+  if (D.done.includes(v)) { toast(`Вершина ${v} уже зафиксирована: её метка окончательная.`); return false; }
+  if (!pq3().includes(v)) { toast(`Вершины ${v} нет в очереди: её метка пока ∞, до неё ещё не дошли.`); return false; }
+  const mn = pqMin();
+  if (D.dist[v] > mn) {
+    D.errors++;
+    const who = pq3().filter(x => D.dist[x] === mn).join(' или ');
+    toast(`Не та: у ${v} метка ${D.dist[v]}, а в очереди есть ${who} с меткой ${mn}. Из очереди берут наименьшую.`);
+    update(); return false;
+  }
+  if (!hand) D.auto = true;
+  D.done.push(v);
+  const upd = [];
+  for (const { u, w } of nbrsOf(G3.E, v)) {
+    if (D.done.includes(u)) continue;
+    const nd = D.dist[v] + w;
+    if (nd < D.dist[u]) { upd.push({ u, old: D.dist[u], nw: nd, w }); D.dist[u] = nd; D.prev[u] = v; if (!D.seen.includes(u)) D.seen.push(u); }
+    else upd.push({ u, old: D.dist[u], nw: D.dist[u], w, keep: true });
+  }
+  D.last = { v, d: D.dist[v], upd, t: performance.now() }; D.log.push(D.last);
+  if (v === S.t3) {
+    const r = djRoute();
+    toast(`Финиш ${S.t3} зафиксирован: ${minutes(D.dist[v])}, маршрут ${r.join(' → ')}.${D.auto ? '' : ' Теперь нажмите «Жадный».'}`);
+  }
+  return true;
+}
+function djRoute() { const D = S.dj; if (!djFinished()) return null; const p = [S.t3]; while (p[0] !== S.s3) p.unshift(D.prev[p[0]]); return p; }
+function djAutoStep() { const q = pq3(); if (!q.length || djFinished()) return false; const mn = pqMin(); const v = q.filter(x => S.dj.dist[x] === mn).sort()[0]; return djTake(v, false); }
+function greedyRun() {
+  const s = S.s3, t = S.t3, path = [s], vis = new Set([s]); let cur = s, cost = 0, dead = false;
+  while (cur !== t) {
+    const c = nbrsOf(G3.E, cur).filter(x => !vis.has(x.u)).sort((a, b) => a.w - b.w || (a.u < b.u ? -1 : 1));
+    if (!c.length) { dead = true; break; }
+    cur = c[0].u; cost += c[0].w; vis.add(cur); path.push(cur);
+  }
+  S.greedy = { path, cost, dead }; S.greedySeen = true;
+  const best = dijGraph(V3, G3.E, s, t);
+  if (dead) toast(`Жадный путь ${path.join(' → ')} упёрся в тупик: все соседи уже пройдены.`);
+  else if (cost > best.cost) toast(`Жадный путь ${path.join(' → ')} = ${minutes(cost)}, а Дейкстра находит ${minutes(best.cost)}. Дешёвое начало — не значит быстрый путь.`);
+  else toast(`Здесь жадный путь ${path.join(' → ')} совпал по времени с лучшим: ${minutes(cost)}. Так бывает не всегда.`);
+}
+
+// ---------- lesson 4: your own graph ----------
+const LET = 'ABCDEFGHIJ';
+function resetL4() {
+  S.g4 = { V: [{ id: 'A', x: 60, y: 170 }, { id: 'B', x: 200, y: 70 }, { id: 'C', x: 200, y: 270 }, { id: 'D', x: 350, y: 170 }],
+           E: [['A', 'B', 2], ['A', 'C', 3], ['B', 'D', 4]] };
+  S.s4 = 'A'; S.t4 = 'D'; S.mode4 = 'build'; S.pend = null; S.endsNext = 's'; S.res4 = { bfs: null, dij: null, fof: null };
+}
+const V4 = () => S.g4.V.map(v => v.id);
+const vx4 = id => S.g4.V.find(v => v.id === id);
+function edited4() { S.res4 = { bfs: null, dij: null, fof: null }; }
+function addVertex4(p) {
+  if (S.g4.V.length >= 10) { toast('Хватит 10 вершин: так граф останется читаемым.'); return; }
+  const x = clamp(p.x, 22, 498), y = clamp(p.y, 22, 318);
+  if (S.g4.V.some(v => Math.hypot(v.x - x, v.y - y) < 40)) { toast('Слишком близко к другой вершине — нажмите на свободное место.'); return; }
+  const id = [...LET].find(ch => !vx4(ch));
+  S.g4.V.push({ id, x, y }); edited4();
+  if (!S.s4) S.s4 = id; else if (!S.t4) S.t4 = id;
+}
+function vertexTap4(id) {
+  if (S.mode4 === 'del') {
+    S.g4.V = S.g4.V.filter(v => v.id !== id); S.g4.E = S.g4.E.filter(e => e[0] !== id && e[1] !== id);
+    if (S.s4 === id) S.s4 = null; if (S.t4 === id) S.t4 = null; S.pend = null; edited4(); return;
+  }
+  if (S.mode4 === 'ends') {
+    if (S.endsNext === 's') { S.s4 = id; if (S.t4 === id) S.t4 = null; S.endsNext = 't'; toast(`Старт — ${id}. Теперь нажмите финиш.`); }
+    else { if (id === S.s4) { toast('Финиш должен отличаться от старта.'); return; } S.t4 = id; S.endsNext = 's'; toast(`Маршрут ${S.s4} → ${S.t4}.`); }
+    edited4(); return;
+  }
+  if (S.pend === null) { S.pend = id; return; }
+  if (S.pend === id) { S.pend = null; return; }
+  const a = S.pend, b = id; S.pend = null;
+  if (S.g4.E.some(e => (e[0] === a && e[1] === b) || (e[0] === b && e[1] === a))) { toast(`Ребро ${a}–${b} уже есть. Нажмите на его число, чтобы поменять вес.`); return; }
+  const A = vx4(a), B = vx4(b), w = clamp(Math.round(Math.hypot(A.x - B.x, A.y - B.y) / 40), 1, 9);
+  S.g4.E.push([a, b, w]); edited4();
+}
+function run4(kind) {
+  const s = S.s4, t = S.t4;
+  if (!s || !t) { toast('Сначала задайте старт и финиш: режим «Старт·финиш».'); return; }
+  if (kind === 'fof') {
+    const r = bfsGraph(V4(), S.g4.E, s, s);
+    S.res4.fof = V4().filter(v => r.dist[v] === 2);
+    toast(S.res4.fof.length ? `Друзья друзей для ${s}: ${S.res4.fof.join(', ')} — на расстоянии 2, но не соседи.` : `У ${s} нет вершин на расстоянии ровно 2.`);
+    return;
+  }
+  const r = kind === 'bfs' ? bfsGraph(V4(), S.g4.E, s, t) : dijGraph(V4(), S.g4.E, s, t);
+  if (!r.path) { toast(`От ${s} до ${t} пути нет — добавьте рёбра.`); S.res4[kind] = null; return; }
+  S.res4[kind] = { path: r.path, hops: r.path.length - 1, cost: pathCost(S.g4.E, r.path) };
+  const x = S.res4[kind];
+  toast(`${kind === 'bfs' ? 'BFS' : 'Дейкстра'}: ${x.path.join(' → ')} — ${x.hops} ${plural(x.hops, 'ребро', 'ребра', 'рёбер')}, вес ${x.cost}.`);
+}
+
+function model() {
+  const id = LID();
+  if (id === 'graph') {
+    const g = G1[S.p1];
+    return { kind: 'graph', p: S.p1, nV: Object.keys(g.V).length, nE: g.E.length, sel: S.sel1, okSocial: S.ans1.social, okWeb: S.ans1.web, miss: S.miss1 };
+  }
+  if (id === 'bfs') {
+    const W = S.wave, tr = S.trace;
+    return { kind: 'bfs', started: !!W, layer: W ? W.layer : 0, front: W ? W.front.length : 0, visited: W ? W.visited : 0, found: !!(W && W.found), dead: !!(W && W.dead),
+             len: W && W.found ? W.dist[S.fin] : null, traceLen: tr ? tr.length - 1 : 0, traced: !!(tr && tr[tr.length - 1] === S.st && W && W.found), running: !!S.run2,
+             free: ROWS * COLS - S.walls.size };
+  }
+  if (id === 'dijkstra') {
+    const D = S.dj, fin = djFinished();
+    return { kind: 'dij', s: S.s3, t: S.t3, done: D.done.length, pq: pq3(), fin, cost: fin ? D.dist[S.t3] : null, route: djRoute(), auto: D.auto, errors: D.errors,
+             handDone: fin && !D.auto, greedySeen: S.greedySeen, greedy: S.greedy, running: !!D.run };
+  }
+  const nV = S.g4.V.length, nE = S.g4.E.length, b = S.res4.bfs, d = S.res4.dij;
+  return { kind: 'world', nV, nE, s: S.s4, t: S.t4, bfs: b, dij: d, fof: S.res4.fof, contrast: !!(b && d && d.hops > b.hops && d.cost < b.cost) };
+}
+
+// ---------- geometry ----------
+const BOX = { graph: [-6, -14, 526, 322], bfs: [-6, -6, COLS * CS + 6, ROWS * CS + 30], dijkstra: [-6, -14, 526, 382], world: [-6, -6, 526, 346] };
+const posOf = id => { const l = LID(); return l === 'graph' ? S.pos1[S.p1][id] : l === 'dijkstra' ? S.pos3[id] : vx4(id); };
+function setPos(id, x, y) {
+  const o = posOf(id); if (!o) return;
+  const l = LID(), B = BOX[l];
+  const mx = l === 'graph' ? pillW(G1[S.p1].V[id][0]) / 2 + 2 : 22;
+  o.x = clamp(x, B[0] + mx, B[2] - mx); o.y = clamp(y, Math.max(B[1] + 20, 20), (l === 'dijkstra' ? 300 : l === 'world' ? 318 : B[3] - 16));
+}
+
+// ---------- drawing ----------
+const scene = $('#scene');
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+// point on the border of a box (half sizes hw, hh) centred at b, on the line from a
+function clipBox(a, b, hw, hh) {
+  const dx = a.x - b.x, dy = a.y - b.y; if (!dx && !dy) return { x: b.x, y: b.y };
+  const k = Math.min(dx ? hw / Math.abs(dx) : INF, dy ? hh / Math.abs(dy) : INF);
+  return { x: b.x + dx * k, y: b.y + dy * k };
+}
+function clipCirc(a, b, r) { const d = Math.hypot(a.x - b.x, a.y - b.y) || 1; return { x: b.x + (a.x - b.x) * r / d, y: b.y + (a.y - b.y) * r / d }; }
+function arrowHead(p, from, col, size = 8) {
+  const d = Math.hypot(p.x - from.x, p.y - from.y) || 1, ux = (p.x - from.x) / d, uy = (p.y - from.y) / d;
+  const bx = p.x - ux * size, by = p.y - uy * size, nx = -uy * size * 0.5, ny = ux * size * 0.5;
+  return `<path d="M${p.x.toFixed(1)} ${p.y.toFixed(1)}L${(bx + nx).toFixed(1)} ${(by + ny).toFixed(1)}L${(bx - nx).toFixed(1)} ${(by - ny).toFixed(1)}Z" fill="${col}"/>`;
+}
+const wLabel = (x, y, w, col, hit, stroke) => `<g${hit ? ` data-hit="${hit}"` : ''}><rect x="${(x - 12).toFixed(1)}" y="${(y - 8).toFixed(1)}" width="24" height="16" rx="5" fill="#0e1520" stroke="${stroke || '#26324a'}" stroke-width="1.1"/><text x="${x.toFixed(1)}" y="${(y + 3.6).toFixed(1)}" font-size="10" fill="${col}" text-anchor="middle">${w}</text></g>`;
+
+function drawGraph1() {
+  const k = S.p1, g = G1[k], P = S.pos1[k], sel = S.sel1, showDeg = k === 'metro' || S.ans1[k];
+  let h = `<text x="0" y="0" font-size="9" fill="${MU}" letter-spacing="1">${g.name.toUpperCase()} · ${g.kind.toUpperCase()}</text>`;
+  if (k === 'web') h += `<text x="0" y="14" font-size="8.5" fill="${DIM}">стрелка: ссылка ведёт со страницы на страницу</text>`;
+  if (k === 'metro') h += `<text x="0" y="14" font-size="8.5" fill="${DIM}">число на ребре — минуты в пути, в кружке — степень</text>`;
+  const hh = 13;
+  // edges
+  g.E.forEach((e, i) => {
+    let a = { ...P[e[0]] }, b = { ...P[e[1]] };
+    const twin = g.directed && g.E.some(f => f[0] === e[1] && f[1] === e[0]);
+    if (twin) { const d = Math.hypot(b.x - a.x, b.y - a.y) || 1, nx = -(b.y - a.y) / d * 6, ny = (b.x - a.x) / d * 6; a.x += nx; a.y += ny; b.x += nx; b.y += ny; }
+    const inc = sel && (e[0] === sel || e[1] === sel);
+    let col = '#3d5274', wd = 2.2;
+    if (inc) { col = g.directed ? (e[1] === sel ? AM : CY) : AM; wd = 3.2; }
+    const pa = clipBox(b, a, pillW(g.V[e[0]][0]) / 2 + 1, hh + 1), pb = clipBox(a, b, pillW(g.V[e[1]][0]) / 2 + 2, hh + 2);
+    h += `<g data-part="edge"><line x1="${pa.x.toFixed(1)}" y1="${pa.y.toFixed(1)}" x2="${pb.x.toFixed(1)}" y2="${pb.y.toFixed(1)}" stroke="${col}" stroke-width="${wd}" stroke-linecap="round"/>`;
+    if (g.directed) h += arrowHead(pb, pa, inc ? col : '#6a82a8', 9);
+    h += `</g>`;
+    if (g.weighted) h += wLabel((P[e[0]].x + P[e[1]].x) / 2, (P[e[0]].y + P[e[1]].y) / 2, e[2], inc ? AM : MU);
+  });
+  // vertices
+  for (const id in g.V) {
+    const nm = g.V[id][0], p = P[id], w = pillW(nm), isSel = id === sel;
+    const right = S.ans1[k] && score1(k, id) === Math.max(...Object.keys(g.V).map(v => score1(k, v)));
+    const fill = right ? '#1f3a2f' : isSel ? '#3a3220' : NF, st = right ? GR : isSel ? AM : '#5b6f93';
+    h += `<g data-v="${id}"><rect x="${(p.x - w / 2 - 4).toFixed(1)}" y="${(p.y - hh - 6).toFixed(1)}" width="${w + 8}" height="${2 * hh + 12}" fill="transparent"/>`;
+    h += `<rect x="${(p.x - w / 2).toFixed(1)}" y="${(p.y - hh).toFixed(1)}" width="${w.toFixed(1)}" height="${2 * hh}" rx="${hh}" fill="${fill}" stroke="${st}" stroke-width="${isSel || right ? 2.2 : 1.5}"/>`;
+    h += `<text x="${p.x.toFixed(1)}" y="${(p.y + 4).toFixed(1)}" font-size="11" fill="${FG}" text-anchor="middle" class="sans" font-weight="600">${nm}</text>`;
+    if (showDeg) {
+      const dg = deg1(k, id), bx = p.x + w / 2 - 3, by = p.y - hh - 2, txt = k === 'web' ? dg.in : dg.all;
+      h += `<circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="8" fill="${k === 'web' ? CY : AM}" stroke="${INK}" stroke-width="1.2"/><text x="${bx.toFixed(1)}" y="${(by + 3.4).toFixed(1)}" font-size="9.5" fill="#0b1019" text-anchor="middle" font-weight="600">${txt}</text>`;
+    }
+    h += `</g>`;
+  }
+  if (sel && k !== 'metro' && !S.ans1[k]) h += `<text x="520" y="318" font-size="9" fill="${AM}" text-anchor="end">выбрано: ${g.V[sel][0]} — нажмите «Это ответ»</text>`;
+  if (sel && (k === 'metro' || S.ans1[k])) {
+    const dg = deg1(k, sel);
+    h += `<text x="520" y="318" font-size="9" fill="${AM}" text-anchor="end">${g.V[sel][0]}: ${g.directed ? `входящих ${dg.in}, исходящих ${dg.out}` : `степень ${dg.all}`}</text>`;
+  }
+  return h;
+}
+
+function drawBfs(t) {
+  const W = S.wave, tr = S.trace || [], inTr = new Set(tr);
+  const front = W && !W.found ? new Set(W.front) : new Set();
+  let h = '', nums = '';
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const i = ci(c, r), x = c * CS, y = r * CS, wall = S.walls.has(i), d = W ? W.dist[i] : -1;
+    let fill = '#121a28', st = '#1f2a3e';
+    if (wall) { fill = '#2a3348'; st = '#3a4762'; }
+    else if (inTr.has(i)) { fill = 'rgba(255,181,71,.55)'; st = AM; }
+    else if (d >= 0) { const a = Math.max(0.10, 0.42 - d * 0.018); fill = `rgba(114,212,232,${a.toFixed(3)})`; st = '#2c4d63'; }
+    h += `<rect data-hit="c:${i}" x="${x + 1}" y="${y + 1}" width="${CS - 2}" height="${CS - 2}" rx="4" fill="${fill}" stroke="${st}" stroke-width="1"/>`;
+    if (wall) h += `<path d="M${x + 6} ${y + 12}h24M${x + 6} ${y + 24}h24M${x + 18} ${y + 1}v11M${x + 12} ${y + 12}v12M${x + 24} ${y + 12}v12M${x + 18} ${y + 24}v11" stroke="#1a2236" stroke-width="1.4" pointer-events="none"/>`;
+    if (front.has(i)) h += `<rect x="${x + 2.5}" y="${y + 2.5}" width="${CS - 5}" height="${CS - 5}" rx="4" fill="none" stroke="${AM}" stroke-width="2" class="pulse" pointer-events="none"/>`;
+    if (d >= 0 && i !== S.st && i !== S.fin) nums += `<text x="${x + CS / 2}" y="${y + CS / 2 + 4}" font-size="12" fill="${inTr.has(i) ? '#0b1019' : FG}" text-anchor="middle" font-weight="500" pointer-events="none">${d}</text>`;
+  }
+  // start and finish
+  const sx = cc(S.st) * CS, sy = cr(S.st) * CS, fx = cc(S.fin) * CS, fy = cr(S.fin) * CS;
+  h += `<g pointer-events="none"><circle cx="${sx + CS / 2}" cy="${sy + CS / 2}" r="12" fill="${GR}" stroke="${INK}" stroke-width="1.4"/><text x="${sx + CS / 2}" y="${sy + CS / 2 + 4}" font-size="10" fill="#0b1019" text-anchor="middle" font-weight="600">${W ? 0 : 'С'}</text></g>`;
+  h += `<g pointer-events="none"><path d="M${fx + 11} ${fy + 29}V${fy + 7}l17 6-17 6" fill="${AM}" stroke="${INK}" stroke-width="1.3" stroke-linejoin="round"/>` +
+       (W && W.found ? `<rect x="${fx + 15}" y="${fy + 20}" width="19" height="13" rx="3" fill="#0b1019"/><text x="${fx + 24.5}" y="${fy + 30}" font-size="10" fill="${AM}" text-anchor="middle" font-weight="600">${W.dist[S.fin]}</text>` : '') + `</g>`;
+  // traced path line
+  if (tr.length > 1) h += `<path d="M${tr.map(i => `${cc(i) * CS + CS / 2} ${cr(i) * CS + CS / 2}`).join('L')}" fill="none" stroke="${AM}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".55" pointer-events="none"/>`;
+  h += nums;
+  const ly = ROWS * CS + 18;
+  h += `<circle cx="8" cy="${ly - 4}" r="6" fill="${GR}"/><text x="18" y="${ly}" font-size="9.5" fill="${MU}">старт</text>`;
+  h += `<path d="M62 ${ly + 3}V${ly - 10}l9 3.5-9 3.5" fill="${AM}"/><text x="76" y="${ly}" font-size="9.5" fill="${MU}">финиш</text>`;
+  h += `<rect x="124" y="${ly - 10}" width="12" height="12" rx="2" fill="#2a3348" stroke="${LN}"/><text x="141" y="${ly}" font-size="9.5" fill="${MU}">стена</text>`;
+  h += `<rect x="188" y="${ly - 10}" width="12" height="12" rx="2" fill="none" stroke="${AM}" stroke-width="1.6"/><text x="205" y="${ly}" font-size="9.5" fill="${MU}">фронт волны</text>`;
+  h += `<text x="${COLS * CS}" y="${ly}" font-size="9.5" fill="${MU}" text-anchor="end">число — шагов от старта</text>`;
+  return h;
+}
+
+function drawDij(t) {
+  const D = S.dj, P = S.pos3, done = new Set(D.done), q = new Set(pq3()), route = djRoute(), R = 18;
+  const onRoute = new Set(); if (route) route.slice(1).forEach((v, i) => onRoute.add([route[i], v].sort().join('')));
+  const gp = S.greedy, onG = new Set(); if (gp) gp.path.slice(1).forEach((v, i) => onG.add([gp.path[i], v].sort().join('')));
+  const lastE = new Set(); if (D.last) D.last.upd.forEach(x => lastE.add([D.last.v, x.u].sort().join('')));
+  let h = `<text x="0" y="0" font-size="9" fill="${MU}" letter-spacing="1">ДОРОГИ ГОРОДА · ВЕС РЕБРА — МИНУТЫ В ПУТИ</text>`;
+  for (const e of G3.E) {
+    const a = P[e[0]], b = P[e[1]], key = [e[0], e[1]].sort().join('');
+    const tree = D.prev[e[1]] === e[0] || D.prev[e[0]] === e[1];
+    let col = '#3d5274', wd = 2.4, dash = '';
+    if (lastE.has(key) && !route) { col = CY; wd = 3.2; }
+    else if (tree) { col = '#7a6a45'; wd = 2.8; }
+    if (onRoute.has(key)) { col = AM; wd = 5; }
+    h += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${col}" stroke-width="${wd}" stroke-linecap="round" ${dash}/>`;
+    if (onG.has(key)) {
+      const d = Math.hypot(b.x - a.x, b.y - a.y) || 1, nx = -(b.y - a.y) / d * 7, ny = (b.x - a.x) / d * 7;
+      h += `<line x1="${a.x + nx}" y1="${a.y + ny}" x2="${b.x + nx}" y2="${b.y + ny}" stroke="${WR}" stroke-width="2.4" stroke-dasharray="6 4" stroke-linecap="round"/>`;
+    }
+    h += wLabel((a.x + b.x) / 2, (a.y + b.y) / 2, e[2], onRoute.has(key) ? AM : lastE.has(key) && !route ? CY : MU);
+  }
+  const mn = q.size ? pqMin() : null;
+  for (const v of V3) {
+    const p = P[v], isDone = done.has(v), inQ = q.has(v), last = D.last && D.last.v === v && t - D.last.t < 1400;
+    const fill = isDone ? '#1f3a2f' : NF, st = last ? AM : isDone ? GR : inQ ? CY : '#5b6f93';
+    h += `<g data-v="${v}"><circle cx="${p.x}" cy="${p.y}" r="${R + 6}" fill="transparent"/>`;
+    h += `<circle cx="${p.x}" cy="${p.y}" r="${R}" fill="${fill}" stroke="${st}" stroke-width="${last || inQ ? 2.6 : 1.8}"${inQ && !isDone ? ' stroke-dasharray="5 3"' : ''}/>`;
+    h += `<text x="${p.x}" y="${p.y + 5}" font-size="14" fill="${FG}" text-anchor="middle" font-weight="600">${v}</text>`;
+    const d = D.dist[v], bw = d === INF ? 22 : String(d).length * 7 + 14, by = p.y - R - 13;
+    h += `<rect x="${p.x - bw / 2}" y="${by - 8}" width="${bw}" height="16" rx="8" fill="${isDone ? GR : inQ ? '#173444' : '#141d2e'}" stroke="${isDone ? GR : inQ ? CY : LN}" stroke-width="1.1"/>`;
+    h += `<text x="${p.x}" y="${by + 4}" font-size="10.5" fill="${isDone ? '#0b1019' : inQ ? CY : MU}" text-anchor="middle" font-weight="600">${fmtD(d)}</text>`;
+    if (v === S.s3 || v === S.t3) h += `<text x="${p.x}" y="${p.y + R + 13}" font-size="9" fill="${v === S.s3 ? GR : AM}" text-anchor="middle" class="sans" font-weight="600">${v === S.s3 ? 'старт' : 'финиш'}</text>`;
+    h += `</g>`;
+  }
+  // last step + queue
+  const y0 = 330;
+  let line = 'Нажмите вершину с наименьшей меткой в очереди — сейчас это старт.';
+  if (S.ends3) line = S.ends3 === 's' ? 'Режим «Старт·финиш»: нажмите вершину-старт.' : 'Теперь нажмите вершину-финиш.';
+  else if (route) line = `Готово: ${route.join(' → ')} = ${minutes(D.dist[S.t3])}` + (gp ? ` · жадный ${gp.path.join('→')} = ${gp.dead ? 'тупик' : minutes(gp.cost)}` : '');
+  else if (D.last) line = `Шаг ${D.log.length}: взяли ${D.last.v} (${D.last.d}) → ` + (D.last.upd.length ? D.last.upd.map(x => x.keep ? `${x.u}: ${fmtD(x.old)} не лучше ${D.last.d}+${x.w}` : `${x.u}: ${fmtD(x.old)} → ${x.nw}`).join(', ') : 'новых соседей нет');
+  h += `<text x="0" y="${y0}" font-size="10" fill="${route ? AM : FG}">${esc(line)}</text>`;
+  h += `<text x="0" y="${y0 + 22}" font-size="9" fill="${MU}" letter-spacing="1">ОЧЕРЕДЬ</text>`;
+  let qx = 58;
+  const ql = pq3();
+  if (!ql.length) h += `<text x="${qx}" y="${y0 + 22}" font-size="10" fill="${DIM}">пусто</text>`;
+  ql.forEach(v => {
+    const s = `${v} · ${D.dist[v]}`, w = s.length * 6.6 + 14;
+    h += `<g data-hit="q:${v}"><rect x="${qx}" y="${y0 + 10}" width="${w}" height="18" rx="6" fill="#173444" stroke="${CY}" stroke-width="1.1"/><text x="${qx + w / 2}" y="${y0 + 23}" font-size="10" fill="${FG}" text-anchor="middle">${s}</text></g>`;
+    qx += w + 6;
+  });
+  h += `<text x="0" y="${y0 + 44}" font-size="9" fill="${MU}" letter-spacing="1">ЗАФИКСИРОВАНЫ</text><text x="104" y="${y0 + 44}" font-size="10" fill="${GR}">${D.done.map(v => `${v}=${D.dist[v]}`).join('  ') || '—'}</text>`;
+  return h;
+}
+
+function drawWorld(t) {
+  const G = S.g4, R = 16, res = S.res4;
+  const pe = p => { const s = new Set(); if (p) p.path.slice(1).forEach((v, i) => s.add([p.path[i], v].sort().join(''))); return s; };
+  const onB = pe(res.bfs), onD = pe(res.dij), fof = new Set(res.fof || []);
+  let h = `<rect data-hit="bg" x="0" y="0" width="520" height="340" rx="14" fill="rgba(114,212,232,.025)" stroke="#26324a" stroke-dasharray="5 5"/>`;
+  h += `<text x="10" y="16" font-size="9" fill="${MU}" letter-spacing="1" pointer-events="none">ВАШ ГРАФ · ${G.V.length} ${plural(G.V.length, 'ВЕРШИНА', 'ВЕРШИНЫ', 'ВЕРШИН')}, ${G.E.length} ${plural(G.E.length, 'РЕБРО', 'РЕБРА', 'РЁБЕР')}</text>`;
+  G.E.forEach((e, i) => {
+    const a = vx4(e[0]), b = vx4(e[1]), key = [e[0], e[1]].sort().join('');
+    if (!a || !b) return;
+    h += `<g data-hit="e:${i}"><line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="transparent" stroke-width="16"/>`;
+    if (onB.has(key)) h += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${CY}" stroke-width="9" stroke-linecap="round" opacity=".55"/>`;
+    h += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${onD.has(key) ? AM : S.mode4 === 'del' ? '#7a5048' : '#4a6288'}" stroke-width="${onD.has(key) ? 4 : 2.4}" stroke-linecap="round"/></g>`;
+    h += wLabel((a.x + b.x) / 2, (a.y + b.y) / 2, e[2], onD.has(key) ? AM : FG, `w:${i}`, S.mode4 === 'build' ? '#4a6288' : S.mode4 === 'del' ? WR : null);
+  });
+  for (const v of G.V) {
+    const isS = v.id === S.s4, isT = v.id === S.t4, pend = S.pend === v.id, fr = fof.has(v.id);
+    const st = pend ? AM : isS ? GR : isT ? AM : fr ? '#c3a6ff' : '#6a82a8';
+    h += `<g data-v="${v.id}"><circle cx="${v.x}" cy="${v.y}" r="${R + 6}" fill="transparent"/>`;
+    if (pend) h += `<circle cx="${v.x}" cy="${v.y}" r="${R + 5}" fill="none" stroke="${AM}" stroke-width="1.6" stroke-dasharray="4 3" class="pulse"/>`;
+    h += `<circle cx="${v.x}" cy="${v.y}" r="${R}" fill="${isS ? '#1f3a2f' : isT ? '#3a3220' : fr ? '#2c2445' : NF}" stroke="${st}" stroke-width="2.2"/>`;
+    h += `<text x="${v.x}" y="${v.y + 5}" font-size="13" fill="${FG}" text-anchor="middle" font-weight="600">${v.id}</text>`;
+    if (isS || isT) h += `<text x="${v.x}" y="${v.y + R + 12}" font-size="9" fill="${isS ? GR : AM}" text-anchor="middle" class="sans" font-weight="600">${isS ? 'старт' : 'финиш'}</text>`;
+    if (fr) h += `<text x="${v.x}" y="${v.y - R - 6}" font-size="9" fill="#c3a6ff" text-anchor="middle" class="sans" font-weight="600">★ друг друга</text>`;
+    h += `</g>`;
+  }
+  // legend
+  const ly = 332;
+  h += `<g pointer-events="none"><rect x="10" y="${ly - 7}" width="18" height="6" rx="3" fill="${CY}" opacity=".6"/><text x="33" y="${ly}" font-size="9" fill="${MU}">путь BFS (меньше рёбер)</text>`;
+  h += `<rect x="190" y="${ly - 6}" width="18" height="4" rx="2" fill="${AM}"/><text x="213" y="${ly}" font-size="9" fill="${MU}">путь Дейкстры (меньше вес)</text>`;
+  h += `<circle cx="397" cy="${ly - 3}" r="5" fill="#2c2445" stroke="#c3a6ff" stroke-width="1.6"/><text x="406" y="${ly}" font-size="9" fill="${MU}">друзья друзей</text></g>`;
+  return h;
+}
+
+function hlBoxes(id) {
+  const l = LID();
+  if (l === 'graph') {
+    const k = S.p1, g = G1[k], P = S.pos1[k];
+    if (id === 'v') return Object.keys(g.V).map(v => { const w = pillW(g.V[v][0]); return [P[v].x - w / 2 - 4, P[v].y - 17, w + 8, 34]; });
+    if (id === 'e' || id === 'w') return g.E.map(e => { const x = (P[e[0]].x + P[e[1]].x) / 2, y = (P[e[0]].y + P[e[1]].y) / 2; return [x - 15, y - 11, 30, 22]; });
+    if (id === 'dir') return g.E.map(e => { const a = P[e[0]], b = P[e[1]], p = clipBox(a, b, pillW(g.V[e[1]][0]) / 2 + 2, 15); return [p.x - 11, p.y - 11, 22, 22]; });
+    if (id === 'deg') return Object.keys(g.V).map(v => { const w = pillW(g.V[v][0]); return [P[v].x + w / 2 - 14, P[v].y - 26, 22, 22]; });
+    return [];
+  }
+  if (l === 'bfs') {
+    const box = i => [cc(i) * CS - 2, cr(i) * CS - 2, CS + 4, CS + 4];
+    if (id === 'start') return [box(S.st)];
+    if (id === 'fin') return [box(S.fin)];
+    if (id === 'grid') return [[-3, -3, COLS * CS + 6, ROWS * CS + 6]];
+    if (id === 'wall') return [...S.walls].slice(0, 60).map(box);
+    if (id === 'wave') return S.wave && S.wave.front.length ? S.wave.front.map(box) : [box(S.st)];
+    if (id === 'path') return S.trace ? S.trace.map(box) : [box(S.fin)];
+    return [];
+  }
+  if (l === 'dijkstra') {
+    const P = S.pos3;
+    if (id === 'label') return V3.map(v => [P[v].x - 20, P[v].y - 41, 40, 22]);
+    if (id === 'weight') return G3.E.map(e => { const a = P[e[0]], b = P[e[1]]; return [(a.x + b.x) / 2 - 15, (a.y + b.y) / 2 - 11, 30, 22]; });
+    if (id === 'queue') return [[-4, 336, 400, 30]];
+    if (id === 'fixed') return S.dj.done.length ? S.dj.done.map(v => [P[v].x - 23, P[v].y - 23, 46, 46]) : [[-4, 360, 300, 22]];
+    if (id === 'step') return [[-4, 316, 526, 22]];
+    return [];
+  }
+  const G = S.g4;
+  if (id === 'canvas') return [[-3, -3, 526, 346]];
+  if (id === 'ends') return G.V.filter(v => v.id === S.s4 || v.id === S.t4).map(v => [v.x - 22, v.y - 22, 44, 44]);
+  if (id === 'weights') return G.E.map(e => { const a = vx4(e[0]), b = vx4(e[1]); return [(a.x + b.x) / 2 - 15, (a.y + b.y) / 2 - 11, 30, 22]; });
+  if (id === 'paths') { const p = (S.res4.dij || S.res4.bfs); return p ? p.path.map(id2 => { const v = vx4(id2); return [v.x - 22, v.y - 22, 44, 44]; }) : [[-3, -3, 526, 346]]; }
+  if (id === 'fof') return (S.res4.fof || []).map(id2 => { const v = vx4(id2); return [v.x - 22, v.y - 22, 44, 44]; });
+  return [];
+}
+
+function drawScene(t) {
+  const id = LID();
+  let h = bg() + (id === 'graph' ? drawGraph1() : id === 'bfs' ? drawBfs(t) : id === 'dijkstra' ? drawDij(t) : drawWorld(t));
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1);
+    if (k === 0) S.hl = null;
+    else for (const b of hlBoxes(S.hl.id)) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+  scene.classList.toggle('addmode', id === 'world' && S.mode4 === 'build');
+}
+
+// The shared task card (with the lab-shell buttons) covers the top-left of the stage and the meter the
+// top-right. fit() measures both and puts the scene in the largest free region: under both, or to the
+// right of the card and under the meter, or between them.
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+const taskCard = $('#taskBox');
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const [x0, y0, x1, y1] = BOX[LID()], cw = x1 - x0, ch = y1 - y0;
+  const tc = taskCard.getBoundingClientRect(), mc = $('#meter').getBoundingClientRect(), pad = 10;
+  const cardR = tc.right - rc.left + 10, cardB = tc.bottom - rc.top + 8, mB = mc.bottom - rc.top + 8, mL = mc.left - rc.left - 10;
+  const regions = [[pad, Math.max(cardB, mB), w - pad, hh - pad], [cardR, mB, w - pad, hh - pad], [cardR, pad, mL, hh - pad]];
+  let best = null;
+  for (const r of regions) {
+    const rw = r[2] - r[0], rh = r[3] - r[1]; if (rw < 120 || rh < 120) continue;
+    const s = Math.min(rw / cw, rh / ch, 1.9);
+    if (!best || s > best.s + 0.01) best = { s, r };
+  }
+  if (!best) best = { s: Math.min(w / cw, hh / ch), r: [0, 0, w, hh] };
+  const s = best.s, r = best.r, px = (r[0] + r[2]) / 2, py = (r[1] + r[3]) / 2;
+  VB = { w: w / s, h: hh / s }; VB.x = (x0 + x1) / 2 - px / s; VB.y = (y0 + y1) / 2 - py / s;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  fitHint();
+  dirty = true;
+}
+// the stage hint (bottom-left) is hidden when it would run into the toolbar
+function fitHint() {
+  const hn = $('#hint'); hn.style.visibility = '';
+  const a = hn.getBoundingClientRect(), b = $('#tools').getBoundingClientRect();
+  if (a.width && b.width && a.right > b.left - 8 && a.bottom > b.top) hn.style.visibility = 'hidden';
+}
+new ResizeObserver(fit).observe(scene);
+new ResizeObserver(fit).observe(taskCard);
+
+// ---------- pointer ----------
+let dirty = true, drag = null;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const editing2 = () => !S.wave || (S.mode2 !== 'wall') || !S.wave.found;
+scene.addEventListener('pointerdown', e => {
+  const v = e.target.closest('[data-v]'), hit = e.target.closest('[data-hit]');
+  if (!v && !hit) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  const p = toSvg(e);
+  if (v) { const o = posOf(v.dataset.v); if (!o) return; drag = { kind: 'v', id: v.dataset.v, dx: o.x - p.x, dy: o.y - p.y, x: e.clientX, y: e.clientY, moved: false }; return; }
+  drag = { kind: 'hit', tag: hit.dataset.hit, p, x: e.clientX, y: e.clientY, moved: false };
+  // walls: paint by dragging
+  if (LID() === 'bfs' && drag.tag.startsWith('c:') && S.mode2 === 'wall' && !(S.wave && S.wave.found) && !S.run2) {
+    const i = +drag.tag.slice(2);
+    if (i === S.st || i === S.fin) { drag.paint = null; return; }
+    drag.paint = !S.walls.has(i); setWall(i, drag.paint); drag.painted = true;
+  }
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) drag.moved = true;
+  if (drag.kind === 'v' && drag.moved) { const p = toSvg(e); setPos(drag.id, p.x + drag.dx, p.y + drag.dy); scene.classList.add('grabbing'); dirty = true; return; }
+  if (drag.painted && drag.paint !== null) {
+    const p = toSvg(e), c = Math.floor(p.x / CS), r = Math.floor(p.y / CS);
+    if (c >= 0 && c < COLS && r >= 0 && r < ROWS) { const i = ci(c, r); if (i !== S.st && i !== S.fin && S.walls.has(i) !== drag.paint) setWall(i, drag.paint); }
+  }
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing');
+  if (cancel) return;
+  if (d.kind === 'v') { if (!d.moved) tapVertex(d.id); else if (LID() === 'world') edited4Pos(); return; }
+  if (d.painted || d.moved) return;
+  tapHit(d.tag, d.p);
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+function edited4Pos() { dirty = true; }
+
+function setWall(i, on) {
+  if (on) S.walls.add(i); else S.walls.delete(i);
+  if (S.wave) resetWave();
+  update();
+}
+
+function tapVertex(id) {
+  const l = LID();
+  if (l === 'graph') { S.sel1 = S.sel1 === id ? null : id; update(); return; }
+  if (l === 'dijkstra') {
+    if (S.ends3) {
+      if (S.ends3 === 's') { S.s3 = id; if (S.t3 === id) S.t3 = V3.find(v => v !== id && v === 'G') || V3.find(v => v !== id); S.ends3 = 't'; resetDij(); toast(`Старт — ${id}. Теперь нажмите финиш.`); }
+      else { if (id === S.s3) { toast('Финиш должен отличаться от старта.'); return; } S.t3 = id; S.ends3 = null; resetDij(); toast(`Маршрут ${S.s3} → ${S.t3}. Начинайте с вершины, у которой метка 0.`); }
+      update(); return;
+    }
+    if (S.dj.run) return;
+    if (djTake(id, true)) update();
+    return;
+  }
+  if (l === 'world') { vertexTap4(id); update(); }
+}
+function tapHit(tag, p) {
+  const l = LID();
+  if (l === 'bfs' && tag.startsWith('c:')) { tapCell(+tag.slice(2)); return; }
+  if (l === 'dijkstra' && tag.startsWith('q:')) { tapVertex(tag.slice(2)); return; }
+  if (l === 'world') {
+    if (tag === 'bg') { if (S.mode4 === 'build') { if (S.pend) { S.pend = null; } else addVertex4(p); update(); } return; }
+    const i = +tag.slice(2), e = S.g4.E[i]; if (!e) return;
+    if (S.mode4 === 'del') { S.g4.E.splice(i, 1); edited4(); update(); return; }
+    if (tag.startsWith('w:') && S.mode4 === 'build') { e[2] = e[2] % 9 + 1; edited4(); update(); }
+  }
+}
+function tapCell(i) {
+  if (S.run2) return;
+  const W = S.wave;
+  if (S.mode2 === 'start' || S.mode2 === 'fin') {
+    if (S.walls.has(i)) { toast('Это стена. Выберите свободную клетку.'); return; }
+    if ((S.mode2 === 'start' && i === S.fin) || (S.mode2 === 'fin' && i === S.st)) { toast('Старт и финиш должны быть в разных клетках.'); return; }
+    if (S.mode2 === 'start') S.st = i; else S.fin = i;
+    S.mode2 = 'wall'; resetWave(); update(); return;
+  }
+  if (W && W.found) { traceTo(i); return; }
+  if (i === S.st || i === S.fin) return;
+}
+function traceTo(i) {
+  const W = S.wave, tr = S.trace, last = tr[tr.length - 1];
+  const at = tr.indexOf(i);
+  if (at >= 0) { if (at < tr.length - 1) { S.trace = tr.slice(0, at + 1); update(); } return; }
+  if (last === S.st) { toast('Путь уже готов. Нажмите на клетку пути, чтобы вернуться к ней.'); return; }
+  if (S.walls.has(i)) { toast('Это стена — сквозь неё не пройти.'); return; }
+  if (!adj(i, last)) { toast(`Нужна соседняя по стороне клетка с последней клеткой пути (там число ${W.dist[last]}).`); return; }
+  if (W.dist[i] < 0) { toast('Сюда волна не дошла — эта клетка дальше от старта, чем финиш.'); return; }
+  if (W.dist[i] !== W.dist[last] - 1) { toast(`Здесь ${W.dist[i]}, а нужно ${W.dist[last] - 1}: каждый шаг назад уменьшает число на 1.`); return; }
+  tr.push(i);
+  if (i === S.st) toast(`Путь восстановлен: ${tr.length - 1} ${plural(tr.length - 1, 'шаг', 'шага', 'шагов')} — короче не бывает.`);
+  update();
+}
+
+// ---------- actions ----------
+function act(a) {
+  const id = LID();
+  if (id === 'graph') {
+    if (a.startsWith('p-')) { S.p1 = a.slice(2); S.sel1 = null; update(); requestAnimationFrame(fit); }
+    if (a === 'ans') answer1();
+    return;
+  }
+  if (id === 'bfs') {
+    if (a === 'step') { if (S.wave && (S.wave.found || S.wave.dead)) return; S.run2 = null; waveStep(); update(); }
+    if (a === 'run') { if (S.wave && (S.wave.found || S.wave.dead)) return; S.run2 = { t: 0 }; update(); }
+    if (a === 'reset') { resetWave(); update(); }
+    if (a === 'm-wall' || a === 'm-start' || a === 'm-fin') { S.mode2 = a.slice(2); if (S.mode2 !== 'wall' && S.wave && S.wave.found) toast('Перенос точки сбросит волну.'); update(); }
+    if (a === 'maze') { resetMaze(); resetWave(); S.mode2 = 'wall'; update(); }
+    if (a === 'empty') { S.walls = new Set(); resetWave(); update(); }
+    return;
+  }
+  if (id === 'dijkstra') {
+    if (a === 'take') { if (S.dj.run || S.ends3) return; if (djAutoStep()) update(); else if (djFinished()) toast('Маршрут уже найден.'); }
+    if (a === 'all') { if (S.ends3 || djFinished()) return; S.dj.run = { t: 0 }; update(); }
+    if (a === 'reset') { S.ends3 = null; resetDij(); update(); }
+    if (a === 'greedy') { if (S.ends3) return; greedyRun(); update(); }
+    if (a === 'ends') { S.ends3 = S.ends3 ? null : 's'; if (S.ends3) toast('Нажмите вершину-старт, потом вершину-финиш.'); update(); }
+    return;
+  }
+  if (a.startsWith('m-')) { S.mode4 = a.slice(2); S.pend = null; if (S.mode4 === 'ends') { S.endsNext = 's'; toast('Нажмите старт, потом финиш.'); } update(); return; }
+  if (a === 'bfs' || a === 'dij' || a === 'fof') { run4(a); update(); return; }
+  if (a === 'clear') { S.g4 = { V: [], E: [] }; S.s4 = null; S.t4 = null; S.pend = null; S.mode4 = 'build'; edited4(); toast('Пусто. Нажимайте на свободное место — появятся вершины.'); update(); }
+  if (a === 'sample') { resetL4(); update(); }
+}
+function answer1() {
+  const k = S.p1; if (k === 'metro') return;
+  const id = S.sel1; if (!id) { toast('Сначала нажмите на вершину.'); return; }
+  const g = G1[k], best = Math.max(...Object.keys(g.V).map(v => score1(k, v))), dg = deg1(k, id), nm = g.V[id][0];
+  if (score1(k, id) === best) {
+    S.ans1[k] = true;
+    toast(k === 'web' ? `Верно: на «${nm}» ведут ${dg.in} ${plural(dg.in, 'ссылка', 'ссылки', 'ссылок')} — больше, чем на любую другую страницу.` : `Верно: у ${nm} степень ${dg.all} — больше всех друзей.`);
+  } else {
+    S.miss1++;
+    if (k === 'web') toast(`На «${nm}» ведёт ${dg.in} ${plural(dg.in, 'ссылка', 'ссылки', 'ссылок')}${dg.out ? `, а исходящих у неё ${dg.out} — их не считаем` : ''}. Ищите больше входящих стрелок.`);
+    else toast(`У ${nm} ${dg.all} ${plural(dg.all, 'друг', 'друга', 'друзей')}. Есть вершина, у которой рёбер больше.`);
+  }
+  update();
+}
+
+let lastT = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  let anim = false;
+  const id = LID();
+  if (id === 'bfs' && S.run2) {
+    anim = true;
+    if (t - S.run2.t > (reduce ? 120 : 380)) { S.run2.t = t; waveStep(); if (S.wave.found || S.wave.dead) S.run2 = null; update(); }
+  }
+  if (id === 'dijkstra') {
+    if (S.dj.run) { anim = true; if (t - S.dj.run.t > (reduce ? 200 : 800)) { S.dj.run.t = t; if (!djAutoStep() || djFinished()) S.dj.run = null; update(); } }
+    if (S.dj.last && t - S.dj.last.t < 1500) anim = true;
+  }
+  if (S.hl) anim = true;
+  if (dirty || anim) { drawScene(t); dirty = false; }
+  lastT = t;
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, o = {}) => `<button data-a="${k}"${o.aria ? ` aria-label="${o.aria}"` : ''}${o.cls ? ` class="${o.cls}"` : ''}${o.dis ? ' disabled' : ''}${o.pr !== undefined ? ` aria-pressed="${o.pr}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  if (id === 'graph') tb.innerHTML = B('p-metro', 'Метро', { pr: S.p1 === 'metro' }) + B('p-social', 'Соцсеть' + (S.ans1.social ? ' ✓' : ''), { pr: S.p1 === 'social' }) + B('p-web', 'Веб' + (S.ans1.web ? ' ✓' : ''), { pr: S.p1 === 'web' }) + sep +
+    B('ans', 'Это ответ ✓', { cls: 'go', dis: S.p1 === 'metro' || !S.sel1 || S.ans1[S.p1], aria: 'Проверить выбранную вершину' });
+  else if (id === 'bfs') {
+    const fin = !!(S.wave && (S.wave.found || S.wave.dead)), busy = !!S.run2;
+    tb.innerHTML = B('step', 'Шаг волны', { cls: 'go', dis: fin || busy }) + B('run', 'Запуск ▶', { dis: fin || busy }) + B('reset', 'Сброс волны', { dis: !S.wave || busy }) + sep +
+      B('m-wall', 'Стены', { pr: S.mode2 === 'wall', dis: busy }) + B('m-start', 'Старт', { pr: S.mode2 === 'start', dis: busy }) + B('m-fin', 'Финиш', { pr: S.mode2 === 'fin', dis: busy }) + sep + B('maze', 'Исходный лабиринт', { dis: busy });
+  } else if (id === 'dijkstra') {
+    const busy = !!S.dj.run, fin = djFinished();
+    tb.innerHTML = B('take', 'Шаг ▶', { dis: busy || fin || !!S.ends3, aria: 'Сделать шаг автоматически' }) + B('all', 'До конца ▶▶', { dis: busy || fin || !!S.ends3 }) + B('reset', 'Сброс', { cls: 'go', dis: busy }) + sep +
+      B('greedy', 'Жадный ▶', { dis: busy || !!S.ends3, aria: 'Показать жадный маршрут' }) + sep + B('ends', 'Старт·финиш', { pr: !!S.ends3, dis: busy });
+  } else tb.innerHTML = B('m-build', 'Строить', { pr: S.mode4 === 'build' }) + B('m-del', 'Удалить', { pr: S.mode4 === 'del' }) + B('m-ends', 'Старт·финиш', { pr: S.mode4 === 'ends' }) + sep +
+    B('bfs', 'BFS ▶', { cls: 'go' }) + B('dij', 'Дейкстра ▶', { cls: 'go' }) + B('fof', 'Друзья друзей') + sep + B('clear', 'Очистить');
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+
+function taskState(m) {
+  if (S.done[LID()]) return '✓ Выполнено';
+  if (m.kind === 'graph') return `Соцсеть ${m.okSocial ? '✓' : '—'} · Веб ${m.okWeb ? '✓' : '—'}` + (m.miss ? ` · промахов ${m.miss}` : '');
+  if (m.kind === 'bfs') {
+    if (m.running) return `Волна ${m.layer} · в очереди ${m.front}`;
+    if (m.dead) return 'До финиша не дойти — уберите стены';
+    if (m.found) return `Финиш: ${m.len} ${plural(m.len, 'шаг', 'шага', 'шагов')} · путь ${m.traceLen}/${m.len}`;
+    if (m.started) return `Волна ${m.layer} · посещено ${m.visited}`;
+    return 'Волна не запущена';
+  }
+  if (m.kind === 'dij') {
+    if (m.handDone && !m.greedySeen) return `Маршрут ${m.cost} мин найден сами — теперь «Жадный»`;
+    if (m.fin && m.auto) return 'Ходы делал автомат — «Сброс» и сами';
+    if (m.fin) return `Готово · ${m.cost} мин`;
+    return `Зафиксировано ${m.done} из ${V3.length} · ошибок ${m.errors}` + (m.auto ? ' · был автошаг' : '');
+  }
+  const parts = [`вершин ${m.nV}/6`, `рёбер ${m.nE}/7`];
+  if (m.bfs && m.dij) parts.push(m.contrast ? 'пути разные ✓' : `рёбер: BFS ${m.bfs.hops}, Дейкстра ${m.dij.hops}`);
+  else parts.push('запустите BFS и Дейкстру');
+  return parts.join(' · ');
+}
+
+const CODE = {
+  bfs: ['from collections import deque', '', 'def bfs(start, finish):', '    dist = {start: 0}', '    q = deque([start])        # очередь', '    while q:', '        v = q.popleft()       # берём из начала', '        if v == finish:', '            return dist[v]', '        for u in neighbours(v):', '            if u not in dist:', '                dist[u] = dist[v] + 1', '                q.append(u)   # ставим в конец', '    return -1                 # пути нет'],
+  dijkstra: ['import heapq', '', 'def dijkstra(g, start):', '    dist = {v: float(\'inf\') for v in g}', '    dist[start] = 0', '    pq = [(0, start)]         # очередь с приоритетом', '    while pq:', '        d, v = heapq.heappop(pq)   # наименьшая метка', '        if d > dist[v]:', '            continue          # устаревшая запись', '        for u, w in g[v]:', '            if d + w < dist[u]:     # релаксация', '                dist[u] = d + w', '                heapq.heappush(pq, (dist[u], u))', '    return dist'],
+};
+const codeHTML = lines => lines.map(s => { const i = s.indexOf('#'); return i > 0 ? esc(s.slice(0, i)) + `<span class="cm">${esc(s.slice(i))}</span>` : esc(s); }).join('\n');
+function adjListCode() {
+  const l = LID();
+  if (l === 'graph') {
+    const k = S.p1, g = G1[k], nm = id => `'${g.V[id][0]}'`;
+    const lines = [`g = {   # ${g.name.toLowerCase()}: ${g.directed ? 'кто → на кого ссылается' : 'список соседей'}`];
+    for (const id in g.V) {
+      const out = g.E.filter(e => e[0] === id || (!g.directed && e[1] === id)).map(e => { const u = e[0] === id ? e[1] : e[0]; return g.weighted ? `(${nm(u)}, ${e[2]})` : nm(u); });
+      lines.push(`    ${nm(id)}: [${out.join(', ')}],`);
+    }
+    lines.push('}');
+    lines.push(g.directed ? "len(g['Главная'])   # исходящие ссылки" : `len(g[${nm(Object.keys(g.V)[0])}])   # степень вершины`);
+    return lines;
+  }
+  const lines = ['g = {   # ваш граф: сосед и вес ребра'];
+  for (const v of S.g4.V) lines.push(`    '${v.id}': [${nbrsOf(S.g4.E, v.id).map(x => `('${x.u}', ${x.w})`).join(', ')}],`);
+  lines.push('}');
+  return lines;
+}
+
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'graph') h = `<h2>Граф в программе</h2><p class="note">Чаще всего граф хранят списками смежности: для каждой вершины — список её соседей.</p>
+    <dl class="reads"><div><dt>Вершин</dt><dd id="r1"></dd></div><div><dt>Рёбер</dt><dd id="r2"></dd></div><div><dt>Выбрана</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><div class="lbl">Граф</div><div class="chips" id="pch"><button data-a="p-metro">Метро</button><button data-a="p-social">Соцсеть</button><button data-a="p-web">Веб</button></div></div>
+    <h3>Список смежности на Python</h3><div class="listing code" id="lst"></div>`;
+  if (id === 'bfs') h = `<h2>Пульт обхода в ширину</h2><p class="note">Клетки — вершины, соседи по стороне — рёбра. Все рёбра «длиной» в один шаг.</p>
+    <dl class="reads"><div><dt>Волна</dt><dd id="r1"></dd></div><div><dt>В очереди</dt><dd id="r2"></dd></div><div><dt>Посещено</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><div class="lbl">Действия</div><div class="chips"><button data-a="step">Шаг волны</button><button data-a="run">Запуск ▶</button><button data-a="reset">Сброс волны</button><button data-a="maze">Исходный лабиринт</button><button data-a="empty">Без стен</button></div></div>
+    <h3>Очередь сейчас (начало слева)</h3><div class="listing" id="lst"></div>
+    <h3>BFS на Python</h3><div class="listing code">${codeHTML(CODE.bfs)}</div>`;
+  if (id === 'dijkstra') h = `<h2>Пульт алгоритма Дейкстры</h2><p class="note">Метка d(v) — лучшее известное время от старта. Зафиксированные метки больше не меняются.</p>
+    <dl class="reads"><div><dt>Маршрут</dt><dd id="r1"></dd></div><div><dt>Шагов</dt><dd id="r2"></dd></div><div><dt>Ошибок</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><div class="lbl">Взять из очереди (сами)</div><div class="chips" id="vch">${V3.map(v => `<button data-v="${v}">${v}</button>`).join('')}</div></div>
+    <div class="ctl"><div class="lbl">Автомат</div><div class="chips"><button data-a="take">Шаг ▶</button><button data-a="all">До конца ▶▶</button><button data-a="greedy">Жадный ▶</button><button data-a="reset">Сброс</button></div></div>
+    <h3>Таблица меток</h3><div class="listing" id="lst"></div>
+    <h3>Дейкстра на Python</h3><div class="listing code">${codeHTML(CODE.dijkstra)}</div>`;
+  if (id === 'world') h = `<h2>Ваш граф</h2><p class="note">Граф неориентированный и взвешенный: как дороги с временем в пути.</p>
+    <dl class="reads"><div><dt>Вершин</dt><dd id="r1"></dd></div><div><dt>Рёбер</dt><dd id="r2"></dd></div><div><dt>Маршрут</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><div class="lbl">Запуск</div><div class="chips"><button data-a="bfs">BFS ▶</button><button data-a="dij">Дейкстра ▶</button><button data-a="fof">Друзья друзей</button></div></div>
+    <div class="ctl"><div class="lbl">Граф</div><div class="chips"><button data-a="sample">Исходный пример</button><button data-a="clear">Очистить</button></div></div>
+    <h3>Список смежности на Python</h3><div class="listing code" id="lst"></div>`;
+  el.innerHTML = h;
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  el.querySelectorAll('#vch [data-v]').forEach(b => b.onclick = () => tapVertex(b.dataset.v));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  const lst = el.querySelector('#lst');
+  if (m.kind === 'graph') {
+    set('#r1', String(m.nV)); set('#r2', String(m.nE)); set('#r3', m.sel ? G1[m.p].V[m.sel][0] : '—');
+    el.querySelectorAll('#pch [data-a]').forEach(b => b.setAttribute('aria-pressed', b.dataset.a === 'p-' + m.p));
+    if (lst) lst.innerHTML = codeHTML(adjListCode());
+  } else if (m.kind === 'bfs') {
+    set('#r1', String(m.layer)); set('#r2', String(m.front)); set('#r3', String(m.visited));
+    el.querySelectorAll('[data-a]').forEach(b => b.disabled = !!S.run2 || ((b.dataset.a === 'step' || b.dataset.a === 'run') && (m.found || m.dead)));
+    if (lst) lst.innerHTML = !S.wave ? `<span class="cm">[${cellName(S.st)}] — в очереди только старт</span>` : m.found ? '<span class="cm">Финиш найден — обход остановлен.</span>' : S.wave.front.length ? S.wave.front.map(cellName).join(' ') + `<div class="cm">у всех расстояние ${S.wave.layer}</div>` : '<span class="cm">пусто</span>';
+  } else if (m.kind === 'dij') {
+    set('#r1', `${m.s} → ${m.t}`); set('#r2', String(S.dj.log.length)); set('#r3', String(m.errors));
+    el.querySelectorAll('[data-a]').forEach(b => b.disabled = !!S.dj.run);
+    el.querySelectorAll('#vch [data-v]').forEach(b => { b.disabled = S.dj.done.includes(b.dataset.v) || !!S.dj.run; });
+    if (lst) lst.innerHTML = V3.map(v => `<div class="${S.dj.done.includes(v) ? '' : pq3().includes(v) ? 'cur' : 'cm'}">${v}: d = ${fmtD(S.dj.dist[v])}${S.dj.prev[v] ? `, пришли из ${S.dj.prev[v]}` : ''}${S.dj.done.includes(v) ? ' ✓' : pq3().includes(v) ? ' (в очереди)' : ''}</div>`).join('');
+  } else {
+    set('#r1', String(m.nV)); set('#r2', String(m.nE)); set('#r3', m.s && m.t ? `${m.s} → ${m.t}` : '—');
+    if (lst) lst.innerHTML = codeHTML(adjListCode());
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'graph') return [
+    { id: 'v', icon: IC(`<rect x="3" y="11" width="28" height="12" rx="6" fill="${NF}" stroke="#5b6f93" stroke-width="1.6"/>`), name: 'Вершины', spec: 'Объекты: станции, люди, страницы. Их можно двигать — связи от этого не меняются.' },
+    { id: 'e', icon: IC(`<circle cx="7" cy="17" r="4" fill="${MU}"/><circle cx="27" cy="17" r="4" fill="${MU}"/><path d="M11 17h12" stroke="#6a82a8" stroke-width="2.4"/>`), name: 'Рёбра', spec: 'Связи между парами вершин. В неориентированном графе ребро работает в обе стороны.' },
+    { id: 'dir', go: 'web', icon: IC(`<path d="M5 17h18" stroke="#6a82a8" stroke-width="2.4"/><path d="M29 17l-8 -5v10z" fill="#6a82a8"/>`), name: 'Дуги (стрелки)', spec: 'Ориентированные рёбра: ссылка со страницы A на B не значит, что B ссылается на A.' },
+    { id: 'w', go: 'metro', icon: IC(`<rect x="6" y="10" width="22" height="14" rx="5" fill="#0e1520" stroke="#26324a"/><text x="17" y="21" font-size="10" fill="${MU}" text-anchor="middle" font-family="monospace">4</text>`), name: 'Веса', spec: 'Числа на рёбрах: минуты, километры, цена. С ними граф называют взвешенным.' },
+    { id: 'deg', go: 'metro', icon: IC(`<circle cx="17" cy="17" r="10" fill="${AM}"/><text x="17" y="21" font-size="11" fill="#0b1019" text-anchor="middle" font-family="monospace">3</text>`), name: 'Степень вершины', spec: 'Сколько рёбер подходит к вершине. Сумма степеней = 2 × число рёбер.' }];
+  if (id === 'bfs') return [
+    { id: 'start', icon: IC(`<circle cx="17" cy="17" r="10" fill="${GR}"/>`), name: 'Старт', spec: 'Отсюда расходится волна: расстояние 0.' },
+    { id: 'fin', icon: IC(`<path d="M10 29V6l15 6-15 6" fill="${AM}"/>`), name: 'Финиш', spec: 'Когда волна дошла сюда, число на нём — длина кратчайшего пути.' },
+    { id: 'grid', icon: IC(`<path d="M4 4h26v26H4zM4 13h26M4 21h26M13 4v26M21 4v26" fill="none" stroke="${LN}" stroke-width="1.4"/>`), name: 'Клетки = вершины', spec: 'Соседние по стороне свободные клетки соединены рёбрами. По диагонали ходить нельзя.' },
+    { id: 'wall', icon: IC(`<rect x="5" y="5" width="24" height="24" rx="3" fill="#2a3348" stroke="${LN}"/>`), name: 'Стены', spec: 'Клетки, которых нет в графе. Их можно рисовать мышью до запуска волны.' },
+    { id: 'wave', icon: IC(`<rect x="5" y="5" width="24" height="24" rx="4" fill="none" stroke="${AM}" stroke-width="2.4"/>`), name: 'Фронт волны', spec: 'Клетки текущего слоя — они сейчас в очереди BFS.' },
+    { id: 'path', icon: IC(`<path d="M5 28V17h12V6h12" fill="none" stroke="${AM}" stroke-width="3"/>`), name: 'Путь назад', spec: 'От финиша к старту, каждый раз к соседу с числом на 1 меньше.' }];
+  if (id === 'dijkstra') return [
+    { id: 'label', icon: IC(`<rect x="6" y="10" width="22" height="14" rx="7" fill="#173444" stroke="${CY}"/><text x="17" y="21" font-size="10" fill="${CY}" text-anchor="middle" font-family="monospace">4</text>`), name: 'Метки d(v)', spec: 'Лучшее известное время от старта. ∞ — до вершины ещё не дошли.' },
+    { id: 'weight', icon: IC(`<rect x="6" y="10" width="22" height="14" rx="5" fill="#0e1520" stroke="#26324a"/><text x="17" y="21" font-size="10" fill="${MU}" text-anchor="middle" font-family="monospace">9</text>`), name: 'Веса дорог', spec: 'Минуты в пути по участку. Отрицательных весов не бывает — иначе Дейкстра ошибётся.' },
+    { id: 'queue', icon: IC(`<rect x="3" y="11" width="13" height="12" rx="4" fill="#173444" stroke="${CY}"/><rect x="18" y="11" width="13" height="12" rx="4" fill="#173444" stroke="${CY}"/>`), name: 'Очередь с приоритетом', spec: 'Вершины с конечной меткой, которые ещё не зафиксированы. Достаём ту, у которой метка меньше.' },
+    { id: 'fixed', icon: IC(`<circle cx="17" cy="17" r="11" fill="#1f3a2f" stroke="${GR}" stroke-width="2"/>`), name: 'Зафиксированные вершины', spec: 'Их метка окончательная — это точное кратчайшее время.' },
+    { id: 'step', icon: IC(`<path d="M5 17h20" stroke="${CY}" stroke-width="3"/><path d="M29 17l-7 -5v10z" fill="${CY}"/>`), name: 'Релаксация', spec: 'Если d(v) + w < d(u) — нашли путь к u короче, и метка u уменьшается.' }];
+  return [
+    { id: 'canvas', icon: IC(`<rect x="4" y="6" width="26" height="22" rx="4" fill="none" stroke="#26324a" stroke-dasharray="3 3"/>`), name: 'Холст', spec: 'Нажмите на пустое место в режиме «Строить» — появится вершина (до 10).' },
+    { id: 'weights', icon: IC(`<rect x="6" y="10" width="22" height="14" rx="5" fill="#0e1520" stroke="#4a6288"/><text x="17" y="21" font-size="10" fill="${FG}" text-anchor="middle" font-family="monospace">3</text>`), name: 'Веса рёбер', spec: 'Нажатие на число: вес +1 (после 9 снова 1). Сначала вес зависит от длины ребра.' },
+    { id: 'ends', icon: IC(`<circle cx="10" cy="17" r="6" fill="#1f3a2f" stroke="${GR}" stroke-width="2"/><circle cx="24" cy="17" r="6" fill="#3a3220" stroke="${AM}" stroke-width="2"/>`), name: 'Старт и финиш', spec: 'Между ними ищут маршрут. Меняются в режиме «Старт·финиш».' },
+    { id: 'paths', icon: IC(`<path d="M4 22h26" stroke="${CY}" stroke-width="6" opacity=".55"/><path d="M4 12h26" stroke="${AM}" stroke-width="3"/>`), name: 'Два маршрута', spec: 'BFS — наименьшее число рёбер (пересадок), Дейкстра — наименьший суммарный вес (время).' },
+    { id: 'fof', icon: IC(`<circle cx="17" cy="17" r="10" fill="#2c2445" stroke="#c3a6ff" stroke-width="2"/>`), name: 'Друзья друзей', spec: 'Вершины на расстоянии ровно 2 от старта — так соцсети предлагают новых знакомых.' }];
+}
+function flashEl(sel) { const el = $(sel); if (!el) return; el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    const head = { graph: 'Из чего состоит граф', bfs: 'Детали обхода в ширину', dijkstra: 'Детали алгоритма Дейкстры', world: 'Детали конструктора графа' }[Ls.id];
+    const list = partsList();
+    $('#pane-parts').innerHTML = `<h2>${head}</h2><p class="note">Нажмите на пункт, чтобы найти его на сцене.</p><div class="parts">` +
+      list.map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => {
+      const p = list.find(x => x.id === b.dataset.id);
+      if (p && p.go && S.p1 !== p.go && LID() === 'graph') { S.p1 = p.go; S.sel1 = null; update(); }
+      S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true;
+    });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function pageRank(it = 30, d = 0.85) {
+  const g = G1.web, V = Object.keys(g.V), N = V.length;
+  let pr = {}; V.forEach(v => pr[v] = 1 / N);
+  const out = v => g.E.filter(e => e[0] === v).length;
+  for (let k = 0; k < it; k++) {
+    const nx = {}; V.forEach(v => nx[v] = (1 - d) / N);
+    for (const e of g.E) nx[e[1]] += d * pr[e[0]] / out(e[0]);
+    pr = nx;
+  }
+  return V.map(v => ({ v, name: g.V[v][0], pr: pr[v], in: deg1('web', v).in })).sort((a, b) => b.pr - a.pr);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'graph') {
+    const k = m.p, g = G1[k], V = Object.keys(g.V);
+    if (g.directed) {
+      let h = `<h2>Входящие и исходящие</h2><div class="formula">Σ вход = Σ исход = |E|</div><p class="note">Каждая дуга один раз выходит из вершины и один раз входит в другую.</p><div class="steps">`;
+      V.forEach(v => { const dg = deg1(k, v); h += step(g.V[v][0], S.ans1.web ? `вход ${dg.in} · исход ${dg.out}` : `вход ? · исход ${dg.out}`, S.ans1.web && v === 'wiki' ? 'okk' : ''); });
+      h += step('сумма исходящих', `${g.E.length}`, 'sum') + step('число дуг |E|', `${g.E.length}`, 'sum') + `</div><p class="note" style="margin-top:10px">Входящие откроются, когда найдёте самую цитируемую страницу.</p>`;
+      return h;
+    }
+    const show = k === 'metro' || S.ans1[k];
+    let h = `<h2>Лемма о рукопожатиях</h2><div class="formula">Σ deg(v) = 2 · |E|</div><p class="note">Каждое ребро добавляет по 1 к степеням обоих своих концов.</p><div class="steps">`;
+    let sum = 0;
+    V.forEach(v => { const dg = deg1(k, v).all; sum += dg; h += step(g.V[v][0], show ? `deg = ${dg}` : 'deg = ?'); });
+    h += step('сумма степеней', show ? String(sum) : '?', 'sum') + step('рёбер |E| · 2', `${g.E.length} · 2 = ${2 * g.E.length}`, 'sum') + `</div>`;
+    if (!show) h += `<p class="note" style="margin-top:10px">Степени откроются после верного ответа — сначала посчитайте сами.</p>`;
+    if (k === 'metro') {
+      const r = dijGraph(V, g.E, 'u', 'r');
+      h += `<h3>Самый быстрый путь</h3><div class="steps">` + step('Университет → Порт', `${r.path.map(v => g.V[v][0]).join(' → ')}`) + step('время', minutes(r.cost), 'sum') + `</div><p class="note" style="margin-top:10px">Как такой путь найти автоматически — в уроке 3.</p>`;
+    }
+    return h;
+  }
+  if (m.kind === 'bfs') {
+    let h = `<h2>Волна по слоям</h2><div class="formula">dist(u) = dist(v) + 1</div><p class="note">Соседу, которого волна ещё не видела, ставим число на 1 больше.</p><div class="steps">`;
+    if (!S.wave) h += step('слой 0', `1 клетка — старт ${cellName(S.st)}`);
+    else S.wave.layers.forEach((ly, k) => { if (ly.length) h += step(`слой ${k}`, `${ly.length} ${plural(ly.length, 'клетка', 'клетки', 'клеток')}`, k === S.wave.layer && !m.found ? 'cur' : ''); });
+    h += step('свободных клеток', String(m.free)) + step('посещено волной', String(m.visited), 'sum');
+    if (m.found) h += step('кратчайший путь', `${m.len} ${plural(m.len, 'шаг', 'шага', 'шагов')}`, 'okk sum') + step('путь восстановлен', `${m.traceLen} из ${m.len}`, m.traced ? 'okk' : '');
+    h += `</div><h3>Сколько работы</h3><div class="steps">` + step('каждая клетка', 'попадает в очередь один раз') + step('каждое ребро', 'проверяется не больше двух раз') + step('сложность BFS', 'O(V + E)', 'sum') + `</div>`;
+    const p = wavePath();
+    if (p) h += `<p class="note" style="margin-top:10px">Один из кратчайших путей (строка, столбец): ${p.map(cellName).join(' → ')}</p>`;
+    return h;
+  }
+  if (m.kind === 'dij') {
+    let h = `<h2>Шаги алгоритма</h2><div class="formula">d(u) = min(d(u), d(v) + w)</div><div class="steps">`;
+    h += step('старт', `d(${S.s3}) = 0, остальные ∞`);
+    S.dj.log.forEach((x, k) => {
+      h += step(`${k + 1}. взяли ${x.v} (${x.d})`, x.upd.length ? x.upd.map(y => y.keep ? `${y.u} ${fmtD(y.old)}` : `${y.u}: ${fmtD(y.old)}→${y.nw}`).join(', ') : '—', x.v === S.t3 ? 'okk' : '');
+    });
+    h += `</div>`;
+    const best = dijGraph(V3, G3.E, S.s3, S.t3);
+    if (m.fin) {
+      h += `<h3>Итог</h3><div class="steps">` + step('маршрут Дейкстры', m.route.join(' → ')) + step('время', `${m.route.slice(1).map((v, i) => G3.E.find(e => [e[0], e[1]].sort().join('') === [m.route[i], v].sort().join(''))[2]).join(' + ')} = ${m.cost} мин`, 'okk sum');
+      if (m.greedy) h += step('жадный маршрут', m.greedy.path.join(' → ')) + step('время жадного', m.greedy.dead ? 'тупик' : `${m.greedy.cost} мин`, m.greedy.cost > m.cost || m.greedy.dead ? 'badd sum' : 'sum');
+      h += `</div>`;
+    } else if (m.greedy) h += `<h3>Жадный маршрут</h3><div class="steps">` + step(m.greedy.path.join(' → '), m.greedy.dead ? 'тупик' : `${m.greedy.cost} мин`, 'badd') + step('лучший', `${best.cost} мин`, 'sum') + `</div>`;
+    h += `<p class="note" style="margin-top:10px">С двоичной кучей (heapq) алгоритм работает за O((V + E) · log V) — так он справляется с картами из миллионов перекрёстков.</p>`;
+    return h;
+  }
+  let h = `<h2>Ваш маршрут</h2><div class="steps">`;
+  h += step('вершин', `${m.nV} (нужно ≥ 6)`, m.nV >= 6 ? 'okk' : '') + step('рёбер', `${m.nE} (нужно ≥ 7)`, m.nE >= 7 ? 'okk' : '');
+  if (m.bfs) h += step('BFS', `${m.bfs.path.join('→')} · ${m.bfs.hops} рёб. · вес ${m.bfs.cost}`); else h += step('BFS', 'не запускали');
+  if (m.dij) h += step('Дейкстра', `${m.dij.path.join('→')} · ${m.dij.hops} рёб. · вес ${m.dij.cost}`); else h += step('Дейкстра', 'не запускали');
+  if (m.bfs && m.dij) h += step('рёбер больше у Дейкстры?', m.contrast ? 'да — меньше пересадок ≠ быстрее' : 'нет — перестройте веса', m.contrast ? 'okk sum' : 'badd sum');
+  h += `</div>`;
+  if (m.fof) h += `<h3>Друзья друзей для ${m.s}</h3><div class="steps">` + step('расстояние 2', m.fof.join(', ') || 'нет') + `</div>`;
+  h += `<h3>PageRank графа «Веб» из урока 1</h3><div class="formula">PR(p) = (1 − d)/N + d · Σ PR(q)/out(q)</div><p class="note">d = 0,85 — вероятность, что читатель пойдёт по ссылке, а не откроет случайную страницу. 30 итераций.</p><div class="steps">`;
+  pageRank().forEach((x, k) => { h += step(`${k + 1}. ${x.name}`, `${x.pr.toFixed(3)} · ссылок ${x.in}`, k === 0 ? 'okk' : ''); });
+  h += `</div><p class="note" style="margin-top:10px">Важна не только число ссылок, но и «вес» ссылающихся: на «Главную» ведут всего 2 ссылки, но одна из них — с самой важной «Вики».</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), ok = !!S.done[LID()];
+  if (m.kind === 'graph') {
+    const g = G1[m.p], d = m.sel ? deg1(m.p, m.sel) : null, open = m.p === 'metro' || S.ans1[m.p];
+    el.innerHTML = `<div class="k">${g.name}</div><div class="v ${ok ? 'ok' : ''}">${m.nV} верш. · ${m.nE} ${g.directed ? 'дуг' : 'рёб.'}</div>` +
+      `<div class="lr"><span>выбрана</span><span>${m.sel ? g.V[m.sel][0] : '—'}</span></div>` +
+      `<div class="lr"><span>${g.directed ? 'входящих' : 'степень'}</span><span>${d ? (open ? (g.directed ? d.in : d.all) : '?') : '—'}</span></div>` +
+      `<div class="lr"><span>Σ степеней</span><span>${2 * m.nE}</span></div>`;
+  } else if (m.kind === 'bfs') {
+    el.innerHTML = `<div class="k">Обход в ширину</div><div class="v ${m.found ? 'ok' : m.dead ? 'bad' : ''}">${m.found ? `путь ${m.len}` : m.dead ? 'нет пути' : `волна ${m.layer}`}</div>` +
+      `<div class="gauge"><b style="width:${(m.visited / Math.max(1, m.free) * 100).toFixed(1)}%"></b></div>` +
+      `<div class="lr"><span>посещено</span><span>${m.visited}/${m.free}</span></div><div class="lr"><span>в очереди</span><span>${m.front}</span></div>` +
+      `<div class="lr"><span>путь назад</span><span>${m.found ? `${m.traceLen}/${m.len}` : '—'}</span></div>`;
+  } else if (m.kind === 'dij') {
+    el.innerHTML = `<div class="k">Маршрут ${m.s} → ${m.t}</div><div class="v ${m.fin ? 'ok' : ''}">${m.fin ? `${m.cost} мин` : `d(${m.t}) = ${fmtD(S.dj.dist[m.t])}`}</div>` +
+      `<div class="gauge"><b style="width:${(m.done / V3.length * 100).toFixed(1)}%"></b></div>` +
+      `<div class="lr"><span>зафиксировано</span><span>${m.done}/${V3.length}</span></div><div class="lr"><span>ошибок</span><span>${m.errors}</span></div>` +
+      `<div class="lr"><span>жадный</span><span>${m.greedy ? (m.greedy.dead ? 'тупик' : m.greedy.cost + ' мин') : '—'}</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">Ваш граф</div><div class="v ${ok || m.contrast ? 'ok' : ''}">${m.nV} верш. · ${m.nE} рёб.</div>` +
+      `<div class="lr"><span>маршрут</span><span>${m.s || '?'} → ${m.t || '?'}</span></div>` +
+      `<div class="lr"><span>BFS</span><span>${m.bfs ? `${m.bfs.hops} рёб. · ${m.bfs.cost}` : '—'}</span></div>` +
+      `<div class="lr"><span>Дейкстра</span><span>${m.dij ? `${m.dij.hops} рёб. · ${m.dij.cost}` : '—'}</span></div>`;
+  }
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены: графы, BFS, Дейкстра и графы вокруг нас!'), 1500);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderTools(); fitHint();
+  renderPanes(m);
+  const n =Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  graph: '<path d="M12 8L33 20M12 8L30 6M33 20L54 10M33 20L50 25M30 6L54 10" stroke="#3d5274" stroke-width="1.6"/><circle cx="12" cy="8" r="4" fill="#5b6f93"/><circle cx="30" cy="6" r="3.5" fill="#5b6f93"/><circle cx="33" cy="20" r="5" fill="#ffb547"/><circle cx="54" cy="10" r="4" fill="#5b6f93"/><circle cx="50" cy="25" r="3.5" fill="#5b6f93"/>',
+  bfs: '<rect x="4" y="3" width="58" height="24" rx="2" fill="#121a28"/><rect x="4" y="3" width="8" height="8" fill="rgba(114,212,232,.45)"/><rect x="12" y="3" width="8" height="8" fill="rgba(114,212,232,.35)"/><rect x="4" y="11" width="8" height="8" fill="rgba(114,212,232,.35)"/><rect x="20" y="3" width="8" height="8" fill="rgba(114,212,232,.25)"/><rect x="12" y="11" width="8" height="8" fill="#2a3348"/><rect x="4" y="19" width="8" height="8" fill="rgba(114,212,232,.25)"/><rect x="28" y="3" width="8" height="8" fill="none" stroke="#ffb547"/><rect x="12" y="19" width="8" height="8" fill="none" stroke="#ffb547"/><rect x="36" y="11" width="8" height="8" fill="#2a3348"/><path d="M56 25V14l5 2-5 2" fill="#ffb547"/>',
+  dijkstra: '<path d="M8 15L24 6L42 6L58 16M8 15L24 24L42 24L58 16" fill="none" stroke="#3d5274" stroke-width="1.6"/><path d="M8 15L24 24L42 24L58 16" fill="none" stroke="#ffb547" stroke-width="2.4"/><circle cx="8" cy="15" r="4" fill="#86e0a8"/><circle cx="24" cy="6" r="3.5" fill="#5b6f93"/><circle cx="42" cy="6" r="3.5" fill="#5b6f93"/><circle cx="24" cy="24" r="3.5" fill="#86e0a8"/><circle cx="42" cy="24" r="3.5" fill="#86e0a8"/><circle cx="58" cy="16" r="4" fill="#ffb547"/>',
+  world: '<path d="M10 22L22 8L36 16L52 6M22 8L36 16L48 24M10 22L48 24" fill="none" stroke="#3d5274" stroke-width="1.5"/><path d="M10 22L22 8L36 16L48 24" fill="none" stroke="#72d4e8" stroke-width="3" opacity=".6"/><circle cx="10" cy="22" r="3.5" fill="#86e0a8"/><circle cx="22" cy="8" r="3.5" fill="#5b6f93"/><circle cx="36" cy="16" r="3.5" fill="#5b6f93"/><circle cx="52" cy="6" r="3.5" fill="#c3a6ff"/><circle cx="48" cy="24" r="3.5" fill="#ffb547"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null;
+  resetL1(); resetL2(); resetL3(); resetL4();
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderStrip(); buildScheme(); update();
+  requestAnimationFrame(fit);
+  const cur = $('#lessons .lesson[aria-current="true"]'), ls = $('#lessons'); if (cur) { const dx = cur.getBoundingClientRect().left - ls.getBoundingClientRect().left; if (dx < 0 || dx + cur.offsetWidth > ls.clientWidth) ls.scrollLeft += dx - 8; }
+}
+window.addEventListener('resize', () => requestAnimationFrame(fit));
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'graph') {
+    const g = G1[m.p];
+    now = `Показан граф «${g.name}» (${g.kind}): ${m.nV} вершин, ${m.nE} ${g.directed ? 'дуг' : 'рёбер'}. ` +
+      `Рёбра: ${g.E.map(e => `${g.V[e[0]][0]}${g.directed ? '→' : '–'}${g.V[e[1]][0]}${g.weighted ? ` (${e[2]} мин)` : ''}`).join(', ')}. ` +
+      (m.sel ? `Выбрана вершина «${g.V[m.sel][0]}». ` : 'Вершина не выбрана. ') +
+      `Ответы: соцсеть — ${m.okSocial ? 'найдена верно' : 'не найдена'}, веб — ${m.okWeb ? 'найдена верно' : 'не найдена'}; промахов ${m.miss}. ` +
+      `Не называй правильную вершину — предложи посчитать рёбра у каждой (в вебе только входящие стрелки).`;
+  }
+  if (id === 'bfs') {
+    now = `Лабиринт ${COLS}×${ROWS} клеток, стен ${S.walls.size}, старт в клетке (строка ${cr(S.st)}, столбец ${cc(S.st)}), финиш (строка ${cr(S.fin)}, столбец ${cc(S.fin)}). ` +
+      (m.started ? `Волна BFS: слой ${m.layer}, посещено ${m.visited} клеток, в очереди ${m.front}. ` : 'Волна ещё не запущена. ') +
+      (m.found ? `Финиш найден, кратчайший путь ${m.len} шагов. Ученик восстановил ${m.traceLen} из ${m.len} шагов пути назад. ` : '') + (m.dead ? 'Финиш недостижим из-за стен. ' : '') +
+      `Задание: дойти волной до финиша и восстановить путь от финиша к старту, переходя к соседу с числом на 1 меньше. Не диктуй клетки — объясняй правило.`;
+  }
+  if (id === 'dijkstra') {
+    const D = S.dj;
+    now = `Взвешенный граф дорог: ${G3.E.map(e => `${e[0]}–${e[1]} ${e[2]} мин`).join(', ')}. Старт ${m.s}, финиш ${m.t}. ` +
+      `Метки сейчас: ${V3.map(v => `${v}=${fmtD(D.dist[v])}`).join(', ')}. Зафиксированы: ${D.done.join(', ') || 'никто'}. В очереди: ${m.pq.join(', ') || 'пусто'}. ` +
+      `Ошибок ученика (взял не минимальную метку): ${m.errors}. ${m.auto ? 'Использовался автоматический шаг — для зачёта нужно «Сброс» и пройти самому. ' : ''}` +
+      (m.fin ? `Маршрут найден: ${m.route.join(' → ')} = ${m.cost} мин. ` : '') + (m.greedy ? `Жадный маршрут: ${m.greedy.path.join(' → ')} = ${m.greedy.dead ? 'тупик' : m.greedy.cost + ' мин'}. ` : 'Жадный маршрут ещё не смотрели. ') +
+      `Не называй следующую вершину — спрашивай, у кого в очереди наименьшая метка и как изменятся метки соседей.`;
+  }
+  if (id === 'world') {
+    now = `Граф ученика: вершины ${S.g4.V.map(v => v.id).join(', ') || 'нет'}; рёбра ${S.g4.E.map(e => `${e[0]}–${e[1]} (вес ${e[2]})`).join(', ') || 'нет'}. Старт ${m.s || 'не задан'}, финиш ${m.t || 'не задан'}. Режим: ${{ build: 'строить', del: 'удалить', ends: 'старт·финиш' }[S.mode4]}. ` +
+      (m.bfs ? `BFS: ${m.bfs.path.join('→')} (${m.bfs.hops} рёбер, вес ${m.bfs.cost}). ` : 'BFS не запускали. ') + (m.dij ? `Дейкстра: ${m.dij.path.join('→')} (${m.dij.hops} рёбер, вес ${m.dij.cost}). ` : 'Дейкстру не запускали. ') +
+      (m.fof ? `Друзья друзей старта: ${m.fof.join(', ') || 'нет'}. ` : '') +
+      `Цель: ≥ 6 вершин, ≥ 7 рёбер и маршрут Дейкстры с бо́льшим числом рёбер, чем у BFS. Подсказывай идею (дорогое прямое ребро и дешёвый обход), но не строй граф за ученика.`;
+  }
+  return [
+    `Раздел: информатика, 9–10 класс, тема «Графы и поиск пути» (Поляков: «Графы», «Алгоритмы на графах»). Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { graph: 'Чем ориентированный граф отличается от неориентированного?', bfs: 'Почему BFS находит самый короткий путь?', dijkstra: 'Почему жадный выбор дороги может ошибиться?', world: 'Как навигатор учитывает пробки?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

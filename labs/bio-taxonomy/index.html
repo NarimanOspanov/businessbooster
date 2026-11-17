@@ -1,0 +1,1108 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по биологии, 7 класс: систематика — искусственная и естественная классификация, ранги от вида до царства, двойные латинские названия, дихотомический определитель и древо жизни из трёх доменов.">
+<title>Систематика: классификация живого</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --leaf:#5fbf6a;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-hit]{cursor:pointer}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+.scene .lbl{font-family:var(--font-body)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .v.bad{color:var(--warn)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+.meter .ft{font:500 11.5px/1.3 var(--font-body);margin-top:7px;text-wrap:pretty}
+.meter .ft span{display:block;font:600 9.5px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:19%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 15px/1.4 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+.feat{display:grid;gap:6px}
+.feat div{background:var(--surface-2);border-radius:10px;padding:9px 11px;font-size:13px;line-height:1.45;border-left:4px solid var(--line)}
+.feat b{display:block;font-weight:600;font-size:13.5px;margin-bottom:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 250px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<script src="/luch/splash.js"></script>
+<div class="app">
+  <header>
+    <div class="brand" role="link" tabindex="0" title="Карта предметов" style="cursor:pointer" onclick="location.href='/#bio'" onkeydown="if(event.key==='Enter')location.href='/#bio'">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9.6 14.6 9.2 6.2 15 10.6Q20 9.4 25 10.6L30.8 6.2 30.4 14.6Q34.6 22 31.6 29Q27.6 36 20 36Q12.4 36 8.4 29Q5.4 22 9.6 14.6Z" fill="#ffb547"/><path d="M20 14Q15.2 10.8 10.9 13.4Q7.6 17.2 9.4 21.8Q11.6 25.8 15.9 25.4Q18.5 25.1 20 27.1Q21.5 25.1 24.1 25.4Q28.4 25.8 30.6 21.8Q32.4 17.2 29.1 13.4Q24.8 10.8 20 14Z" fill="#ffd896"/><circle cx="15" cy="18.8" r="5" fill="#fffaf0"/><circle cx="25" cy="18.8" r="5" fill="#fffaf0"/><circle cx="15.6" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="24.4" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="16.6" cy="18.1" r="1" fill="#fff"/><circle cx="25.4" cy="18.1" r="1" fill="#fff"/><path d="M18.6 23.4h2.8L20 26.6z" fill="#ff8a73"/><path d="M10.5 29.6Q15.3 27.4 20 29.7Q24.7 27.4 29.5 29.6V34.6Q24.7 32.6 20 34.8Q15.3 32.6 10.5 34.6Z" fill="#72d4e8"/><path d="M20 29.7V34.8" stroke="#0b1019" stroke-width="1.1"/><path d="M8.2 23.5Q5.6 28.6 9.4 32.6Q11.6 33.2 12.4 31Q10.4 28.4 8.2 23.5Z" fill="#e8962a"/><path d="M31.8 23.5Q34.4 28.6 30.6 32.6Q28.4 33.2 27.6 31Q29.6 28.4 31.8 23.5Z" fill="#e8962a"/><path d="M35 3.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="#86e0a8"/></svg>
+      <div><h1>OPEN SCHOOL AI</h1><small>Доступное образование для всех</small></div>
+    </div>
+    <div class="headr">
+      
+      <div class="prog" aria-label="Прогресс"><b>Систематика</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Лабораторный стол: карточки организмов, лестница рангов, названия и определитель. Карточки можно перетаскивать и нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const f = x => (Math.round(x * 10) / 10).toString();
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-bio-taxonomy';
+const wrap = (s, n) => { const out = []; let cur = ''; for (const w of s.split(' ')) { if (cur && (cur + ' ' + w).length > n) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; } if (cur) out.push(cur); return out; };
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+// ---------- pictures: every organism drawn in a 48 × 48 box centred at 0,0 ----------
+const PIC = {
+  shark: '<path d="M-22 2Q-10 -8 8 -4L20 -11L16 1L21 9L8 4Q-8 9 -22 2Z" fill="#7d93ad" stroke="#04070d"/><path d="M-6 -6L-1 -16L3 -5Z" fill="#7d93ad" stroke="#04070d"/><path d="M-8 5L-4 12L0 5" fill="#6a7f98" stroke="#04070d"/><path d="M-19 3Q-6 6 6 3" stroke="#c9d4e2" stroke-width="2" fill="none" opacity=".6"/><circle cx="-15" cy="-1" r="1.3" fill="#04070d"/><path d="M-11 -2v4M-9 -2v4" stroke="#4a5a70" stroke-width=".8"/>',
+  dolphin: '<path d="M-24 1L-19 -1Q-12 -10 4 -8Q14 -6 17 -2L23 -8L22 1L24 8L16 3Q6 8 -10 5Q-17 4 -19 2Z" fill="#8fb0d0" stroke="#04070d"/><path d="M-1 -8Q3 -15 7 -14Q5 -11 6 -7" fill="#8fb0d0" stroke="#04070d"/><path d="M-16 3Q-4 7 10 3" stroke="#dfe9f4" stroke-width="2" fill="none" opacity=".7"/><circle cx="-14" cy="-2" r="1.3" fill="#04070d"/><path d="M-6 5L-2 11L1 5" fill="#7a9cbd" stroke="#04070d" stroke-width=".8"/>',
+  penguin: '<path d="M-4 20l-5 2h7zM4 20l5 2h-7z" fill="#ffb547"/><ellipse cx="0" cy="3" rx="10" ry="17" fill="#1c2433" stroke="#04070d"/><ellipse cx="1" cy="6" rx="6.5" ry="12.5" fill="#f4f6fa"/><circle cx="0" cy="-10" r="6.5" fill="#1c2433"/><circle cx="-2" cy="-11" r="1.4" fill="#fff"/><path d="M-5 -10l-6 2 6 1z" fill="#ffb547"/><path d="M-9 -2Q-15 6 -11 12" stroke="#1c2433" stroke-width="3" fill="none"/>',
+  flyfish: '<path d="M-6 -1L6 -18L11 -15L2 0Z" fill="#bfe3f4" fill-opacity=".8" stroke="#5fb4d9"/><path d="M-21 2Q-6 -6 12 0L21 -7L18 2L22 9L12 4Q-6 9 -21 2Z" fill="#4f86c6" stroke="#04070d"/><path d="M-19 3Q-4 6 10 3" stroke="#cfe2f6" stroke-width="2" fill="none" opacity=".7"/><path d="M-4 4L6 16L10 13L1 4Z" fill="#bfe3f4" fill-opacity=".8" stroke="#5fb4d9"/><circle cx="-15" cy="0" r="1.4" fill="#04070d"/>',
+  bat: '<path d="M0 -3L-6 -8L-23 -10Q-18 -4 -20 3Q-14 -1 -12 5Q-8 0 -4 7L0 5L4 7Q8 0 12 5Q14 -1 20 3Q18 -4 23 -10L6 -8Z" fill="#5a4a5e" stroke="#04070d"/><ellipse cx="0" cy="-1" rx="4" ry="7" fill="#7a6270"/><path d="M-3 -7L-4 -13L-1 -8M3 -7L4 -13L1 -8" fill="#7a6270" stroke="#04070d" stroke-width=".8"/><circle cx="-1.5" cy="-5" r=".9" fill="#ffd36b"/><circle cx="1.5" cy="-5" r=".9" fill="#ffd36b"/>',
+  eagle: '<path d="M-3 -2Q-14 -13 -24 -7L-18 -4L-22 0L-15 0L-18 4L-5 3Z" fill="#7a5530" stroke="#04070d"/><path d="M3 -2Q14 -13 24 -7L18 -4L22 0L15 0L18 4L5 3Z" fill="#7a5530" stroke="#04070d"/><path d="M-3 10L0 19L3 10Z" fill="#f4f6fa" stroke="#04070d" stroke-width=".8"/><ellipse cx="0" cy="2" rx="5" ry="10" fill="#6a4524" stroke="#04070d"/><circle cx="0" cy="-10" r="4.5" fill="#f4f6fa" stroke="#04070d"/><path d="M1 -10l5 1-4 3z" fill="#ffd34a"/><circle cx="1" cy="-11" r=".9" fill="#04070d"/>',
+  mudsk: '<rect x="-24" y="12" width="48" height="12" fill="#5a4630"/><path d="M-24 13Q-12 9 0 13T24 12" stroke="#7a6040" stroke-width="2" fill="none"/><path d="M-20 7Q-12 -4 4 1L12 -2L20 6L12 8Q-6 13 -20 7Z" fill="#8a8a5a" stroke="#04070d"/><path d="M-6 9L-10 15M-2 9L-3 15" stroke="#6a6a40" stroke-width="2.2" stroke-linecap="round"/><circle cx="-15" cy="-2" r="3.2" fill="#d6d6a0" stroke="#04070d"/><circle cx="-10" cy="-3" r="3.2" fill="#d6d6a0" stroke="#04070d"/><circle cx="-15" cy="-2" r="1.3" fill="#04070d"/><circle cx="-10" cy="-3" r="1.3" fill="#04070d"/><circle cx="-2" cy="3" r="1" fill="#5aa0d0"/><circle cx="4" cy="4" r="1" fill="#5aa0d0"/>',
+  ostrich: '<path d="M2 4L0 21M8 4L10 21" stroke="#e0a090" stroke-width="2.4" stroke-linecap="round"/><path d="M-2 21h4M8 21h5" stroke="#e0a090" stroke-width="2"/><ellipse cx="5" cy="-1" rx="12" ry="8" fill="#2a2a2e" stroke="#04070d"/><path d="M14 -6q6 -2 8 4q-4 0 -8 0z" fill="#f4f6fa"/><path d="M-4 -4Q-9 -14 -7 -21" stroke="#e0a090" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="-7" cy="-21" r="3" fill="#c88a78"/><path d="M-10 -21l-4 1 4 1z" fill="#d8b070"/><circle cx="-7" cy="-22" r=".8" fill="#04070d"/>',
+  cheetah: '<path d="M12 -2Q22 -4 22 6" stroke="#d9a440" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M-9 3L-11 18M-4 4L-3 18M8 3L6 18M12 2L14 18" stroke="#d9a440" stroke-width="2.6" stroke-linecap="round"/><ellipse cx="2" cy="-1" rx="13" ry="6" fill="#e3b04c" stroke="#04070d"/><circle cx="-14" cy="-6" r="5.4" fill="#e3b04c" stroke="#04070d"/><path d="M-17 -11l1 -3 2 2M-12 -11l1 -3 2 2" fill="#e3b04c" stroke="#04070d" stroke-width=".8"/><path d="M-16 -6Q-17 -2 -18 -1" stroke="#04070d" stroke-width="1"/><circle cx="-15" cy="-7" r=".9" fill="#04070d"/>' + [[-6, -3], [-1, 1], [4, -4], [9, 0], [5, 2], [-4, 2], [0, -4], [11, -3]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.1" fill="#3a2a14"/>`).join(''),
+  wolf: '<path d="M12 -1Q22 2 21 11" stroke="#8a8f99" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M-9 3L-10 18M-4 4L-4 18M7 3L6 18M11 2L12 18" stroke="#7a808a" stroke-width="2.8" stroke-linecap="round"/><ellipse cx="1" cy="-1" rx="13" ry="7" fill="#9aa0aa" stroke="#04070d"/><path d="M-10 -6L-14 -15L-11 -10L-7 -15L-6 -6Z" fill="#9aa0aa" stroke="#04070d" stroke-width=".8"/><path d="M-6 -7Q-10 -9 -14 -6L-23 -3L-13 1Q-8 0 -6 -3Z" fill="#9aa0aa" stroke="#04070d"/><circle cx="-23" cy="-3" r="1.2" fill="#04070d"/><circle cx="-12" cy="-6" r=".9" fill="#ffd36b"/><path d="M-12 1Q-4 4 6 1" stroke="#d0d4dc" stroke-width="2" fill="none" opacity=".6"/>',
+  dog: '<path d="M12 -2Q18 -10 20 -14" stroke="#c08a50" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M-9 3L-10 18M-4 4L-4 18M7 3L6 18M11 2L12 18" stroke="#b07a40" stroke-width="2.8" stroke-linecap="round"/><ellipse cx="1" cy="-1" rx="13" ry="7" fill="#c89458" stroke="#04070d"/><circle cx="-13" cy="-8" r="6" fill="#c89458" stroke="#04070d"/><path d="M-20 -7L-24 -5L-20 -3" fill="#c89458" stroke="#04070d" stroke-width=".8"/><circle cx="-24" cy="-5" r="1.2" fill="#04070d"/><path d="M-11 -13Q-6 -12 -7 -4" fill="#7a5230" stroke="#04070d" stroke-width=".8"/><circle cx="-15" cy="-9" r=".9" fill="#04070d"/><path d="M-8 -3Q-12 1 -9 4" stroke="#e05050" stroke-width="1.6" fill="none"/>',
+  rose: '<path d="M0 22V-4" stroke="#3f8f4c" stroke-width="2.2"/><path d="M0 12l-3 -1M0 4l3 -1M0 16l3 -1" stroke="#3f8f4c" stroke-width="1.4"/><path d="M0 8Q-12 2 -16 10Q-6 14 0 8Z" fill="#5fbf6a" stroke="#04070d" stroke-width=".8"/><path d="M0 14Q12 8 16 16Q6 20 0 14Z" fill="#5fbf6a" stroke="#04070d" stroke-width=".8"/>' + [0, 1, 2, 3, 4].map(k => { const a = (k * 72 - 90) * Math.PI / 180; return `<ellipse cx="${f(7 * Math.cos(a))}" cy="${f(-12 + 7 * Math.sin(a))}" rx="6" ry="5" fill="#f08aa8" stroke="#04070d" stroke-width=".8"/>`; }).join('') + '<circle cx="0" cy="-12" r="3.4" fill="#ffd34a" stroke="#c99a20" stroke-width=".8"/>',
+  human: '<circle cx="0" cy="-15" r="5.5" fill="#e8b890" stroke="#04070d"/><path d="M-5 -19Q0 -24 5 -19Q4 -21 0 -21.5Q-4 -21 -5 -19Z" fill="#4a3020"/><path d="M-7 -8Q0 -10 7 -8L8 6H-8Z" fill="#5fb4d9" stroke="#04070d"/><path d="M-7 -7L-12 6M7 -7L12 6" stroke="#e8b890" stroke-width="2.6" stroke-linecap="round"/><path d="M-4 6L-5 21M4 6L5 21" stroke="#3a4a6a" stroke-width="3.4" stroke-linecap="round"/>',
+  lion: '<circle r="17" fill="#a0602a" stroke="#04070d"/>' + Array.from({ length: 12 }, (_, k) => { const a = k * 30 * Math.PI / 180; return `<circle cx="${f(15 * Math.cos(a))}" cy="${f(15 * Math.sin(a))}" r="5" fill="#b8702e"/>`; }).join('') + '<circle r="11" fill="#e3b04c" stroke="#04070d"/><circle cx="-4" cy="-3" r="1.3" fill="#04070d"/><circle cx="4" cy="-3" r="1.3" fill="#04070d"/><path d="M-3 3h6l-3 3z" fill="#5a3020"/><path d="M0 6Q-3 9 -5 8M0 6Q3 9 5 8" stroke="#5a3020" fill="none"/>',
+  tiger: '<path d="M-12 -10L-10 -17L-5 -12M12 -10L10 -17L5 -12" fill="#f08a2a" stroke="#04070d"/><circle r="14" fill="#f08a2a" stroke="#04070d"/><path d="M-5 6Q0 13 5 6Q5 2 0 2Q-5 2 -5 6Z" fill="#f4f0e0"/><path d="M-3 -13L-1 -7M3 -13L1 -7M0 -14V-9M-14 -2L-8 -1M-14 3L-8 2M14 -2L8 -1M14 3L8 2" stroke="#1c1408" stroke-width="1.6"/><circle cx="-5" cy="-3" r="1.4" fill="#04070d"/><circle cx="5" cy="-3" r="1.4" fill="#04070d"/><path d="M-2 4h4l-2 2z" fill="#c05050"/>',
+  cat: '<path d="M-12 -6L-12 -18L-4 -11M12 -6L12 -18L4 -11" fill="#b0b4bc" stroke="#04070d"/><circle cy="1" r="13" fill="#b0b4bc" stroke="#04070d"/><ellipse cx="-5" cy="-1" rx="2.4" ry="3" fill="#86e0a8"/><ellipse cx="5" cy="-1" rx="2.4" ry="3" fill="#86e0a8"/><path d="M-5 -3v4M5 -3v4" stroke="#04070d" stroke-width="1.2"/><path d="M-2 5h4l-2 2z" fill="#e08a9a"/><path d="M-3 7L-16 5M-3 8L-16 10M3 7L16 5M3 8L16 10" stroke="#e8ecf4" stroke-width=".6"/>',
+  bee: '<ellipse cx="-4" cy="-10" rx="8" ry="5" fill="#d8eef8" fill-opacity=".75" stroke="#8fb0d0" transform="rotate(-25 -4 -10)"/><ellipse cx="6" cy="-10" rx="8" ry="5" fill="#d8eef8" fill-opacity=".75" stroke="#8fb0d0" transform="rotate(25 6 -10)"/><ellipse cx="4" cy="2" rx="13" ry="8" fill="#ffc83a" stroke="#04070d"/><path d="M0 -5.6v15.2M6 -6v16M12 -3.4v10.8" stroke="#1c1408" stroke-width="2.4"/><circle cx="-12" cy="0" r="5" fill="#2a2010" stroke="#04070d"/><path d="M-14 -4Q-18 -10 -20 -10M-12 -5Q-14 -11 -16 -12" stroke="#2a2010" fill="none"/><path d="M17 2l4 0" stroke="#2a2010" stroke-width="1.6"/>',
+  sunfl: '<path d="M0 22V4" stroke="#3f8f4c" stroke-width="2.6"/><path d="M0 14Q-10 8 -14 14Q-6 18 0 14Z" fill="#5fbf6a"/>' + Array.from({ length: 12 }, (_, k) => { const a = k * 30; return `<ellipse cx="0" cy="-17" rx="3" ry="6" fill="#ffd34a" stroke="#c99a20" stroke-width=".6" transform="rotate(${a} 0 -7)"/>`; }).join('') + '<circle cx="0" cy="-7" r="6.5" fill="#6a4020" stroke="#04070d"/><circle cx="-2" cy="-9" r="1" fill="#a0703a"/><circle cx="2" cy="-6" r="1" fill="#a0703a"/>',
+  ecoli: '<path d="M14 -2Q19 -8 23 -4M14 3Q20 8 23 4M-14 -2Q-19 -8 -23 -5" stroke="#86e0a8" stroke-width="1" fill="none"/><rect x="-15" y="-7" width="30" height="14" rx="7" fill="#7fcf8a" stroke="#04070d"/><path d="M-8 -1Q-3 3 2 -1T10 0" stroke="#2f6a35" stroke-width="1.4" fill="none"/><path d="M-11 -9l-2 -3M-4 -9l-1 -3M3 -9l1 -3M10 -9l2 -3M-11 9l-2 3M-4 9l-1 3M3 9l1 3M10 9l2 3" stroke="#86e0a8" stroke-width=".8"/>',
+  halo: '<rect x="-24" y="-24" width="48" height="48" fill="#3a2440"/><path d="M-20 18l4 -4 4 4zM12 16l3 -3 3 3zM-6 20l3 -3 3 3z" fill="#e8ecf4" opacity=".7"/><rect x="-16" y="-6" width="32" height="12" rx="6" fill="#e070a0" stroke="#04070d" transform="rotate(-12)"/><path d="M15 -6Q20 -12 23 -9" stroke="#e070a0" fill="none"/><path d="M-9 0Q-3 -4 3 0T10 -2" stroke="#7a2050" stroke-width="1.3" fill="none" transform="rotate(-12)"/>',
+  mush: '<path d="M-6 2Q-7 14 -5 20H5Q7 14 6 2Z" fill="#efe6d4" stroke="#04070d"/><path d="M-6 9h12" stroke="#d8c8a8" stroke-width="2"/><path d="M-20 3Q-20 -16 0 -17Q20 -16 20 3Q0 7 -20 3Z" fill="#e8dcc0" stroke="#04070d"/><path d="M-16 2Q0 5 16 2" stroke="#a07a5a" stroke-width="1.4" fill="none"/><circle cx="-7" cy="-8" r="1.6" fill="#c8b898"/><circle cx="6" cy="-11" r="1.4" fill="#c8b898"/><path d="M-9 20Q-14 22 -18 21M9 20Q14 22 18 21" stroke="#efe6d4" fill="none"/>',
+  amoeba: '<path d="M-6 -16Q4 -20 8 -12Q18 -14 18 -4Q24 4 14 8Q12 18 2 15Q-8 22 -12 12Q-22 10 -18 0Q-22 -10 -12 -10Q-12 -16 -6 -16Z" fill="#a8d4e0" fill-opacity=".85" stroke="#4a8aa0"/><circle cx="2" cy="0" r="5" fill="#5a7ab0" stroke="#2a4a80"/><circle cx="-9" cy="5" r="2.4" fill="#86e0a8" opacity=".8"/><circle cx="10" cy="-6" r="1.8" fill="#e8ecf4" opacity=".7"/>',
+};
+const picG = (id, x, y, s, bg) => `<g transform="translate(${f(x)} ${f(y)}) scale(${f(s * 100) / 100})" pointer-events="none">${bg ? `<circle r="23" fill="${bg}"/>` : ''}${PIC[id]}</g>`;
+
+// ---------- lesson 1: animals for sorting ----------
+const CLS = { fish: { name: 'Рыбы', c: '#72d4e8' }, bird: { name: 'Птицы', c: '#ffb547' }, mam: { name: 'Млекопитающие', c: '#ff9ecb' } };
+const CLSK = ['fish', 'bird', 'mam'];
+const ENV = { water: { name: 'Живут в воде', c: '#5fb4d9' }, air: { name: 'Летают', c: '#c3cbdb' }, land: { name: 'Ходят по суше', c: '#c9a46a' } };
+const ENVK = ['water', 'air', 'land'];
+const ANI = [
+  { id: 'shark', name: ['Акула'], cls: 'fish', env: 'water', cover: 'чешуя', breath: 'жабры', young: 'яйца или мальки, молоком не кормит' },
+  { id: 'dolphin', name: ['Дельфин'], cls: 'mam', env: 'water', cover: 'гладкая кожа, у детёныша — волоски на морде', breath: 'лёгкие, всплывает за воздухом', young: 'кормит детёныша молоком' },
+  { id: 'penguin', name: ['Пингвин'], cls: 'bird', env: 'water', cover: 'перья', breath: 'лёгкие и воздушные мешки', young: 'насиживает яйца' },
+  { id: 'flyfish', name: ['Летучая', 'рыба'], cls: 'fish', env: 'air', cover: 'чешуя', breath: 'жабры', young: 'мечет икру' },
+  { id: 'bat', name: ['Летучая', 'мышь'], cls: 'mam', env: 'air', cover: 'шерсть', breath: 'лёгкие', young: 'кормит детёныша молоком' },
+  { id: 'eagle', name: ['Орёл'], cls: 'bird', env: 'air', cover: 'перья', breath: 'лёгкие и воздушные мешки', young: 'насиживает яйца' },
+  { id: 'mudsk', name: ['Илистый', 'прыгун'], cls: 'fish', env: 'land', cover: 'чешуя', breath: 'жабры, на суше ещё и кожа', young: 'мечет икру в норе' },
+  { id: 'ostrich', name: ['Страус'], cls: 'bird', env: 'land', cover: 'перья', breath: 'лёгкие и воздушные мешки', young: 'насиживает яйца' },
+  { id: 'cheetah', name: ['Гепард'], cls: 'mam', env: 'land', cover: 'шерсть', breath: 'лёгкие', young: 'кормит котят молоком' },
+];
+ANI.forEach(a => { a.short = a.name.join(' '); });
+
+// ---------- lesson 2: taxa and ladders ----------
+const RANK_A = ['Царство', 'Тип', 'Класс', 'Отряд', 'Семейство', 'Род', 'Вид'];
+const RANK_P = ['Царство', 'Отдел', 'Класс', 'Порядок', 'Семейство', 'Род', 'Вид'];
+const TX = {
+  Animalia: { ru: 'Животные', la: 'Animalia', r: 0 }, Plantae: { ru: 'Растения', la: 'Plantae', r: 0 }, Fungi: { ru: 'Грибы', la: 'Fungi', r: 0 },
+  Chordata: { ru: 'Хордовые', la: 'Chordata', r: 1 }, Angio: { ru: 'Покрытосеменные', la: 'Magnoliophyta', r: 1 }, Arthropoda: { ru: 'Членистоногие', la: 'Arthropoda', r: 1 },
+  Mammalia: { ru: 'Млекопитающие', la: 'Mammalia', r: 2 }, Dicot: { ru: 'Двудольные', la: 'Magnoliopsida', r: 2 }, Aves: { ru: 'Птицы', la: 'Aves', r: 2 }, Monocot: { ru: 'Однодольные', la: 'Liliopsida', r: 2 },
+  Carnivora: { ru: 'Хищные', la: 'Carnivora', r: 3 }, Primates: { ru: 'Приматы', la: 'Primates', r: 3 }, Rosales: { ru: 'Розоцветные', la: 'Rosales', r: 3 },
+  Canidae: { ru: 'Псовые', la: 'Canidae', r: 4 }, Hominidae: { ru: 'Гоминиды', la: 'Hominidae', r: 4 }, Rosaceae: { ru: 'Розовые', la: 'Rosaceae', r: 4 }, Felidae: { ru: 'Кошачьи', la: 'Felidae', r: 4 },
+  Canis: { ru: 'Волки', la: 'Canis', r: 5 }, Homo: { ru: 'Люди', la: 'Homo', r: 5 }, Rosa: { ru: 'Роза (шиповник)', la: 'Rosa', r: 5 },
+  lupus: { ru: 'Волк', la: 'Canis lupus', r: 6 }, familiaris: { ru: 'Собака домашняя', la: 'Canis familiaris', r: 6 }, sapiens: { ru: 'Человек разумный', la: 'Homo sapiens', r: 6 }, canina: { ru: 'Шиповник собачий', la: 'Rosa canina', r: 6 },
+};
+const ORGS = [
+  { id: 'wolf', name: 'Волк', gen: 'волка', plant: false, path: ['Animalia', 'Chordata', 'Mammalia', 'Carnivora', 'Canidae', 'Canis', 'lupus'], extra: ['Felidae', 'Aves'] },
+  { id: 'dog', name: 'Собака', gen: 'собаки', plant: false, path: ['Animalia', 'Chordata', 'Mammalia', 'Carnivora', 'Canidae', 'Canis', 'familiaris'], extra: ['Felidae', 'Primates'] },
+  { id: 'rose', name: 'Роза', gen: 'розы', plant: true, path: ['Plantae', 'Angio', 'Dicot', 'Rosales', 'Rosaceae', 'Rosa', 'canina'], extra: ['Monocot', 'Fungi'] },
+  { id: 'human', name: 'Человек', gen: 'человека', plant: false, path: ['Animalia', 'Chordata', 'Mammalia', 'Primates', 'Hominidae', 'Homo', 'sapiens'], extra: ['Arthropoda', 'Canidae'] },
+];
+const ALLTX = [...new Set(ORGS.flatMap(o => o.path))];
+const rankName = (r, plant) => (plant ? RANK_P : RANK_A)[r].toLowerCase();
+const shared = (a, b) => ORGS[a].path.filter((k, r) => ORGS[b].path[r] === k).length;
+const ladderN = i => ORGS[i].path.filter(k => S.placed[k]).length;
+
+// ---------- lesson 3: common and scientific names ----------
+const PAIRS = [
+  { id: 'wolf', ru: 'Серый волк', la: 'Canis lupus', g: 'Canis — «собака»: род волков, собак и койотов', e: 'lupus — «волк»' },
+  { id: 'lion', ru: 'Лев', la: 'Panthera leo', g: 'Panthera — род больших рычащих кошек', e: 'leo — «лев»' },
+  { id: 'tiger', ru: 'Тигр', la: 'Panthera tigris', g: 'Panthera — род больших рычащих кошек', e: 'tigris — «тигр»' },
+  { id: 'cat', ru: 'Домашняя кошка', la: 'Felis catus', g: 'Felis — «кошка»: род малых кошек', e: 'catus — «кот»' },
+  { id: 'human', ru: 'Человек разумный', la: 'Homo sapiens', g: 'Homo — «человек»', e: 'sapiens — «разумный»' },
+  { id: 'bee', ru: 'Медоносная пчела', la: 'Apis mellifera', g: 'Apis — «пчела»', e: 'mellifera — «несущая мёд»' },
+  { id: 'sunfl', ru: 'Подсолнечник однолетний', la: 'Helianthus annuus', g: 'Helianthus — «солнечный цветок» (греч.)', e: 'annuus — «однолетний»' },
+  { id: 'ecoli', ru: 'Кишечная палочка', la: 'Escherichia coli', g: 'Escherichia — в честь врача Теодора Эшериха', e: 'coli — «кишечника»' },
+];
+const RORD = [3, 6, 2, 7, 0, 5, 1, 4];
+
+// ---------- lesson 4: specimens, the key and the tree of life ----------
+const GRP = {
+  bact: { name: 'Бактерии', dom: 'домен Бактерии', c: '#72d4e8' }, arch: { name: 'Археи', dom: 'домен Археи', c: '#ff9ecb' },
+  prot: { name: 'Протисты', dom: 'эукариоты', c: '#86e0a8' }, plant: { name: 'Растения', dom: 'эукариоты', c: '#86e0a8' },
+  fungi: { name: 'Грибы', dom: 'эукариоты', c: '#86e0a8' }, anim: { name: 'Животные', dom: 'эукариоты', c: '#86e0a8' },
+};
+const SPECS = [
+  { id: 'mush', code: 'А', name: 'Шампиньон', grp: 'fungi', obs: ['многоклеточный, тело из нитей-гиф', 'в клетках есть ядро', 'хлоропластов нет', 'стенки из хитина, всасывает пищу'] },
+  { id: 'ecoli', code: 'Б', name: 'Кишечная палочка', grp: 'bact', obs: ['одна клетка длиной около 2 мкм', 'ядра нет, ДНК прямо в цитоплазме', 'гены рРНК — как у других бактерий', 'в клеточной стенке есть муреин'] },
+  { id: 'bee', code: 'В', name: 'Медоносная пчела', grp: 'anim', obs: ['многоклеточная: ткани и органы', 'в клетках есть ядро', 'хлоропластов нет', 'клеточной стенки нет, ест нектар'] },
+  { id: 'halo', code: 'Г', name: 'Галобактерия', grp: 'arch', obs: ['одна клетка, живёт в рассоле', 'ядра нет', 'гены рРНК ближе к эукариотам', 'муреина в стенке нет, мембраны особые'] },
+  { id: 'sunfl', code: 'Д', name: 'Подсолнечник', grp: 'plant', obs: ['многоклеточный: корень, стебель, листья', 'в клетках есть ядро', 'есть хлоропласты, идёт фотосинтез', 'стенки клеток из целлюлозы'] },
+  { id: 'amoeba', code: 'Е', name: 'Амёба', grp: 'prot', obs: ['одна клетка, живёт в пресной воде', 'в клетке есть ядро', 'хлоропластов нет', 'стенки нет, ловит пищу ложноножками'] },
+];
+const DKEY = [
+  { a: { t: 'В клетках нет ядра', go: 1 }, b: { t: 'В клетках есть ядро', go: 2 } },
+  { a: { t: 'рРНК как у бактерий, есть муреин', leaf: 'bact' }, b: { t: 'рРНК ближе к эукариотам', leaf: 'arch' } },
+  { a: { t: 'Есть хлоропласты, фотосинтез', leaf: 'plant' }, b: { t: 'Хлоропластов нет', go: 3 } },
+  { a: { t: 'Стенки клеток из хитина', leaf: 'fungi' }, b: { t: 'Клеточной стенки нет', go: 4 } },
+  { a: { t: 'Тело — одна клетка', leaf: 'prot' }, b: { t: 'Много клеток, ткани и органы', leaf: 'anim' } },
+];
+const LET = ['а', 'б'];
+function truePath(grp) {
+  const out = [];
+  const dfs = c => { for (const s of ['a', 'b']) { const o = DKEY[c][s]; out.push({ c, s }); if (o.leaf === grp) return true; if (o.go !== undefined && dfs(o.go)) return true; out.pop(); } return false; };
+  dfs(0); return out;
+}
+const TREE = { bact: 116, arch: 154, prot: 196, plant: 236, fungi: 278, anim: 318 }, LX = 432;
+
+const LESSONS = [
+  { id: 'why', title: 'Зачем классифицировать',
+    text: ['Учёные описали около 2 миллионов видов живых организмов, а по оценкам на Земле их в несколько раз больше. Чтобы не запутаться в таком разнообразии, организмы объединяют в группы. Наука о разнообразии и классификации живого называется систематикой.',
+           'Классификация бывает искусственной и естественной. Искусственная делит по одному удобному признаку: «живут в воде», «летают», «ядовитые». Тогда акула, дельфин и пингвин попадают в одну группу, хотя устроены совсем по-разному.',
+           'Естественная классификация учитывает много признаков строения и отражает родство — общее происхождение. Карл Линней в XVIII веке ввёл ранги и двойные названия видов; его система растений по числу тычинок была ещё во многом искусственной. Естественная система сложилась после работ Дарвина, а сегодня её уточняют по сходству ДНК.'],
+    why: 'В мировых базах биоразнообразия, таких как GBIF, — сотни миллионов находок, и у каждой есть место в системе живого. По ним видно, какие виды исчезают и куда смещаются из-за потепления. Специалист по охране природы по этим данным решает, где создать заповедник. За ближайшие 10 лет ИИ возьмёт на себя сортировку миллионов фото и записей, а решать, что считать отдельным видом и что спасать в первую очередь, будут люди.',
+    task: 'Разложите 9 животных по классам — рыбы, птицы, млекопитающие — по строению тела. Затем включите искусственную систему «по среде» и сравните.',
+    hint: 'Нажмите на карточку — справа вверху появятся покров тела, дыхание и забота о потомстве. Летает животное или плавает — не важно: смотрите на перья, шерсть, жабры и молоко.',
+    stage: 'Перетащите карточку в коробку или нажмите карточку, а потом коробку.',
+    check: m => m.right === 9 && S.sawArt },
+  { id: 'ranks', title: 'Ранги: от вида до царства',
+    text: ['Ранги — ступени системы. Самая мелкая — вид: особи, похожие по строению, которые скрещиваются между собой и дают плодовитое потомство. Близкие виды объединяют в род, роды — в семейство, семейства — в отряд (у растений — порядок), отряды — в класс, классы — в тип (у растений — отдел), типы — в царство.',
+           'Чем выше ранг, тем больше в нём организмов и тем меньше у них общих признаков. В царство Животные входят и пчела, и кит, а в род Волки (Canis) — только волк, собака, койот, обыкновенный шакал и ещё несколько видов.',
+           'Чем больше общих ступеней у двух организмов, тем ближе их родство. У волка и собаки общий даже род, у волка и человека — только класс, тип и царство, а с розой у них нет ни одной общей ступени. Над царствами учёные ставят ещё более крупный ранг — домен.'],
+    why: 'Ранги нужны везде, где хранят знания о видах: в музейных коллекциях, ботанических садах, банках семян. Ветеринары в зоопарках лечат волков и лис, опираясь на опыт с собаками: родственники из одного семейства похожи устройством тела. Биоинформатик по ДНК строит деревья родства и проверяет, верно ли расставлены ступени. В ближайшие 10 лет таких расчётов станет намного больше: программы будут их ускорять, а проверять выводы останется человеку.',
+    task: 'Постройте лестницу рангов от царства до вида для волка, собаки, розы и человека: перетащите названия на ступени.',
+    hint: 'Общая ступень заполняется сразу у всех родственников. Латинские окончания подсказывают ранг: -idae и -aceae — семейство, -ales — порядок.',
+    stage: 'Перетащите название на ступень или нажмите название, а потом ступень. Организм выбирается сверху.',
+    check: m => m.placed === ALLTX.length },
+  { id: 'names', title: 'Двойные названия',
+    text: ['У одного животного в разных языках разные имена: волк, wolf, Wolf, loup, lobo. А в одном языке одним словом порой зовут разные виды. Поэтому у каждого вида есть научное название — одинаковое во всём мире.',
+           'Карл Линней ввёл двойные (бинарные) названия. Первое слово — род, пишется с большой буквы, второе — видовой эпитет, с маленькой: Canis lupus — волк, Homo sapiens — человек разумный. Названия пишут на латыни и выделяют курсивом.',
+           'У видов одного рода общее первое слово: лев Panthera leo и тигр Panthera tigris — оба из рода Panthera. Новые виды называют по строгим правилам — кодексам номенклатуры, и внутри одного кодекса два вида не могут носить одно имя.'],
+    why: 'Врач-микробиолог определяет возбудителя по научному названию — Escherichia coli, Staphylococcus aureus — и по нему подбирает антибиотик: ошибка в названии стоит здоровья. Учёные разных стран читают статьи друг друга и не путают виды. Каждый год описывают 15–20 тысяч новых видов, и каждому дают латинское имя. Приложения вроде iNaturalist узнают вид по фото за секунды, но имена, по которым работают и люди, и программы, дают и проверяют систематики.',
+    task: 'Соедините все 8 русских названий с научными двойными названиями.',
+    hint: 'Первое слово — род. Лев и тигр из одного рода Panthera, отличает их второе слово. Нажмите на латинское название — внизу появится перевод рода.',
+    stage: 'Протяните линию от русского названия к латинскому или нажмите их по очереди.',
+    check: m => m.matched === 8 },
+  { id: 'key', title: 'Определитель и древо жизни',
+    text: ['Определитель — книга или программа, по которой узнают, к какому виду или группе относится организм. Чаще всего он дихотомический: на каждом шаге два противоположных утверждения — теза и антитеза. Выбираешь подходящее и идёшь дальше, пока не дойдёшь до названия.',
+           'Когда-то всё живое делили на два царства — растения и животные. Потом выделили грибы, а с микроскопом открыли бактерии и простейших. В 1977 году Карл Вёзе сравнил гены рибосомной РНК и увидел, что безъядерные организмы бывают двух совсем разных типов. Так появилась система трёх доменов: бактерии, археи и эукариоты.',
+           'У бактерий и архей нет ядра. Археи внешне похожи на бактерии, но по генам ближе к эукариотам — организмам с ядром в клетках: протистам, растениям, грибам и животным. Сегодня родство уточняют по ДНК, а по короткому участку генома — ДНК-штрихкоду — вид узнают даже по капле воды или кусочку ткани.'],
+    why: 'По ДНК-штрихкодам проверяют, из какой рыбы сделано филе и не продают ли кожу редких видов, а экологи по следам ДНК в воде узнают, кто живёт в озере. В больнице возбудителя инфекции определяют по генам за часы — от этого зависит, каким лекарством лечить. ИИ-приложения узнают растение по фото, но ошибаются на редких и новых видах; их проверяют систематики, а учатся программы на коллекциях, собранных людьми. Биолог, биоинформатик и специалист по охране природы в ближайшие 10 лет будут работать вместе с такими программами.',
+    task: 'Определите все 6 образцов по дихотомическому определителю и посмотрите, где каждый из них на древе жизни.',
+    hint: 'Выберите образец сверху и читайте его признаки. На каждом шаге выберите одну из двух строк — тезу или антитезу.',
+    stage: 'Нажмите образец сверху, потом подходящую строку определителя на каждом шаге.',
+    check: m => m.ok === 6 },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(LESSONS.findIndex(l => l.id === saved.lesson), 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: LESSONS[S.lesson].id, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function resetLesson() {
+  S.bin = Array(ANI.length).fill(-1); S.csel = -1; S.look = -1; S.mode = 'nat'; S.sawArt = false;
+  S.org = 0; S.placed = {}; S.ksel = null; S.miss = 0; S.flash = null;
+  S.match = Array(PAIRS.length).fill(false); S.lsel = -1; S.info = -1;
+  S.cur = 0; S.path = []; S.step = 0; S.ok = Array(SPECS.length).fill(false);
+}
+
+// ---------- models ----------
+function model() {
+  const id = LID();
+  if (id === 'why') { let n = 0, r = 0; S.bin.forEach((b, i) => { if (b >= 0) { n++; if (CLSK[b] === ANI[i].cls) r++; } }); return { kind: 'why', placed: n, right: r }; }
+  if (id === 'ranks') return { kind: 'ranks', placed: ALLTX.filter(k => S.placed[k]).length, lad: ladderN(S.org), full: ORGS.filter((_, i) => ladderN(i) === 7).length };
+  if (id === 'names') return { kind: 'names', matched: S.match.filter(Boolean).length };
+  return { kind: 'key', ok: S.ok.filter(Boolean).length };
+}
+
+// ---------- lesson 1 actions ----------
+function setMode(md) {
+  if (S.mode === md) return;
+  S.mode = md; S.csel = -1;
+  if (md === 'art') { S.sawArt = true; toast('Искусственная система: в каждой группе оказались и рыба, и птица, и зверь.'); }
+  renderTools(); update();
+}
+function dropAni(c, b) {
+  if (S.mode === 'art') { toast('Это искусственная система — она строится сама, по среде обитания. Включите естественную, чтобы раскладывать.'); dirty = true; return; }
+  S.bin[c] = b; S.csel = -1; S.look = c;
+  const m = model();
+  if (m.placed === ANI.length && m.right < ANI.length) toast(`Все животные разложены. Верно ${m.right} из 9 — красные переложите.`);
+  else if (m.right === 9 && !S.sawArt) toast('Все 9 верно! Теперь включите искусственную систему «по среде» внизу.');
+  update();
+}
+
+// ---------- lesson 2 actions ----------
+function pickOrg(i) { S.org = clamp(i, 0, ORGS.length - 1); S.ksel = null; renderTools(); update(); }
+function place(k, r) {
+  const o = ORGS[S.org], t = TX[k];
+  if (S.placed[o.path[r]]) { toast(`Ступень «${rankName(r, o.plant)}» уже заполнена.`); return; }
+  if (o.path[r] === k) {
+    S.placed[k] = true; S.ksel = null; S.flash = { k, t: performance.now() };
+    const also = ORGS.filter((q, i) => i !== S.org && q.path[r] === k).map(q => q.gen);
+    if (also.length) toast(`«${t.ru}» — общая ступень и для ${also.join(' и ')}: она заполнилась у всех.`);
+    const m = model();
+    if (m.lad === 7 && m.placed < ALLTX.length) { const nx = ORGS.findIndex((_, i) => ladderN(i) < 7); if (nx >= 0) setTimeout(() => toast(`Лестница ${o.gen} готова. Теперь выберите сверху: ${ORGS[nx].name.toLowerCase()}.`), also.length ? 2900 : 0); }
+  } else {
+    S.miss++;
+    if (!o.path.includes(k)) toast(`«${t.ru}» (${t.la}) — не из лестницы ${o.gen}. ${t.r === r ? `Это ${rankName(t.r, o.plant)}, но другой.` : ''}`);
+    else toast(`«${t.ru}» — это ${rankName(t.r, o.plant)}, а не ${rankName(r, o.plant)}.`);
+  }
+  update();
+}
+
+// ---------- lesson 3 actions ----------
+function tryMatch(i, j) {
+  S.lsel = -1; S.info = j;
+  if (S.match[i]) { toast(`«${PAIRS[i].ru}» уже соединено.`); update(); return; }
+  if (S.match[j]) { toast(`${PAIRS[j].la} уже нашло свою пару.`); update(); return; }
+  if (i === j) { S.match[i] = true; S.flash = { k: i, t: performance.now() }; toast(`Верно: ${PAIRS[i].ru} — ${PAIRS[i].la}. ${PAIRS[i].e}.`); }
+  else {
+    S.miss++;
+    const gi = PAIRS[i].la.split(' ')[0], gj = PAIRS[j].la.split(' ')[0];
+    toast(gi === gj ? `Род угадан — ${gi}, а видовой эпитет другой. Смотрите на второе слово.` : `Не пара. ${PAIRS[j].la.split(' ')[0]} — это ${PAIRS[j].g.split(' — ')[1] || 'другой род'}.`);
+  }
+  update();
+}
+
+// ---------- lesson 4 actions ----------
+let nextT = 0;
+function pickSpec(i) { clearTimeout(nextT); S.cur = i; S.path = []; S.step = 0; renderTools(); update(); }
+function answer(c, s) {
+  const sp = SPECS[S.cur];
+  if (S.ok[S.cur]) { toast(`Образец ${sp.code} уже определён: ${sp.name.toLowerCase()}. Выберите другой.`); return; }
+  if (c !== S.step) { toast(`Сейчас шаг ${S.step + 1}: выберите строку ${S.step + 1}а или ${S.step + 1}б.`); return; }
+  S.path.push({ c, s });
+  const o = DKEY[c][s];
+  if (o.go !== undefined) { S.step = o.go; update(); return; }
+  if (o.leaf === sp.grp) {
+    S.ok[S.cur] = true; S.flash = { k: sp.grp, t: performance.now() };
+    const m = model();
+    toast(`Образец ${sp.code} — ${sp.name.toLowerCase()}: ${GRP[sp.grp].name.toLowerCase()}, ${GRP[sp.grp].dom}.`);
+    if (m.ok < SPECS.length) { const nx = SPECS.findIndex((_, i) => !S.ok[i]); nextT = setTimeout(() => { if (LID() === 'key' && S.cur !== nx && S.ok[S.cur]) pickSpec(nx); }, 1400); }
+  } else {
+    S.miss++;
+    const tp = truePath(sp.grp), k = tp.findIndex((p, i) => !S.path[i] || S.path[i].s !== p.s);
+    toast(`Не сходится: образец ${sp.code} — не ${GRP[o.leaf].name.toLowerCase()}. Перечитайте его признаки на шаге ${(k < 0 ? 0 : tp[k].c) + 1}.`);
+    S.path = []; S.step = 0;
+  }
+  update();
+}
+function stepBack() { if (S.ok[S.cur] || !S.path.length) return; const p = S.path.pop(); S.step = p.c; update(); }
+
+// ---------- drawing helpers ----------
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4000" fill="url(#tile)"/>`;
+}
+const T = (x, y, s, size, fill, extra = '') => `<text class="lbl" x="${f(x)}" y="${f(y)}" font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+
+// ---------- lesson 1 scene ----------
+const CW = 100, CH = 50, BW = 168, BH = 196, BY = 132;
+const HOME = [4, 0, 7, 2, 5, 8, 1, 6, 3];
+const homeXY = c => { const k = HOME[c]; return k < 5 ? [k * 105, 6] : [52 + (k - 5) * 105, 64]; };
+const binXY = b => [2 + b * 176, BY];
+const binOf = c => S.mode === 'art' ? ENVK.indexOf(ANI[c].env) : S.bin[c];
+const chipStep = b => Math.min(30, (BH - 34) / Math.max(1, ANI.filter((_, c) => binOf(c) === b).length));
+const chipXY = c => { const b = binOf(c), [x, y] = binXY(b), k = ANI.filter((_, j) => j < c && binOf(j) === b).length; return [x + 6, y + 28 + k * chipStep(b)]; };
+function cardSVG(c, x, y, sel) {
+  const a = ANI[c];
+  let h = `<g data-drag="c${c}" transform="translate(${f(x)} ${f(y)})"><rect width="${CW}" height="${CH}" rx="10" fill="#1a2438" stroke="${sel ? '#ffb547' : '#56627d'}" stroke-width="${sel ? 2.4 : 1.4}"/>`;
+  h += picG(a.id, 23, CH / 2, 0.78, '#0e1520');
+  a.name.forEach((ln, k) => { h += `<text class="lbl" x="46" y="${f(CH / 2 + 4 + (k - (a.name.length - 1) / 2) * 13)}" font-size="10.5" font-weight="600" fill="#e8ecf4" pointer-events="none">${ln}</text>`; });
+  return h + `</g>`;
+}
+function sortScene() {
+  let h = bench();
+  const art = S.mode === 'art', m = model(), full = S.bin.every(b => b >= 0), solved = m.right === 9;
+  if (!art) for (let c = 0; c < ANI.length; c++) { const [x, y] = homeXY(c); h += `<rect x="${x}" y="${y}" width="${CW}" height="${CH}" rx="10" fill="rgba(160,185,230,.03)" stroke="#26324a" stroke-dasharray="4 3"/>`; }
+  else h += T(260, 50, 'искусственная система: делим по одному признаку — где живёт', 12, '#c3cbdb', 'text-anchor="middle"') + T(260, 72, solved ? 'полоска — настоящий класс: голубая — рыбы, оранжевая — птицы, розовая — звери' : 'сначала разложите животных по классам — тогда здесь будет видно, кто кому родня', 10.5, '#8b96ad', 'text-anchor="middle"');
+  const keys = art ? ENVK : CLSK;
+  keys.forEach((k, b) => {
+    const [x, y] = binXY(b), G = art ? ENV[k] : CLS[k];
+    h += `<g data-hit="bin${b}"><rect x="${x}" y="${y}" width="${BW}" height="${BH}" rx="10" fill="rgba(26,36,56,.85)" stroke="${G.c}" stroke-width="1.6" ${art ? 'stroke-dasharray="6 4"' : ''}/>`;
+    h += `<rect x="${x}" y="${y}" width="${BW}" height="22" rx="10" fill="${G.c}" opacity=".18"/><text class="lbl" x="${x + BW / 2}" y="${y + 15}" font-size="11.5" font-weight="600" fill="${G.c}" text-anchor="middle">${G.name}</text></g>`;
+  });
+  for (let c = 0; c < ANI.length; c++) {
+    if (binOf(c) < 0 || (drag && drag.kind === 'c' + c && drag.moved)) continue;
+    const [x, y] = chipXY(c), st = chipStep(binOf(c)), ch = st - 3, fs = Math.min(11, ch * .5), sel = S.csel === c;
+    const ok = !art && CLSK[S.bin[c]] === ANI[c].cls;
+    const stroke = sel ? '#ffb547' : art ? '#3a4762' : full ? (ok ? '#86e0a8' : '#ff8a73') : '#3a4762';
+    h += `<g data-drag="c${c}"><rect x="${x}" y="${f(y)}" width="${BW - 12}" height="${f(ch)}" rx="${f(Math.min(7, ch / 3))}" fill="#121a28" stroke="${stroke}" stroke-width="${sel ? 2 : 1.2}"/>`;
+    if (art && solved) h += `<rect x="${x + 1}" y="${f(y + 1)}" width="5" height="${f(ch - 2)}" rx="2.5" fill="${CLS[ANI[c].cls].c}"/>`;
+    if (ch >= 20) h += picG(ANI[c].id, x + 20, y + ch / 2, ch / 52, null);
+    h += `<text class="lbl" x="${x + (ch >= 20 ? 38 : 10)}" y="${f(y + ch / 2 + fs * .36)}" font-size="${f(fs)}" fill="#e8ecf4" pointer-events="none">${ANI[c].short}</text>`;
+    if (!art && full) h += `<text x="${x + BW - 22}" y="${f(y + ch / 2 + fs * .38)}" font-size="${f(fs + 1)}" fill="${ok ? '#86e0a8' : '#ff8a73'}" text-anchor="middle" pointer-events="none">${ok ? '✓' : '✗'}</text>`;
+    h += `</g>`;
+  }
+  if (!art) for (let c = 0; c < ANI.length; c++) {
+    if (S.bin[c] >= 0 || (drag && drag.kind === 'c' + c && drag.moved)) continue;
+    const [x, y] = homeXY(c); h += cardSVG(c, x, y, S.csel === c);
+  }
+  if (!art && full && solved) h += T(260, 346, 'Естественная система: внутри класса общий план строения', 10.5, '#86e0a8', 'text-anchor="middle"');
+  if (drag && drag.kind[0] === 'c' && drag.moved) { const c = +drag.kind.slice(1); h += cardSVG(c, drag.px + drag.dx, drag.py + drag.dy, true); }
+  return h;
+}
+
+// ---------- lesson 2 scene: the ladder ----------
+const RY = r => 64 + r * 40, SLX = r => 207 - (222 - r * 14) / 2, SLW = r => 222 - r * 14;
+const POOLX = 334, POOLW = 186;
+function poolKeys() {
+  const o = ORGS[S.org], ks = o.path.filter(k => !S.placed[k]).concat(o.extra);
+  const hsh = k => [...k].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) % 997, 7);
+  return ks.sort((a, b) => hsh(a) - hsh(b));
+}
+const chipPos = k => { const i = poolKeys().indexOf(k); return [POOLX, 64 + i * 31]; };
+function chipSVG(k, x, y, sel) {
+  const t = TX[k];
+  return `<g data-drag="k:${k}" transform="translate(${f(x)} ${f(y)})"><rect width="${POOLW}" height="28" rx="8" fill="#1a2438" stroke="${sel ? '#ffb547' : '#56627d'}" stroke-width="${sel ? 2.2 : 1.2}"/>` +
+    `<text class="lbl" x="10" y="12.5" font-size="11" font-weight="600" fill="#e8ecf4" pointer-events="none">${t.ru}</text><text class="lbl" x="10" y="23.5" font-size="9" font-style="italic" fill="#8b96ad" pointer-events="none">${t.la}</text></g>`;
+}
+function ranksScene(t) {
+  let h = bench();
+  const o = ORGS[S.org], RN = o.plant ? RANK_P : RANK_A;
+  ORGS.forEach((q, i) => {
+    const x = i * 130 + 2, cur = i === S.org, n = ladderN(i);
+    h += `<g data-hit="o${i}"><rect x="${x}" y="2" width="124" height="42" rx="10" fill="${cur ? '#1a2438' : 'rgba(26,36,56,.5)'}" stroke="${cur ? '#ffb547' : n === 7 ? '#86e0a8' : '#3a4762'}" stroke-width="${cur ? 2.2 : 1.3}"/>`;
+    h += picG(q.id, x + 22, 23, 0.72, '#0e1520') + T(x + 44, 21, q.name, 12, '#e8ecf4', 'font-weight="600" pointer-events="none"') + T(x + 44, 35, n === 7 ? '✓ готово' : `${n} / 7`, 10, n === 7 ? '#86e0a8' : '#8b96ad', 'pointer-events="none"') + `</g>`;
+  });
+  for (let r = 0; r < 7; r++) {
+    const y = RY(r), x = SLX(r), w = SLW(r), k = o.path[r], fill = !!S.placed[k], fl = S.flash && S.flash.k === k && !reduce && t - S.flash.t < 900;
+    h += T(2, y + 21, RN[r], 11, '#8b96ad');
+    h += `<g data-hit="r${r}"><rect x="${f(x)}" y="${y}" width="${f(w)}" height="34" rx="8" fill="${fill ? (fl ? '#2a4a3a' : '#16302a') : S.ksel ? 'rgba(255,181,71,.07)' : 'rgba(160,185,230,.03)'}" stroke="${fill ? '#86e0a8' : S.ksel ? '#ffb547' : '#3a4762'}" stroke-width="${fill ? 1.5 : 1.2}" ${fill ? '' : 'stroke-dasharray="5 4"'}/>`;
+    if (fill) {
+      const tx = TX[k], sh = ORGS.filter((q, i) => i !== S.org && q.path[r] === k);
+      h += T(x + 10, y + 15, tx.ru, 11.5, '#e8ecf4', 'font-weight="600" pointer-events="none"') + T(x + 10, y + 28, tx.la, 9.5, '#8b96ad', 'font-style="italic" pointer-events="none"');
+      sh.forEach((q, j) => { h += picG(q.id, x + w - 14 - j * 22, y + 17, 0.4, '#0e1520'); });
+    } else h += T(x + w / 2, y + 21, '?', 13, '#56627d', 'text-anchor="middle" pointer-events="none"');
+    h += `</g>`;
+  }
+  h += `<path d="M98 ${RY(0) - 4}V${RY(6) + 38}" stroke="#26324a" stroke-width="1"/>`;
+  const pk = poolKeys();
+  h += T(POOLX, 59, pk.length > o.extra.length ? 'названия — перетащите на ступень' : 'лишние названия — не подходят', 10, '#8b96ad');
+  pk.forEach(k => { if (drag && drag.kind === 'k:' + k && drag.moved) return; const [x, y] = chipPos(k); h += chipSVG(k, x, y, S.ksel === k); });
+  if (ladderN(S.org) === 7) {
+    const y0 = 64 + pk.length * 31 + 10, others = ORGS.map((q, i) => i).filter(i => i !== S.org);
+    h += `<rect x="${POOLX}" y="${y0}" width="${POOLW}" height="${22 + others.length * 18}" rx="10" fill="rgba(18,26,40,.9)" stroke="#26324a"/>` + T(POOLX + 10, y0 + 16, `общих ступеней у ${o.gen}:`, 10.5, '#c3cbdb');
+    others.forEach((i, j) => { const n = shared(S.org, i); h += T(POOLX + 10, y0 + 34 + j * 18, `с ${ORGS[i].name.toLowerCase() === 'роза' ? 'розой' : ORGS[i].name.toLowerCase() === 'человек' ? 'человеком' : ORGS[i].name.toLowerCase() === 'собака' ? 'собакой' : 'волком'}`, 10.5, '#8b96ad') + T(POOLX + POOLW - 10, y0 + 34 + j * 18, `${n} из 7`, 10.5, n >= 5 ? '#86e0a8' : n ? '#ffb547' : '#ff8a73', 'text-anchor="end"'); });
+  }
+  if (drag && drag.kind.startsWith('k:') && drag.moved) h += chipSVG(drag.kind.slice(2), drag.px + drag.dx, drag.py + drag.dy, true);
+  return h;
+}
+
+// ---------- lesson 3 scene: matching names ----------
+const LW = 200, RX = 320, RW = 200, ROWY = i => 2 + i * 34;
+function namesScene(t) {
+  let h = bench();
+  // matched lines
+  PAIRS.forEach((p, i) => {
+    if (!S.match[i]) return;
+    const k = RORD.indexOf(i), y1 = ROWY(i) + 15, y2 = ROWY(k) + 15;
+    h += `<path d="M${LW} ${y1}C${LW + 50} ${y1} ${RX - 50} ${y2} ${RX} ${y2}" stroke="#86e0a8" stroke-width="2" fill="none" opacity=".8"/>`;
+  });
+  PAIRS.forEach((p, i) => {
+    const y = ROWY(i), m = S.match[i], sel = S.lsel === i;
+    h += `<g data-drag="L${i}"><rect x="0" y="${y}" width="${LW}" height="30" rx="9" fill="${m ? '#16302a' : '#1a2438'}" stroke="${sel ? '#ffb547' : m ? '#86e0a8' : '#56627d'}" stroke-width="${sel ? 2.2 : 1.3}"/>`;
+    h += picG(p.id, 16, y + 15, 0.52, '#0e1520') + T(34, y + 19, p.ru, 11, '#e8ecf4', 'font-weight="600" pointer-events="none"');
+    h += `<circle cx="${LW}" cy="${y + 15}" r="4" fill="${m ? '#86e0a8' : sel ? '#ffb547' : '#56627d'}"/></g>`;
+  });
+  RORD.forEach((j, k) => {
+    const y = ROWY(k), p = PAIRS[j], m = S.match[j], fl = S.flash && S.flash.k === j && !reduce && t - S.flash.t < 900, [g, e] = p.la.split(' ');
+    h += `<g data-hit="R${k}"><rect x="${RX}" y="${y}" width="${RW}" height="30" rx="9" fill="${m ? (fl ? '#2a4a3a' : '#16302a') : S.info === j ? '#22304a' : '#1a2438'}" stroke="${m ? '#86e0a8' : S.info === j ? '#72d4e8' : '#56627d'}" stroke-width="1.3"/>`;
+    h += `<circle cx="${RX}" cy="${y + 15}" r="4" fill="${m ? '#86e0a8' : '#56627d'}"/>`;
+    h += `<text class="lbl" x="${RX + 14}" y="${y + 19.5}" font-size="12.5" font-style="italic" fill="#e8ecf4" pointer-events="none"><tspan font-weight="600" fill="#72d4e8">${g}</tspan> ${e}</text></g>`;
+  });
+  if (drag && drag.kind[0] === 'L' && drag.moved) { const i = +drag.kind.slice(1), y1 = ROWY(i) + 15; h += `<path d="M${LW} ${y1}L${f(drag.px)} ${f(drag.py)}" stroke="#ffb547" stroke-width="2" stroke-dasharray="6 4" pointer-events="none"/><circle cx="${f(drag.px)}" cy="${f(drag.py)}" r="5" fill="#ffb547" pointer-events="none"/>`; }
+  // info box
+  const y = 282;
+  h += `<rect x="0" y="${y}" width="520" height="60" rx="12" fill="rgba(18,26,40,.9)" stroke="#26324a"/>`;
+  if (S.info >= 0) {
+    const p = PAIRS[S.info];
+    h += `<text class="lbl" x="14" y="${y + 21}" font-size="13" font-style="italic" fill="#e8ecf4">${p.la}</text>` + T(170, y + 21, S.match[S.info] ? '— ' + p.ru.toLowerCase() : '', 12, '#86e0a8');
+    h += T(14, y + 38, 'род: ' + p.g, 10.5, '#c3cbdb') + T(14, y + 53, 'вид: ' + (S.match[S.info] ? p.e : 'перевод откроется, когда найдёте пару'), 10.5, S.match[S.info] ? '#c3cbdb' : '#8b96ad');
+  } else {
+    h += T(14, y + 21, 'Одно животное — много имён:', 11.5, '#e8ecf4', 'font-weight="600"');
+    h += T(14, y + 38, 'волк · wolf (англ.) · Wolf (нем.) · loup (фр.) · lobo (исп.) · 狼 (кит.) · オオカミ (яп.)', 10.5, '#c3cbdb');
+    h += `<text class="lbl" x="14" y="${y + 53}" font-size="10.5" fill="#8b96ad">а учёные всех стран пишут одно: <tspan font-style="italic" fill="#72d4e8">Canis lupus</tspan></text>`;
+  }
+  return h;
+}
+
+// ---------- lesson 4 scene: key and tree ----------
+const KY = c => 168 + c * 35.5;
+function keyScene(t) {
+  let h = bench();
+  SPECS.forEach((sp, i) => {
+    const x = i * 87.6, sel = S.cur === i, ok = S.ok[i];
+    h += `<g data-hit="s${i}"><rect x="${f(x)}" y="2" width="82" height="56" rx="10" fill="${ok ? GRP[sp.grp].c + '22' : '#1a2438'}" stroke="${sel ? '#ffb547' : ok ? GRP[sp.grp].c : '#3a4762'}" stroke-width="${sel ? 2.4 : 1.3}"/>`;
+    h += picG(sp.id, x + 41, 22, 0.62, '#0e1520') + T(x + 41, 52, ok ? sp.name : 'Образец ' + sp.code, ok && sp.name.length > 12 ? 8.6 : 10.5, ok ? '#e8ecf4' : '#c3cbdb', 'text-anchor="middle" font-weight="600" pointer-events="none"') + `</g>`;
+  });
+  // observations
+  const sp = SPECS[S.cur], oy = 68;
+  h += `<rect x="0" y="${oy}" width="282" height="84" rx="12" fill="rgba(18,26,40,.9)" stroke="#26324a"/>`;
+  h += T(12, oy + 18, `Образец ${sp.code}${S.ok[S.cur] ? ' — ' + sp.name.toLowerCase() : ''} · признаки`, 11.5, '#e8ecf4', 'font-weight="600"');
+  sp.obs.forEach((ln, j) => { h += T(12, oy + 35 + j * 13.5, '• ' + ln, 10.5, '#c3cbdb'); });
+  // key
+  h += T(2, 164, 'Определитель', 10, '#8b96ad');
+  const done = S.ok[S.cur], tp = done ? truePath(sp.grp) : S.path;
+  DKEY.forEach((cp, c) => {
+    ['a', 'b'].forEach((s, j) => {
+      const y = KY(c) + j * 17, o = cp[s], chosen = tp.some(p => p.c === c && p.s === s), active = !done && c === S.step;
+      const res = o.go !== undefined ? '→ ' + (o.go + 1) : '→ ' + GRP[o.leaf].name;
+      h += `<g data-hit="q${c}${s}"><rect x="0" y="${y}" width="282" height="16" rx="5" fill="${chosen ? 'rgba(134,224,168,.14)' : active ? 'rgba(255,181,71,.10)' : 'transparent'}" stroke="${active ? '#ffb547' : chosen ? '#86e0a8' : 'none'}" stroke-width="1"/>`;
+      const col = chosen ? '#e8ecf4' : active ? '#e8ecf4' : '#6b768d';
+      h += T(6, y + 12, `${c + 1}${LET[j]}`, 10, active ? '#ffb547' : chosen ? '#86e0a8' : '#56627d', 'font-weight="600" pointer-events="none"') + T(26, y + 12, o.t, 10, col, 'pointer-events="none"');
+      h += T(276, y + 12, res, 10, o.leaf ? (chosen || active ? GRP[o.leaf].c : '#56627d') : col, 'text-anchor="end" pointer-events="none"') + `</g>`;
+    });
+  });
+  // tree of life
+  const X0 = 296;
+  h += `<rect x="${X0 - 6}" y="68" width="${526 - X0}" height="274" rx="12" fill="rgba(18,26,40,.6)" stroke="#26324a"/>`;
+  h += T(X0 + 4, 86, 'Древо жизни по генам рРНК', 11, '#e8ecf4', 'font-weight="600"');
+  const node = (x, y, kids, col) => kids.map(([cx, cy, cc]) => `<path d="M${x} ${f(y)}V${f(cy)}H${cx}" stroke="${cc || col}" stroke-width="2.2" fill="none"/>`).join('');
+  const FA = [404, (TREE.fungi + TREE.anim) / 2], EU = [372, (TREE.prot + FA[1]) / 2], AE = [340, (TREE.arch + EU[1]) / 2], RT = [312, (TREE.bact + AE[1]) / 2];
+  h += `<path d="M${X0} ${f(RT[1])}H${RT[0]}" stroke="#c3cbdb" stroke-width="2.2"/>`;
+  h += node(RT[0], RT[1], [[LX, TREE.bact, GRP.bact.c], [AE[0], AE[1], '#c3cbdb']]);
+  h += node(AE[0], AE[1], [[LX, TREE.arch, GRP.arch.c], [EU[0], EU[1], '#86e0a8']]);
+  h += node(EU[0], EU[1], [[LX, TREE.prot], [LX, TREE.plant], [FA[0], FA[1]]], '#86e0a8');
+  h += node(FA[0], FA[1], [[LX, TREE.fungi], [LX, TREE.anim]], '#86e0a8');
+  h += T(EU[0] + 4, (TREE.plant + FA[1]) / 2 + 2, 'эукариоты', 9, '#86e0a8') + T(X0 + 4, 100, 'корень слева — общий предок всего живого', 8.6, '#8b96ad') + `<circle cx="${X0}" cy="${f(RT[1])}" r="3" fill="#c3cbdb"/>`;
+  Object.keys(TREE).forEach(g => {
+    const y = TREE[g], i = SPECS.findIndex(s => s.grp === g), ok = S.ok[i], fl = S.flash && S.flash.k === g && !reduce && t - S.flash.t < 1200;
+    if (fl) h += `<circle cx="${LX}" cy="${y}" r="${f(15 + 8 * (t - S.flash.t) / 1200)}" fill="none" stroke="${GRP[g].c}" opacity="${f(1 - (t - S.flash.t) / 1200)}"/>`;
+    h += ok ? picG(SPECS[i].id, LX, y, 0.5, '#0e1520') + `<circle cx="${LX}" cy="${y}" r="12" fill="none" stroke="${GRP[g].c}" stroke-width="1.6"/>` : `<circle cx="${LX}" cy="${y}" r="4" fill="${GRP[g].c}"/>`;
+    h += T(LX + 16, y + 1, GRP[g].name, 11, ok ? '#e8ecf4' : '#c3cbdb', 'font-weight="600"') + T(LX + 16, y + 13, ok ? SPECS[i].name.toLowerCase() : GRP[g].dom, 8.6, ok ? GRP[g].c : '#8b96ad');
+  });
+  return h;
+}
+
+function hlBox(id) {
+  const L = LID();
+  if (L === 'why') { const b = CLSK.indexOf(id); if (b >= 0) { const [x, y] = binXY(b); return [x - 3, y - 3, BW + 6, BH + 6]; } return { cards: [0, 2, 520, 116], art: [0, 128, 520, 206] }[id]; }
+  if (L === 'ranks') return { tabs: [0, 0, 520, 46], ladder: [0, 50, 322, 284], pool: [POOLX - 4, 40, POOLW + 8, 300], icons: [SLX(0) + SLW(0) - 60, RY(0), 60, 36] }[id];
+  if (L === 'names') return { left: [-3, -1, LW + 6, 274], right: [RX - 3, -1, RW + 6, 274], info: [-3, 279, 526, 66] }[id];
+  return { specs: [-3, -1, 526, 62], obs: [-3, 65, 288, 86], key: [-3, 144, 288, 196], tree: [287, 65, 236, 280] }[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = id === 'why' ? sortScene() : id === 'ranks' ? ranksScene(t) : id === 'names' ? namesScene(t) : keyScene(t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit: the scene content (520 × 350 units) goes into the biggest free region — below the task card and the meter, or beside them
+const taskEl = document.querySelector('#stage .task'), meterEl = $('#meter');
+const CB = { x: 0, y: 0, w: 522, h: 350 };
+let fitLater = false;
+function fit() {
+  if (drag) { fitLater = true; return; } // never move the scene under the pointer mid-drag
+  fitLater = false;
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const tr = taskEl.getBoundingClientRect(), mr = meterEl.getBoundingClientRect();
+  const tB = tr.height ? tr.bottom - rc.top + 8 : 0, tR = tr.width ? tr.right - rc.left + 8 : 0;
+  const mB = mr.height ? mr.bottom - rc.top + 8 : 0, mL = mr.width ? mr.left - rc.left - 8 : w;
+  const regs = [[0, Math.max(tB, mB), w, hh - Math.max(tB, mB)], [tR, mB, w - tR, hh - mB], [tR, 0, mL - tR, hh], [0, tB, mL, hh - tB]];
+  let best = null;
+  regs.forEach(r => { if (r[2] <= 40 || r[3] <= 40) return; const s = Math.min((r[2] - 16) / CB.w, (r[3] - 8) / CB.h, 1.6); if (!best || s > best.s) best = { s, r }; });
+  if (!best) best = { s: Math.min(w / CB.w, hh / CB.h), r: [0, 0, w, hh] };
+  const s = best.s, r = best.r;
+  const left = r[0] + (r[2] - CB.w * s) / 2, top = r[1] + (r[3] - CB.h * s) / 2;
+  const vw = w / s, vh = hh / s, vx = CB.x - left / s, vy = CB.y - top / s;
+  scene.setAttribute('viewBox', `${vx.toFixed(1)} ${vy.toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}`);
+  dirty = true;
+}
+
+// ---------- pointer: taps and dragging ----------
+let drag = null, dirty = true;
+const ro = new ResizeObserver(() => fit());
+ro.observe(scene); ro.observe(taskEl); ro.observe(meterEl);
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const binAt = p => { for (let b = 0; b < 3; b++) { const [x, y] = binXY(b); if (p.x > x - 4 && p.x < x + BW + 4 && p.y > y - 10 && p.y < y + BH + 6) return b; } return -1; };
+const rungAt = p => { for (let r = 0; r < 7; r++) { const y = RY(r); if (p.x > 90 && p.x < 330 && p.y > y - 3 && p.y < y + 37) return r; } return -1; };
+const rowAt = p => { if (p.x < RX - 30 || p.x > RX + RW + 10) return -1; const k = Math.floor((p.y - 2 + 2) / 34); return k >= 0 && k < 8 ? k : -1; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag],[data-hit]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  const p = toSvg(e);
+  if (el.dataset.drag) {
+    const kind = el.dataset.drag;
+    drag = { kind, px: p.x, py: p.y, sx: p.x, sy: p.y, x: e.clientX, y: e.clientY, moved: false, dx: -CW / 2, dy: -CH / 2 };
+    if (kind[0] === 'c') { const c = +kind.slice(1); if (S.bin[c] < 0 && S.mode === 'nat') { const [x, y] = homeXY(c); drag.dx = x - p.x; drag.dy = y - p.y; } }
+    if (kind.startsWith('k:')) { const [x, y] = chipPos(kind.slice(2)); drag.dx = x - p.x; drag.dy = y - p.y; }
+    scene.classList.add('grabbing');
+  } else drag = { kind: 'hit', hit: el.dataset.hit, x: e.clientX, y: e.clientY, moved: false };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) drag.moved = true;
+  if (drag.kind === 'hit' || !drag.moved) return;
+  if (drag.kind[0] === 'c' && S.mode === 'art') return;
+  const p = toSvg(e); drag.px = p.x; drag.py = p.y; dirty = true;
+});
+function endDrag(cancel) {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing');
+  if (fitLater) fit();
+  if (cancel) { dirty = true; return; }
+  const k = d.kind;
+  if (k[0] === 'c') {
+    const c = +k.slice(1);
+    if (!d.moved) { if (S.mode === 'nat') S.csel = S.csel === c ? -1 : c; S.look = c; update(); return; }
+    if (S.mode === 'art') { dropAni(c, -1); return; }
+    dropAni(c, binAt({ x: d.px, y: d.py }));
+    return;
+  }
+  if (k.startsWith('k:')) {
+    const key = k.slice(2);
+    if (!d.moved) { S.ksel = S.ksel === key ? null : key; dirty = true; return; }
+    const r = rungAt({ x: d.px, y: d.py }); if (r >= 0) place(key, r); else dirty = true;
+    return;
+  }
+  if (k[0] === 'L') {
+    const i = +k.slice(1);
+    if (!d.moved) { S.lsel = S.lsel === i ? -1 : i; dirty = true; return; }
+    const r = rowAt({ x: d.px, y: d.py }); if (r >= 0) tryMatch(i, RORD[r]); else dirty = true;
+    return;
+  }
+  if (d.moved) return;
+  tap(d.hit);
+}
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function tap(id) {
+  const L = LID();
+  if (L === 'why' && id.startsWith('bin')) { if (S.mode === 'art') { toast('Здесь группы собраны по среде обитания — по одному признаку.'); return; } if (S.csel >= 0) dropAni(S.csel, +id.slice(3)); else toast('Сначала нажмите на карточку с животным, потом на коробку.'); }
+  if (L === 'ranks') {
+    if (id[0] === 'o') pickOrg(+id.slice(1));
+    if (id[0] === 'r') { const r = +id.slice(1); if (S.ksel) place(S.ksel, r); else if (!S.placed[ORGS[S.org].path[r]]) toast('Сначала нажмите на название справа, потом на ступень.'); }
+  }
+  if (L === 'names' && id[0] === 'R') { const j = RORD[+id.slice(1)]; if (S.lsel >= 0) tryMatch(S.lsel, j); else { S.info = j; update(); } }
+  if (L === 'key') {
+    if (id[0] === 's') pickSpec(+id.slice(1));
+    if (id[0] === 'q') answer(+id[1], id[2]);
+  }
+}
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  let anim = !!S.hl;
+  if (S.flash && !reduce && t - S.flash.t < 1250) anim = true;
+  if (dirty || anim) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3200); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, c) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${c ? `<i style="background:${c}"></i>` : ''}${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    why: B('nat', 'Естественная: по строению', S.mode === 'nat') + B('art', 'Искусственная: по среде', S.mode === 'art') + sep + B('reset', 'Убрать карточки'),
+    ranks: ORGS.map((o, i) => B('org-' + i, o.name, S.org === i)).join('') + sep + B('reset', 'Сбросить'),
+    names: B('reset', 'Начать заново'),
+    key: B('back', 'Шаг назад') + B('restart', 'Определять заново') + sep + B('reset', 'Сбросить всё'),
+  }[id];
+  placeHint();
+}
+function placeHint() {
+  const hn = $('#hint'), st = $('#stage').getBoundingClientRect(), tb = $('#tools').getBoundingClientRect();
+  hn.style.visibility = tb.left - st.left < st.width * 0.19 + 30 ? 'hidden' : '';
+}
+addEventListener('resize', placeHint);
+function act(a) {
+  if (a === 'nat' || a === 'art') return setMode(a);
+  if (a.startsWith('org-')) return pickOrg(+a.slice(4));
+  if (a === 'back') return stepBack();
+  if (a === 'restart') { if (S.ok[S.cur]) toast('Этот образец уже определён. Выберите другой сверху.'); S.path = []; S.step = 0; update(); return; }
+  if (a === 'reset') { const keep = { org: S.org, cur: S.cur }; resetLesson(); if (LID() === 'ranks') S.org = keep.org; renderTools(); update(); return; }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons for the Details tab ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const dot = c => IC(`<circle cx="17" cy="17" r="11" fill="${c}" opacity=".85"/><circle cx="17" cy="17" r="4" fill="#0b1019"/>`);
+const picIC = id => `<svg viewBox="-24 -24 48 48" aria-hidden="true"><circle r="23" fill="#0e1520"/>${PIC[id]}</svg>`;
+const ICON = {
+  cards: IC('<rect x="3" y="7" width="18" height="13" rx="3" fill="#1a2438" stroke="#56627d"/><rect x="13" y="14" width="18" height="13" rx="3" fill="#1a2438" stroke="#ffb547"/>'),
+  art: IC('<rect x="3" y="6" width="28" height="22" rx="4" fill="none" stroke="#c3cbdb" stroke-dasharray="3 2"/><path d="M8 14h18M8 20h12" stroke="#5fb4d9" stroke-width="2"/>'),
+  tabs: IC('<rect x="2" y="10" width="9" height="14" rx="3" fill="#1a2438" stroke="#ffb547"/><rect x="13" y="10" width="9" height="14" rx="3" fill="#1a2438" stroke="#56627d"/><rect x="24" y="10" width="8" height="14" rx="3" fill="#1a2438" stroke="#56627d"/>'),
+  ladder: IC('<rect x="4" y="4" width="26" height="5" rx="2" fill="#86e0a8"/><rect x="7" y="12" width="20" height="5" rx="2" fill="#86e0a8"/><rect x="10" y="20" width="14" height="5" rx="2" fill="none" stroke="#56627d" stroke-dasharray="2 2"/><rect x="13" y="28" width="8" height="4" rx="2" fill="none" stroke="#56627d"/>'),
+  pool: IC('<rect x="5" y="5" width="24" height="9" rx="3" fill="#1a2438" stroke="#56627d"/><rect x="5" y="19" width="24" height="9" rx="3" fill="#1a2438" stroke="#ffb547"/>'),
+  left: IC('<rect x="3" y="6" width="22" height="8" rx="3" fill="#1a2438" stroke="#56627d"/><rect x="3" y="19" width="22" height="8" rx="3" fill="#16302a" stroke="#86e0a8"/><circle cx="27" cy="23" r="2.5" fill="#86e0a8"/>'),
+  right: IC('<text x="4" y="21" font-size="13" font-style="italic" fill="#72d4e8" font-family="serif">Aa</text><text x="19" y="21" font-size="13" font-style="italic" fill="#e8ecf4" font-family="serif">b</text>'),
+  info: IC('<rect x="4" y="5" width="26" height="24" rx="4" fill="#1a2438" stroke="#56627d"/><path d="M9 12h16M9 17h16M9 22h10" stroke="#8b96ad" stroke-width="1.6"/>'),
+  specs: IC('<rect x="3" y="8" width="8" height="18" rx="2" fill="#1a2438" stroke="#ffb547"/><rect x="13" y="8" width="8" height="18" rx="2" fill="#1a2438" stroke="#56627d"/><rect x="23" y="8" width="8" height="18" rx="2" fill="#1a2438" stroke="#56627d"/>'),
+  key: IC('<path d="M6 8h22M6 13h22M6 21h22M6 26h22" stroke="#8b96ad" stroke-width="2"/><rect x="4" y="5" width="26" height="11" rx="3" fill="none" stroke="#ffb547"/>'),
+  tree: IC('<path d="M4 17H9V7H30M9 17V24H14V20H30M14 24V28H30" stroke="#86e0a8" stroke-width="2" fill="none"/><path d="M9 7H30" stroke="#72d4e8" stroke-width="2"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'why') return (m.placed < 9 ? `Разложено ${m.placed} из 9` : `Верно ${m.right} из 9`) + ` · искусственная: ${S.sawArt ? 'да' : 'нет'}`;
+  if (m.kind === 'ranks') return `Ступеней ${m.placed} из ${ALLTX.length} · лестниц ${m.full} из 4`;
+  if (m.kind === 'names') return `Пар ${m.matched} из 8 · ошибок ${S.miss}`;
+  return `Определено ${m.ok} из 6`;
+}
+
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'why') h = `<h2>Две системы</h2><p class="note">Переключите систему и сравните группы. Нажмите на животное — увидите его признаки.</p>
+      <div class="ctl"><div class="lbl">Система</div><div class="chips" id="mChips"><button data-k="nat">Естественная: по строению</button><button data-k="art">Искусственная: по среде</button></div></div>
+      <dl class="reads"><div><dt>Разложено</dt><dd id="r1"></dd></div><div><dt>Верно</dt><dd id="r2"></dd></div><div><dt>Выбрано</dt><dd id="r3"></dd></div></dl>
+      <h3>В коробках</h3><div class="steps" id="binList"></div>
+      <div class="row"><button class="ghostbtn" data-a="reset">Убрать карточки</button></div>`;
+  if (id === 'ranks') h = `<h2>Лестница рангов</h2>
+      <div class="ctl"><div class="lbl">Организм</div><div class="chips" id="oChips">${ORGS.map((o, i) => `<button data-i="${i}">${o.name}</button>`).join('')}</div></div>
+      <dl class="reads"><div><dt>Эта лестница</dt><dd id="r1"></dd></div><div><dt>Все названия</dt><dd id="r2"></dd></div><div><dt>Ошибок</dt><dd id="r3"></dd></div></dl>
+      <h3>Общие ступени</h3><p class="note">Показываются, когда готовы обе лестницы.</p><div class="steps" id="shList"></div>
+      <div class="row"><button class="ghostbtn" data-a="reset">Сбросить</button></div>`;
+  if (id === 'names') h = `<h2>Пары названий</h2><p class="note">Нажмите на латинское название на столе — внизу появится перевод рода.</p>
+      <dl class="reads"><div><dt>Пар</dt><dd id="r1"></dd></div><div><dt>Ошибок</dt><dd id="r2"></dd></div><div><dt>Родов</dt><dd id="r3"></dd></div></dl>
+      <h3>Найденные пары</h3><div class="steps" id="pList"></div>
+      <div class="row"><button class="ghostbtn" data-a="reset">Начать заново</button></div>`;
+  if (id === 'key') h = `<h2>Определение</h2>
+      <div class="ctl"><div class="lbl">Образец</div><div class="chips" id="sChips">${SPECS.map((s, i) => `<button data-i="${i}">${s.code}</button>`).join('')}</div></div>
+      <dl class="reads"><div><dt>Определено</dt><dd id="r1"></dd></div><div><dt>Шаг</dt><dd id="r2"></dd></div><div><dt>Ошибок</dt><dd id="r3"></dd></div></dl>
+      <h3>Путь по определителю</h3><div class="steps" id="kList"></div>
+      <div class="row"><button class="ghostbtn" data-a="back">Шаг назад</button><button class="ghostbtn" data-a="restart">Определять заново</button></div>`;
+  el.innerHTML = h;
+  el.querySelectorAll('#mChips button').forEach(b => b.onclick = () => setMode(b.dataset.k));
+  el.querySelectorAll('#oChips button').forEach(b => b.onclick = () => pickOrg(+b.dataset.i));
+  el.querySelectorAll('#sChips button').forEach(b => b.onclick = () => pickSpec(+b.dataset.i));
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, html = (s, v) => { const x = el.querySelector(s); if (x) x.innerHTML = v; };
+  if (m.kind === 'why') {
+    el.querySelectorAll('#mChips button').forEach(b => b.setAttribute('aria-pressed', S.mode === b.dataset.k));
+    set('#r1', `${m.placed} из 9`); set('#r2', m.placed === 9 ? `${m.right} из 9` : '—'); set('#r3', S.look >= 0 ? ANI[S.look].short : '—');
+    const keys = S.mode === 'art' ? ENVK : CLSK;
+    html('#binList', keys.map((k, b) => step((S.mode === 'art' ? ENV : CLS)[k].name, ANI.filter((_, c) => binOf(c) === b).map(a => a.short).join(', ') || '—')).join(''));
+  } else if (m.kind === 'ranks') {
+    el.querySelectorAll('#oChips button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.i === S.org));
+    set('#r1', `${m.lad} из 7`); set('#r2', `${m.placed} из ${ALLTX.length}`); set('#r3', String(S.miss));
+    const pairs = []; for (let a = 0; a < 4; a++) for (let b = a + 1; b < 4; b++) pairs.push([a, b]);
+    html('#shList', pairs.map(([a, b]) => step(`${ORGS[a].name} и ${ORGS[b].name.toLowerCase()}`, ladderN(a) === 7 && ladderN(b) === 7 ? `${shared(a, b)} из 7` : '?')).join(''));
+  } else if (m.kind === 'names') {
+    set('#r1', `${m.matched} из 8`); set('#r2', String(S.miss)); set('#r3', String(new Set(PAIRS.map(p => p.la.split(' ')[0])).size));
+    html('#pList', PAIRS.filter((_, i) => S.match[i]).map(p => step(p.ru, `<i>${p.la}</i>`)).join('') || '<p class="note">Пока ни одной.</p>');
+  } else {
+    el.querySelectorAll('#sChips button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.i === S.cur));
+    set('#r1', `${m.ok} из 6`); set('#r2', S.ok[S.cur] ? 'готово' : String(S.step + 1)); set('#r3', String(S.miss));
+    const tp = S.ok[S.cur] ? truePath(SPECS[S.cur].grp) : S.path;
+    html('#kList', tp.map(p => { const o = DKEY[p.c][p.s]; return step(`${p.c + 1}${LET[p.s === 'a' ? 0 : 1]}. ${o.t}`, o.go !== undefined ? '→ ' + (o.go + 1) : GRP[o.leaf].name); }).join('') || '<p class="note">Выберите строку 1а или 1б на столе.</p>');
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'why') return [
+    { id: 'cards', icon: ICON.cards, name: 'Карточки животных', spec: 'Нажмите карточку — признаки строения появятся справа вверху.' },
+    ...CLSK.map(k => ({ id: k, icon: dot(CLS[k].c), name: CLS[k].name, spec: { fish: 'Чешуя, дышат жабрами, мечут икру или рождают мальков без молока.', bird: 'Перья, клюв, лёгкие с воздушными мешками, насиживают яйца.', mam: 'Шерсть (хотя бы у детёнышей), дышат лёгкими, кормят детёнышей молоком.' }[k] })),
+    { id: 'art', icon: ICON.art, name: 'Искусственная система', spec: 'Кнопка внизу. Группы по одному признаку — где живёт: в воде, в воздухе, на суше.' }];
+  if (id === 'ranks') return [
+    { id: 'tabs', icon: ICON.tabs, name: 'Организмы', spec: 'Волк, собака, роза и человек. Число — сколько ступеней уже заполнено.' },
+    { id: 'ladder', icon: ICON.ladder, name: 'Лестница рангов', spec: 'Сверху царство — самая широкая группа, внизу вид. У растений вместо типа — отдел, вместо отряда — порядок.' },
+    { id: 'pool', icon: ICON.pool, name: 'Названия групп', spec: 'Русское и латинское название. Среди них есть лишние — из чужих лестниц.' },
+    { id: 'icons', icon: picIC('dog'), name: 'Значки родственников', spec: 'На заполненной ступени — кто ещё стоит на ней. Чем ниже значок, тем ближе родство.' }];
+  if (id === 'names') return [
+    { id: 'left', icon: ICON.left, name: 'Русские названия', spec: 'Тяните от правой точки карточки к латинскому названию.' },
+    { id: 'right', icon: ICON.right, name: 'Научные названия', spec: 'Голубое слово с большой буквы — род, второе слово — видовой эпитет.' },
+    { id: 'info', icon: ICON.info, name: 'Перевод', spec: 'Что значит род; перевод эпитета откроется, когда пара найдена.' }];
+  return [
+    { id: 'specs', icon: ICON.specs, name: 'Образцы', spec: 'Шесть неизвестных организмов. После определения появится имя.' },
+    { id: 'obs', icon: ICON.info, name: 'Признаки образца', spec: 'Что видно в микроскоп и что показал анализ ДНК.' },
+    { id: 'key', icon: ICON.key, name: 'Дихотомический определитель', spec: 'Пять шагов по две строки: теза и антитеза. Стрелка ведёт к следующему шагу или к группе.' },
+    { id: 'tree', icon: ICON.tree, name: 'Древо жизни', spec: 'Три домена: бактерии, археи, эукариоты. Археи ближе к эукариотам, грибы — к животным.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на столе</h2><p class="note">Нажмите на строку, чтобы найти это на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'why') {
+    let h = `<h2>Как рассуждать</h2><div class="formula">не где живёт, а как устроено</div><div class="steps">` +
+      step('Чешуя, жабры, икра', 'рыбы') + step('Перья, яйца, клюв', 'птицы') + step('Шерсть, молоко, лёгкие', 'млекопитающие') + `</div>`;
+    if (S.look >= 0) { const a = ANI[S.look]; h += `<h3>${a.short}: признаки</h3><div class="steps">` + step('Покров', a.cover) + step('Дыхание', a.breath) + step('Потомство', a.young) + step('Где живёт', ENV[a.env].name.toLowerCase()) + `</div>`; }
+    h += `<h3>Две системы</h3><div class="steps">` + step('Искусственная', '1 признак, удобно, но не отражает родство') + step('Естественная', 'много признаков, отражает происхождение') + `</div>`;
+    h += `<h3>Сейчас</h3><div class="steps">` + ANI.map((a, c) => step(a.short, S.bin[c] < 0 ? '—' : CLS[CLSK[S.bin[c]]].name + (m.placed === 9 ? (CLSK[S.bin[c]] === a.cls ? ' ✓' : ' ✗') : ''))).join('') +
+      step('итого', m.placed === 9 ? `верно ${m.right} из 9` : `разложено ${m.placed} из 9`, 'sum') + `</div>`;
+    return h;
+  }
+  if (id === 'ranks') {
+    const o = ORGS[S.org], RN = o.plant ? RANK_P : RANK_A;
+    let h = `<h2>Ступени: ${o.name.toLowerCase()}</h2><div class="formula">вид ⊂ род ⊂ семейство ⊂ ${o.plant ? 'порядок' : 'отряд'} ⊂ класс ⊂ ${o.plant ? 'отдел' : 'тип'} ⊂ царство</div><div class="steps">` +
+      o.path.map((k, r) => step(RN[r], S.placed[k] ? `${TX[k].ru} · <i>${TX[k].la}</i>` : '?')).join('') + `</div>`;
+    h += `<h3>Подсказки по латыни</h3><div class="steps">` + step('-idae (животные)', 'семейство: Canidae, Hominidae') + step('-aceae (растения)', 'семейство: Rosaceae') + step('-ales (растения)', 'порядок: Rosales') + step('Два слова', 'вид: Canis lupus') + `</div>`;
+    if (o.id === 'rose') h += `<p class="note" style="margin-top:10px">В школьных учебниках семейство роз часто называют Розоцветными. В научной системе Розоцветные (Rosales) — порядок, а семейство — Розовые (Rosaceae).</p>`;
+    if (o.id === 'dog') h += `<p class="note" style="margin-top:10px">Часть учёных считает собаку подвидом волка и пишет Canis lupus familiaris. Род у них в любом случае общий.</p>`;
+    return h;
+  }
+  if (id === 'names') {
+    let h = `<h2>Как устроено название</h2><div class="formula"><i>Panthera</i> + <i>leo</i> = род + видовой эпитет</div><div class="steps">` +
+      step('1-е слово', 'род, с большой буквы') + step('2-е слово', 'видовой эпитет, с маленькой') + step('Шрифт', 'курсив, латынь') + step('Сокращение', 'E. coli = Escherichia coli') + `</div>`;
+    h += `<h3>Роды в задании</h3><div class="steps">` + [...new Set(PAIRS.map(p => p.la.split(' ')[0]))].map(g => step(`<i>${g}</i>`, PAIRS.filter(p => p.la.startsWith(g + ' ')).length + ' вид(а) здесь')).join('') + `</div>`;
+    h += `<h3>Итого</h3><div class="steps">` + step('Найдено пар', `${m.matched} из 8`) + step('Ошибок', String(S.miss), 'sum') + `</div>`;
+    return h;
+  }
+  const sp = SPECS[S.cur];
+  let h = `<h2>Как работает определитель</h2><div class="formula">теза или антитеза → следующий шаг → группа</div><div class="steps">` +
+    step('1. Ядро в клетке?', 'нет → прокариоты, да → эукариоты') + step('2. Гены рРНК', 'бактерии или археи') + step('3. Хлоропласты?', 'растения') + step('4. Стенка из хитина?', 'грибы') + step('5. Одна клетка?', 'протисты, иначе животные') + `</div>`;
+  h += `<h3>Образец ${sp.code}</h3><div class="steps">` + sp.obs.map((o, i) => step('признак ' + (i + 1), o)).join('') + `</div>`;
+  h += `<h3>Итого</h3><div class="steps">` + SPECS.map((s, i) => step('Образец ' + s.code, S.ok[i] ? `${s.name} · ${GRP[s.grp].name}` : '—')).join('') + step('определено', `${m.ok} из 6`, 'sum') + `</div>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'why') {
+    if (S.look >= 0) {
+      const a = ANI[S.look];
+      el.innerHTML = `<div class="k">Признаки</div><div class="v">${a.short}</div><div class="ft"><span>покров</span>${a.cover}</div><div class="ft"><span>дыхание</span>${a.breath}</div><div class="ft"><span>потомство</span>${a.young}</div>`;
+    } else el.innerHTML = `<div class="k">Разложено</div><div class="v ${S.done.why ? 'ok' : ''}">${m.placed} / 9</div><div class="gauge"><b style="width:${(m.placed / 9 * 100).toFixed(1)}%"></b></div><div class="lr"><span>система</span><span>${S.mode === 'art' ? 'искусств.' : 'естеств.'}</span></div>`;
+  } else if (m.kind === 'ranks') {
+    el.innerHTML = `<div class="k">Лестница · ${ORGS[S.org].name}</div><div class="v ${m.lad === 7 ? 'ok' : ''}">${m.lad} / 7</div><div class="gauge"><b style="width:${(m.lad / 7 * 100).toFixed(1)}%"></b></div>
+      <div class="lr"><span>все названия</span><span>${m.placed}/${ALLTX.length}</span></div><div class="lr"><span>ошибок</span><span>${S.miss}</span></div>`;
+  } else if (m.kind === 'names') {
+    el.innerHTML = `<div class="k">Пары</div><div class="v ${m.matched === 8 ? 'ok' : ''}">${m.matched} / 8</div><div class="gauge"><b style="width:${(m.matched / 8 * 100).toFixed(1)}%"></b></div><div class="lr"><span>ошибок</span><span>${S.miss}</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">Определено</div><div class="v ${m.ok === 6 ? 'ok' : ''}">${m.ok} / 6</div><div class="gauge"><b style="width:${(m.ok / 6 * 100).toFixed(1)}%"></b></div>
+      <div class="lr"><span>образец</span><span>${SPECS[S.cur].code}</span></div><div class="lr"><span>шаг</span><span>${S.ok[S.cur] ? '✓' : S.step + 1}</span></div>`;
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Вы настоящий систематик!'), 1500);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  why: '<rect x="3" y="4" width="18" height="10" rx="2" fill="#1a2438" stroke="#56627d"/><rect x="24" y="4" width="18" height="10" rx="2" fill="#1a2438" stroke="#56627d"/><rect x="45" y="4" width="18" height="10" rx="2" fill="#1a2438" stroke="#56627d"/><rect x="3" y="18" width="18" height="9" rx="2" fill="none" stroke="#72d4e8"/><rect x="24" y="18" width="18" height="9" rx="2" fill="none" stroke="#ffb547"/><rect x="45" y="18" width="18" height="9" rx="2" fill="none" stroke="#ff9ecb"/>',
+  ranks: '<rect x="8" y="3" width="50" height="4" rx="2" fill="#86e0a8"/><rect x="13" y="9" width="40" height="4" rx="2" fill="#86e0a8"/><rect x="18" y="15" width="30" height="4" rx="2" fill="#86e0a8"/><rect x="23" y="21" width="20" height="4" rx="2" fill="none" stroke="#ffb547"/>',
+  names: '<rect x="3" y="5" width="20" height="7" rx="2" fill="#1a2438" stroke="#56627d"/><rect x="3" y="18" width="20" height="7" rx="2" fill="#1a2438" stroke="#56627d"/><path d="M23 8C33 8 33 21 43 21M23 21C33 21 33 8 43 8" stroke="#86e0a8" fill="none"/><text x="44" y="12" font-size="7" font-style="italic" fill="#72d4e8">Canis</text><text x="44" y="25" font-size="7" font-style="italic" fill="#72d4e8">Homo</text>',
+  key: '<path d="M4 15H12V6H30M12 15V24H30" stroke="#ffb547" stroke-width="1.6" fill="none"/><path d="M36 15H42V5H62M42 15V25H52V20H62M52 25V28H62" stroke="#86e0a8" stroke-width="1.4" fill="none"/><path d="M42 5H62" stroke="#72d4e8" stroke-width="1.4"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null;
+  resetLesson();
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '', guide = '';
+  if (id === 'why') {
+    now = `9 карточек животных: ${ANI.map((a, c) => `${a.short} — ${S.bin[c] < 0 ? 'не разложена' : 'в коробке «' + CLS[CLSK[S.bin[c]]].name + '»'}`).join('; ')}. Коробки естественной системы: рыбы, птицы, млекопитающие. ` +
+      `Сейчас включена ${S.mode === 'art' ? 'искусственная система по среде обитания (вода, воздух, суша)' : 'естественная система по строению'}; искусственную ученик ${S.sawArt ? 'уже смотрел' : 'ещё не включал'}. ` +
+      (m.placed === 9 ? `Все разложены, верно ${m.right} из 9.` : `Разложено ${m.placed} из 9.`) + (S.look >= 0 ? ` Выбрано животное «${ANI[S.look].short}»: покров — ${ANI[S.look].cover}, дыхание — ${ANI[S.look].breath}, потомство — ${ANI[S.look].young}.` : '');
+    guide = 'Не говори, в какую коробку класть животное. Спрашивай про покров тела, дыхание и выкармливание детёнышей. Помоги понять, почему деление «по среде» — искусственное.';
+  }
+  if (id === 'ranks') {
+    const o = ORGS[S.org], RN = o.plant ? RANK_P : RANK_A;
+    now = `Лестница рангов для организма «${o.name}» (${TX[o.path[6]].la}): ${o.path.map((k, r) => `${RN[r]} — ${S.placed[k] ? TX[k].ru + ' (' + TX[k].la + ')' : 'пусто'}`).join('; ')}. Справа названия для перетаскивания: ${poolKeys().map(k => TX[k].ru).join(', ')} (среди них есть лишние). ` +
+      `Готовых лестниц ${m.full} из 4 (волк, собака, роза, человек), заполнено названий ${m.placed} из ${ALLTX.length}, ошибок ${S.miss}. Общая ступень заполняется сразу у всех организмов, которые на ней стоят.`;
+    guide = 'Не называй, на какую ступень ставить название. Спрашивай, какая группа шире, что объединяет волка и собаку, подсказывай латинские окончания (-idae, -aceae — семейство, -ales — порядок).';
+  }
+  if (id === 'names') {
+    now = `Слева 8 русских названий, справа 8 научных: ${RORD.map(j => PAIRS[j].la).join(', ')}. Соединено: ${PAIRS.filter((_, i) => S.match[i]).map(p => p.ru + ' — ' + p.la).join('; ') || 'пока ничего'}. Ошибок ${S.miss}.` + (S.info >= 0 ? ` Внизу показан перевод для ${PAIRS[S.info].la}: ${PAIRS[S.info].g}.` : '');
+    guide = 'Не называй пары напрямую. Объясняй устройство названия: род и видовой эпитет, общий род у льва и тигра, подсказывай значения латинских слов, если ученик застрял.';
+  }
+  if (id === 'key') {
+    const sp = SPECS[S.cur];
+    now = `6 образцов: ${SPECS.map((s, i) => `образец ${s.code} — ${S.ok[i] ? 'определён: ' + s.name + ', ' + GRP[s.grp].name : 'не определён'}`).join('; ')}. Выбран образец ${sp.code}, его признаки: ${sp.obs.join('; ')}. ` +
+      `Дихотомический определитель: ${DKEY.map((cp, c) => `${c + 1}а ${cp.a.t} → ${cp.a.go !== undefined ? cp.a.go + 1 : GRP[cp.a.leaf].name}; ${c + 1}б ${cp.b.t} → ${cp.b.go !== undefined ? cp.b.go + 1 : GRP[cp.b.leaf].name}`).join('. ')}. ` +
+      `Сейчас шаг ${S.step + 1}, пройденный путь: ${S.path.map(p => (p.c + 1) + (p.s === 'a' ? 'а' : 'б')).join(', ') || 'нет'}. Справа древо жизни из трёх доменов: бактерии, археи, эукариоты (протисты, растения, грибы, животные).`;
+    guide = 'Не называй группу образца. Предложи прочитать его признаки и сравнить с тезой и антитезой текущего шага. Объясни, почему археи ближе к эукариотам и как ДНК изменила систему живого.';
+  }
+  return [
+    `Раздел: биология, 7 класс, тема «Систематика: классификация живого». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Для тьютора: ${guide}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = {
+    why: 'Почему дельфин не рыба, хотя живёт в воде?', ranks: 'Почему у волка и собаки общий род, а у волка и человека — только класс?',
+    names: 'Зачем учёным латинские названия, если есть русские?', key: 'Чем археи отличаются от бактерий?',
+  }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
