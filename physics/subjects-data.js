@@ -167,7 +167,7 @@ window.LUCH_SUBJECTS = {
     ],
     topics: [
       { id: 'pc', b: 'base', g: 5, t: 'Компьютер и файлы', items: ['Устройство компьютера', 'Файлы и папки', 'Работа с текстом'], req: [], status: 'done', href: '/labs/cs-pc/', lessons: 3, doneItems: 3 },
-      { id: 'info', b: 'base', g: 5, t: 'Информация', items: ['Что такое информация', 'Кодирование', 'Биты и байты'], req: [], status: 'done', href: '/labs/cs-info/', lessons: 3, doneItems: 3 },
+      { id: 'info', b: 'base', g: 5, t: 'Информация', items: ['Что такое информация', 'Кодирование', 'Биты и байты', 'Количество информации и сжатие'], req: [], status: 'done', href: '/labs/cs-info/', lessons: 4, doneItems: 4 },
 
       { id: 'algo', b: 'prog', g: 5, t: 'Алгоритмы', items: ['Исполнители', 'Последовательность команд', 'Блок-схемы'], req: ['info'], status: 'done', href: '/labs/cs-algo/', lessons: 3, doneItems: 3 },
       { id: 'blocks', b: 'prog', g: 6, t: 'Визуальное программирование', items: ['Scratch', 'Циклы', 'Условия', 'Своя игра'], req: ['algo'], status: 'done', href: '/labs/cs-blocks/', lessons: 4, doneItems: 4 },

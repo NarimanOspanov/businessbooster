@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Интерактивная лаборатория по информатике, 5 класс: что такое информация, кодирование азбукой Морзе, биты и байты.">
+<meta name="description" content="Интерактивная лаборатория по информатике, 5 класс: что такое информация, кодирование азбукой Морзе, биты и байты, количество информации и сжатие данных.">
 <title>Информация</title>
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -189,7 +189,7 @@ input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
     </div>
     <div class="headr">
       
-      <div class="prog" aria-label="Прогресс"><b>Информация</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+      <div class="prog" aria-label="Прогресс"><b>Информация</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
     </div>
   </header>
 
@@ -275,6 +275,18 @@ const LESSONS = [
     stage: 'Нажмите на лампочку, чтобы включить её. Кнопки «+» и «−» меняют число лампочек.',
     students: 30,
     check: m => m.answer === 5 },
+  { id: 'compress', title: 'Количество информации и сжатие',
+    text: ['Один бит — это количество информации в ответе «да» или «нет» на вопрос, где оба ответа одинаково вероятны. Хороший вопрос вдвое сокращает число вариантов.',
+           'Загадано число от 1 до 64. Спрашиваем «больше 32?» — остаётся 32 варианта, потом 16, 8, 4, 2 и 1. Шесть вопросов — шесть бит. Это формула Хартли: N = 2ᴵ, то есть I = log₂N. Если N не степень двойки, log₂N получается дробным, а число вопросов округляют вверх: для 100 чисел log₂100 ≈ 6,64, значит, нужно 7 вопросов (2⁶ = 64 < 100 ≤ 128 = 2⁷).',
+           'Объём сообщения: I = K × i, где K — число символов, i — бит на один символ. Алфавиту из 5 букв хватает 3 бит на букву (2³ = 8 ≥ 5), из 32 букв — 5 бит.',
+           'Сжатие: частым символам дают короткие коды, редким — длинные (так устроен код Хаффмана, а в азбуке Морзе частая буква Е — одна точка). Ни один код не должен быть началом другого, иначе текст не расшифровать однозначно (условие Фано). Клод Шеннон доказал: чем предсказуемее текст, тем сильнее его можно сжать.',
+           'ZIP и PNG сжимают без потерь: после распаковки всё совпадает до бита. MP3, JPEG и видео сжимают с потерями: выбрасывают то, чего ухо и глаз почти не замечают, и выигрывают в десятки раз. Текст программы или банковскую выписку так сжимать нельзя, а фото и музыку — можно.'],
+    why: 'Фильм в стриминговом сервисе и голосовое сообщение в мессенджере доходят до тебя только благодаря сжатию: без него час видео весил бы сотни гигабайт. Дата-центры хранят петабайты данных, и каждый процент сжатия экономит диски и электричество. Языковые модели ИИ учатся предсказывать следующий токен текста — по Шеннону, хорошее предсказание и есть сжатие. Телеком-операторы по всему миру делят частоты и каналы, считая биты. Профессии на ближайшие 10 лет: инженер видеокодеков и медиасжатия, ML-инженер, который ужимает модели, чтобы они работали на телефоне, инженер хранения данных, сетевой и телеком-инженер. Рутинный код всё чаще пишет ИИ, а человек решает, что можно выбросить без потерь для смысла и качества.',
+    task: 'Угадайте число от 1 до 64 за наименьшее число вопросов, а затем сожмите строку ОКОЛО_КОЛОКОЛА до 30 бит или меньше.',
+    hint: 'В угадайке задавайте вопрос, который отсекает ровно половину оставшихся чисел, — ведущий хитрый и всегда оставляет большую часть. В сжатии: чем чаще буква, тем короче её код, но коротких кодов мало — следите, чтобы набор оставался однозначным.',
+    stage: 'Нажмите на число k — это вопрос «загаданное больше k?». Кнопки − и + у буквы меняют длину её кода.',
+    text2: 'ОКОЛО_КОЛОКОЛА', limit: 30, gameN: 64,
+    check: m => m.gWin && m.valid && m.bits <= m.limit },
 ];
 
 const KEY = 'luch-cs-info';
@@ -283,7 +295,8 @@ try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {
 const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview',
             place: {}, miss: 0, sel: null, lastBad: null,
             letters: [], buf: '', dotMs: 250, sound: true, keyDown: false,
-            n: 1, bits: [], answer: null, hl: null };
+            n: 1, bits: [], answer: null, hl: null,
+            gN: 64, lo: 1, hi: 64, q: 0, glog: [], gWin: false, lens: {} };
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
 const L = () => LESSONS[S.lesson];
 const LID = () => L().id;
@@ -322,8 +335,49 @@ const decode = c => REV[c] || '?';
 const MAXN = 8;
 const bitsValue = () => { let v = 0; for (let i = 0; i < S.n; i++) v = v * 2 + (S.bits[i] ? 1 : 0); return v; };
 
+// ---------- lesson 4: amount of information and compression ----------
+const GN = [8, 16, 32, 64, 100];
+const minQ = N => Math.ceil(Math.log2(N) - 1e-9);
+const CSYM = ['О', 'К', 'Л', '_', 'А']; // by frequency in «ОКОЛО_КОЛОКОЛА»
+const CFREQ = c => [...LESSONS[3].text2].filter(x => x === c).length;
+const HUFF = { О: 1, К: 2, Л: 3, _: 4, А: 4 };
+function newGame() { S.lo = 1; S.hi = S.gN; S.q = 0; S.glog = []; }
+function resetLens() { S.lens = {}; CSYM.forEach(c => S.lens[c] = 3); }
+resetLens();
+function prefixCodes() { // canonical prefix code from the chosen lengths
+  const kraft = CSYM.reduce((s, c) => s + 2 ** -S.lens[c], 0), valid = kraft <= 1 + 1e-9, codes = {};
+  if (valid) {
+    const order = CSYM.map((c, i) => ({ c, i, l: S.lens[c] })).sort((a, b) => a.l - b.l || a.i - b.i);
+    let code = 0, pl = order[0].l;
+    for (const o of order) { code = code * 2 ** (o.l - pl); codes[o.c] = code.toString(2).padStart(o.l, '0'); code++; pl = o.l; }
+  }
+  return { kraft, valid, codes };
+}
+// the host is fair but sly: he keeps the larger half of the numbers that still fit all the answers
+function ask(k) {
+  const N = S.gN;
+  if (S.lo === S.hi) { toast('Число уже найдено. Нажмите «Новое число».'); return; }
+  if (k < S.lo) { toast(`Все оставшиеся числа больше ${k} — ответ «да» уже известен. Вопрос не засчитан.`); return; }
+  if (k >= S.hi) { toast(`Ни одно оставшееся число не больше ${k} — ответ «нет» уже известен. Вопрос не засчитан.`); return; }
+  const yes = S.hi - k, no = k - S.lo + 1, ans = yes > no || (yes === no && Math.random() < 0.5);
+  S.q++; if (ans) S.lo = k + 1; else S.hi = k;
+  S.glog.push({ k, ans, left: S.hi - S.lo + 1, lo: S.lo, hi: S.hi });
+  if (S.lo === S.hi) {
+    const mq = minQ(N), best = S.q <= mq;
+    if (N === L().gameN && best) S.gWin = true;
+    toast(`Загадано ${S.lo}. Вопросов: ${S.q}, минимум для ${N} чисел — ${mq}.` + (best ? (N === L().gameN ? ' Отлично, это предел!' : ' Теперь попробуйте 1…64.') : ' Где-то вопрос отсёк меньше половины.'));
+  }
+  update();
+}
+
 function model() {
   const id = LID();
+  if (id === 'compress') {
+    const Ls = L(), N = S.gN, { kraft, valid, codes } = prefixCodes(), K = Ls.text2.length;
+    const bits = CSYM.reduce((s, c) => s + CFREQ(c) * S.lens[c], 0);
+    return { kind: 'comp', N, q: S.q, min: minQ(N), left: S.hi - S.lo + 1, found: S.lo === S.hi, gWin: S.gWin,
+             kraft, valid, codes, bits, K, eq: K * minQ(CSYM.length), bytes: K * 8, limit: Ls.limit };
+  }
   if (id === 'what') {
     const cards = L().cards, placed = cards.filter(c => S.place[c.id]).length;
     return { kind: 'sort', placed, total: cards.length, miss: S.miss };
@@ -486,8 +540,59 @@ function drawBits(t) {
   return h;
 }
 
+const SYMX = j => 8 + j * 69.2;
+function drawCompress(t) {
+  const m = model(), N = m.N, Ls = L();
+  let h = '';
+  // guessing game: the number grid
+  const cols = N <= 16 ? N : N === 100 ? 20 : 16, cw = 344 / cols, chh = 19, gx = 8, gy = 94;
+  h += `<text x="180" y="88" font-size="9" fill="#8b96ad" text-anchor="middle">загадано число от 1 до ${N} · нажмите на k — вопрос «больше k?»</text>`;
+  for (let k = 1; k <= N; k++) {
+    const i = k - 1, x = gx + (i % cols) * cw, y = gy + Math.floor(i / cols) * (chh + 2), live = k >= S.lo && k <= S.hi, fd = m.found && live;
+    h += `<g data-hit="num:${k}"><rect x="${(x + 1).toFixed(1)}" y="${y}" width="${(cw - 2).toFixed(1)}" height="${chh}" rx="4" fill="${fd ? '#1f3a2f' : live ? '#1d2940' : '#0f1522'}" stroke="${fd ? '#86e0a8' : live ? '#56627d' : '#1a2336'}" stroke-width="1.1"/>`;
+    h += `<text x="${(x + cw / 2).toFixed(1)}" y="${y + 13}" font-size="${cw < 19 ? 7.5 : 9}" fill="${fd ? '#86e0a8' : live ? '#e8ecf4' : '#3a4762'}" text-anchor="middle">${k}</text></g>`;
+  }
+  const last = S.glog[S.glog.length - 1];
+  const l1 = m.found ? `Найдено: ${S.lo} · ${m.q} ${plural(m.q, 'вопрос', 'вопроса', 'вопросов')} = ${m.q} ${plural(m.q, 'бит', 'бита', 'бит')}`
+    : last ? `Вопрос ${m.q}: больше ${last.k}? — ${last.ans ? 'да' : 'нет'} · осталось ${m.left} (${S.lo}…${S.hi})` : `Вопросов пока не было · вариантов ${N}`;
+  h += `<text x="180" y="216" font-size="10.5" fill="${m.found ? (m.q <= m.min ? '#86e0a8' : '#ffb547') : '#e8ecf4'}" text-anchor="middle" class="sans" font-weight="600">${l1}</text>`;
+  h += `<text x="180" y="230" font-size="9" fill="#8b96ad" text-anchor="middle">вопросов ${m.q} · минимум ⌈log₂${N}⌉ = ${m.min}${S.gWin ? ' · угадайка ✓' : ''}</text>`;
+  // compression: the string with its codes
+  const txt = [...Ls.text2], tw = 22, ts = 24.6, tx0 = 180 - (txt.length * ts - (ts - tw)) / 2, ty = 248;
+  h += `<text x="180" y="243" font-size="9" fill="#8b96ad" text-anchor="middle">строка: ${m.K} символов, ${CSYM.length} разных · под буквой — её код</text>`;
+  txt.forEach((c, i) => {
+    const x = tx0 + i * ts, code = m.valid ? m.codes[c] : '?';
+    h += `<rect x="${x.toFixed(1)}" y="${ty}" width="${tw}" height="20" rx="4" fill="#1d2940" stroke="#56627d" stroke-width="1"/><text x="${(x + tw / 2).toFixed(1)}" y="${ty + 14}" font-size="11.5" fill="#e8ecf4" text-anchor="middle" class="sans" font-weight="600">${c}</text>`;
+    h += `<text x="${(x + tw / 2).toFixed(1)}" y="${ty + 30}" font-size="${code.length > 4 ? 5.6 : 6.6}" fill="${m.valid ? '#ffb547' : '#ff8a73'}" text-anchor="middle">${code}</text>`;
+  });
+  // code table: one card per symbol with − / + for the code length
+  const cy = 286, cwid = 65, chg = 56;
+  CSYM.forEach((c, j) => {
+    const x = SYMX(j), l = S.lens[c], code = m.valid ? m.codes[c] : '?';
+    h += `<rect x="${x.toFixed(1)}" y="${cy}" width="${cwid}" height="${chg}" rx="8" fill="#141d2e" stroke="${m.valid ? '#26324a' : '#ff8a73'}" stroke-width="1.2"/>`;
+    h += `<text x="${(x + 9).toFixed(1)}" y="${cy + 17}" font-size="15" fill="#e8ecf4" class="sans" font-weight="600">${c}</text><text x="${(x + cwid - 7).toFixed(1)}" y="${cy + 16}" font-size="9" fill="#8b96ad" text-anchor="end">×${CFREQ(c)}</text>`;
+    h += `<text x="${(x + cwid / 2).toFixed(1)}" y="${cy + 31}" font-size="10" fill="${m.valid ? '#ffb547' : '#ff8a73'}" text-anchor="middle">${code}</text>`;
+    h += `<g data-hit="len:${j}:-1"><rect x="${(x + 3).toFixed(1)}" y="${cy + 36}" width="18" height="16" rx="4" fill="#1d2940" stroke="#56627d"/><text x="${(x + 12).toFixed(1)}" y="${cy + 48}" font-size="12" fill="#e8ecf4" text-anchor="middle">−</text></g>`;
+    h += `<text x="${(x + cwid / 2).toFixed(1)}" y="${cy + 48}" font-size="11" fill="#e8ecf4" text-anchor="middle">${l}</text>`;
+    h += `<g data-hit="len:${j}:1"><rect x="${(x + cwid - 21).toFixed(1)}" y="${cy + 36}" width="18" height="16" rx="4" fill="#1d2940" stroke="#56627d"/><text x="${(x + cwid - 12).toFixed(1)}" y="${cy + 48}" font-size="12" fill="#e8ecf4" text-anchor="middle">+</text></g>`;
+  });
+  // volume bars
+  const bx = 104, bwMax = 216, by = 348, sc = bwMax / m.bytes;
+  const bars = [['по 1 байту', m.bytes, '#3a4762'], [`поровну по ${minQ(CSYM.length)} бита`, m.eq, '#2f4466'], ['ваш код', m.valid ? m.bits : null, m.valid && m.bits <= m.limit ? '#86e0a8' : '#72d4e8']];
+  bars.forEach(([lab, v, col], i) => {
+    const y = by + i * 15;
+    h += `<text x="${bx - 5}" y="${y + 9}" font-size="8.5" fill="#8b96ad" text-anchor="end">${lab}</text>`;
+    h += v === null ? `<text x="${bx}" y="${y + 9}" font-size="8.5" fill="#ff8a73">коды неоднозначны</text>`
+      : `<rect x="${bx}" y="${y}" width="${(v * sc).toFixed(1)}" height="11" rx="3" fill="${col}"/><text x="${(bx + v * sc + 4).toFixed(1)}" y="${y + 9}" font-size="8.5" fill="#e8ecf4">${v} бит</text>`;
+  });
+  const lx = bx + m.limit * sc;
+  h += `<path d="M${lx.toFixed(1)} ${by - 3}V${by + 43}" stroke="#ffb547" stroke-width="1.2" stroke-dasharray="3 2"/><text x="${lx.toFixed(1)}" y="${by + 52}" font-size="8" fill="#ffb547" text-anchor="middle">цель ${m.limit}</text>`;
+  return h;
+}
+
 function hlBox(id) {
   const lid = LID();
+  if (lid === 'compress') return { grid: [2, 80, 356, 124], log: [2, 204, 356, 32], text: [2, 236, 356, 48], table: [2, 282, 356, 64], bars: [2, 346, 356, 58] }[id];
   if (lid === 'what') {
     const i = SENSES.findIndex(z => z.id === id);
     if (i >= 0) return [zoneX(i) - 3, ZONE.y - 3, ZONE.w + 6, ZONE.h + 6];
@@ -505,6 +610,7 @@ function drawScene(t) {
     <rect x="-2000" y="-2000" width="4360" height="4405" fill="url(#tile)"/>`;
   if (id === 'what') h += drawSort(t);
   else if (id === 'code') h += drawMorse(t);
+  else if (id === 'compress') h += drawCompress(t);
   else h += drawBits(t);
   if (S.hl) {
     const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
@@ -567,7 +673,9 @@ scene.addEventListener('pointerup', e => endDrag(e, false));
 scene.addEventListener('pointercancel', e => endDrag(e, true));
 
 function onHit(h) {
-  const [k, v] = h.split(':');
+  const [k, v, w] = h.split(':');
+  if (k === 'num') ask(+v);
+  if (k === 'len') setLen(CSYM[+v], +w);
   if (k === 'zone') { if (S.sel) tryPlace(S.sel, v); else toast('Сначала выберите карточку.'); }
   if (k === 'lamp') { S.bits[+v] = !S.bits[+v]; update(); }
   if (k === 'add') act('plus');
@@ -618,6 +726,16 @@ function commitLetter() {
   update();
 }
 
+// compression and guessing game
+function setLen(c, d) {
+  const l = clamp(S.lens[c] + d, 1, 6);
+  if (l === S.lens[c]) { toast(d < 0 ? 'Короче 1 бита код не бывает.' : 'Длиннее 6 бит здесь не нужно.'); return; }
+  S.lens[c] = l;
+  if (!prefixCodes().valid) toast('Столько коротких кодов не бывает: какой-то код станет началом другого. Удлините другую букву.');
+  update();
+}
+function setGN(n) { S.gN = n; newGame(); renderTools(); buildScheme(); update(); }
+
 // bits
 function setCode(v) { for (let i = 0; i < S.n; i++) S.bits[i] = !!((v >> (S.n - 1 - i)) & 1); update(); }
 
@@ -647,6 +765,7 @@ function renderTools() {
     what: B('reshuffle', 'Начать заново'),
     code: B('dot', '·', undefined, 'big') + B('dash', '−', undefined, 'big') + B('letter', 'Буква ⏎') + B('back', '⌫') + sep + B('clearM', 'Заново') + B('sound', 'Звук', S.sound),
     bits: B('minus', '− лампа') + B('plus', '+ лампа') + B('off', 'Все выкл') + sep + B('enough', 'Хватит!'),
+    compress: B('gN', `Числа 1…${S.gN}`) + B('gnew', 'Новое число') + B('gtip', 'Подсказка') + sep + B('ceq', 'Коды по 3 бита'),
   }[id];
 }
 function act(a) {
@@ -660,6 +779,14 @@ function act(a) {
   if (a === 'plus') { if (S.n >= MAXN) { toast(`Больше ${MAXN} лампочек (1 байт) здесь не помещается.`); return; } S.n++; S.bits[S.n - 1] = false; S.answer = null; update(); return; }
   if (a === 'minus') { if (S.n <= 1) return; S.n--; S.bits.length = S.n; S.answer = null; update(); return; }
   if (a === 'off') { S.bits = []; update(); return; }
+  if (a === 'gN') { setGN(GN[(GN.indexOf(S.gN) + 1) % GN.length]); return; }
+  if (a === 'gnew') { newGame(); update(); return; }
+  if (a === 'gtip') {
+    const n = S.hi - S.lo + 1;
+    toast(n === 1 ? 'Число найдено. Нажмите «Новое число».' : `Осталось ${n} ${plural(n, 'число', 'числа', 'чисел')}: от ${S.lo} до ${S.hi}. Какое k разделит их на две равные части?`);
+    return;
+  }
+  if (a === 'ceq') { resetLens(); update(); return; }
   if (a === 'enough') {
     const m = model(), N = L().students;
     S.answer = S.n;
@@ -697,6 +824,11 @@ const ICON = {
   codeL: IC('<text x="17" y="21" font-size="10" fill="var(--fg)" text-anchor="middle" font-family="monospace">0110</text>'),
   kids: IC('<circle cx="10" cy="11" r="4" fill="var(--arm)"/><path d="M3 26q0-9 7-9t7 9z" fill="var(--arm)"/><circle cx="24" cy="11" r="4" fill="#3a4762"/><path d="M17 26q0-9 7-9t7 9z" fill="#3a4762"/>'),
   byte: IC('<rect x="2" y="12" width="30" height="10" rx="2" fill="none" stroke="var(--arm)" stroke-width="1.4"/><path d="M5.75 12v10M9.5 12v10M13.25 12v10M17 12v10M20.75 12v10M24.5 12v10M28.25 12v10" stroke="var(--arm)" stroke-width=".8"/>'),
+  grid: IC('<rect x="3" y="8" width="8" height="8" rx="2" fill="#0f1522" stroke="var(--line)"/><rect x="13" y="8" width="8" height="8" rx="2" fill="#1d2940" stroke="var(--muted)"/><rect x="23" y="8" width="8" height="8" rx="2" fill="#1d2940" stroke="var(--muted)"/><rect x="3" y="18" width="8" height="8" rx="2" fill="#0f1522" stroke="var(--line)"/><rect x="13" y="18" width="8" height="8" rx="2" fill="#0f1522" stroke="var(--line)"/><rect x="23" y="18" width="8" height="8" rx="2" fill="#1f3a2f" stroke="var(--ok)"/>'),
+  log: IC('<text x="17" y="15" font-size="8" fill="var(--fg)" text-anchor="middle" font-family="sans-serif">&gt;32?</text><text x="17" y="27" font-size="8" fill="var(--ok)" text-anchor="middle" font-family="sans-serif">да</text>'),
+  text: IC('<rect x="2" y="9" width="9" height="10" rx="2" fill="#1d2940" stroke="var(--muted)"/><rect x="12.5" y="9" width="9" height="10" rx="2" fill="#1d2940" stroke="var(--muted)"/><rect x="23" y="9" width="9" height="10" rx="2" fill="#1d2940" stroke="var(--muted)"/><text x="17" y="28" font-size="6" fill="var(--force)" text-anchor="middle" font-family="monospace">0 10 0</text>'),
+  ctable: IC('<rect x="3" y="5" width="12" height="24" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.4"/><rect x="19" y="5" width="12" height="24" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.4"/><text x="9" y="15" font-size="7" fill="var(--fg)" text-anchor="middle" font-family="sans-serif">О</text><text x="25" y="15" font-size="7" fill="var(--fg)" text-anchor="middle" font-family="sans-serif">А</text><text x="9" y="24" font-size="6" fill="var(--force)" text-anchor="middle" font-family="monospace">0</text><text x="25" y="24" font-size="5" fill="var(--force)" text-anchor="middle" font-family="monospace">1111</text>'),
+  bars: IC('<rect x="3" y="7" width="28" height="5" rx="2" fill="#3a4762"/><rect x="3" y="15" width="12" height="5" rx="2" fill="#2f4466"/><rect x="3" y="23" width="8" height="5" rx="2" fill="var(--ok)"/><path d="M12 5v25" stroke="var(--force)" stroke-dasharray="2 2"/>'),
 };
 const senseIC = id => IC(`<g transform="translate(17 17) scale(.95)">${senseIcon(id, 'var(--fg)')}</g>`);
 
@@ -706,6 +838,7 @@ function taskState(m) {
   const id = LID();
   if (S.done[id]) return '✓ Выполнено';
   if (id === 'what') return `Разложено ${m.placed} из ${m.total}` + (m.miss ? ` · промахов ${m.miss}` : '');
+  if (id === 'compress') return `Угадайка 1…${L().gameN}: ${m.gWin ? '✓' : m.N === L().gameN ? `${m.q} вопр., осталось ${m.left}` : 'не начата'} · сжатие: ${m.valid ? `${m.bits} бит` : 'коды неоднозначны'} (цель ≤ ${m.limit})`;
   if (id === 'code') return `Принято: ${m.text || '—'}` + (m.buf ? ` · набирается ${m.buf}` : '') + (m.text.length >= 3 && m.text !== 'ЛУЧ' ? ' · не то слово, сотрите лишнее' : '');
   return `${S.n} ${plural(S.n, 'лампочка', 'лампочки', 'лампочек')} · ${m.combos} ${plural(m.combos, 'код', 'кода', 'кодов')}` + (m.answer !== null && m.answer !== undefined ? ` · ответ ${m.answer} не подошёл` : '');
 }
@@ -733,6 +866,14 @@ function buildScheme() {
       slider('inN', 'Число лампочек (бит)', 1, MAXN, 1, S.n) +
       `<div class="ctl"><div class="lbl">Включить лампочку</div><div class="chips" id="lampChips"></div></div>
       <div class="row"><button class="ghostbtn" data-a="off">Все выкл</button><button class="ghostbtn" data-a="enough">Хватит!</button></div>`;
+  if (id === 'compress') h = `<h2>Угадайка</h2>
+      <dl class="reads"><div><dt>Вопросов</dt><dd id="r1"></dd></div><div><dt>Осталось</dt><dd id="r2"></dd></div><div><dt>Минимум</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Сколько чисел загадывать</div><div class="chips" id="gnChips"></div></div>
+      <div class="row"><button class="ghostbtn" data-a="gnew">Новое число</button><button class="ghostbtn" data-a="gtip">Подсказка</button></div>
+      <h3>Сжатие строки «${L().text2}»</h3>
+      <dl class="reads"><div><dt>Ваш код</dt><dd id="r4"></dd></div><div><dt>По 1 байту</dt><dd id="r5"></dd></div><div><dt>Сжатие</dt><dd id="r6"></dd></div></dl>
+      <div class="steps" id="lenRows" style="margin-top:10px"></div>
+      <div class="row"><button class="ghostbtn" data-a="ceq">Коды по 3 бита</button></div>`;
   el.innerHTML = h;
   const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
   on('#inDot', e => { S.dotMs = +e.target.value; updateScheme(model()); });
@@ -754,6 +895,19 @@ function updateScheme(m) {
   } else if (id === 'code') {
     set('#r1', m.text || '—'); set('#r2', m.buf ? `${m.buf} (${m.preview})` : '—'); set('#r3', String(m.signals));
     set('#inDotO', S.dotMs + ' мс'); val('#inDot', S.dotMs);
+  } else if (id === 'compress') {
+    set('#r1', String(m.q)); set('#r2', String(m.left)); set('#r3', String(m.min));
+    set('#r4', m.valid ? `${m.bits} бит` : '—'); set('#r5', `${m.bytes} бит`); set('#r6', m.valid ? `× ${fmt(m.bytes / m.bits, 1)}` : '—');
+    const gc = el.querySelector('#gnChips');
+    if (gc) {
+      gc.innerHTML = GN.map(n => `<button data-n="${n}" aria-pressed="${n === S.gN}">1…${n}</button>`).join('');
+      gc.querySelectorAll('button').forEach(b => b.onclick = () => setGN(+b.dataset.n));
+    }
+    const lr = el.querySelector('#lenRows');
+    if (lr) {
+      lr.innerHTML = CSYM.map((c, j) => `<div class="step"><b>${c} · встречается ${CFREQ(c)} ${plural(CFREQ(c), 'раз', 'раза', 'раз')} · код ${m.valid ? m.codes[c] : '?'}</b><span><button class="ghostbtn" data-j="${j}" data-d="-1" aria-label="Короче код ${c}">−</button> ${S.lens[c]} <button class="ghostbtn" data-j="${j}" data-d="1" aria-label="Длиннее код ${c}">+</button></span></div>`).join('');
+      lr.querySelectorAll('button').forEach(b => b.onclick = () => setLen(CSYM[+b.dataset.j], +b.dataset.d));
+    }
   } else {
     set('#r1', String(m.n)); set('#r2', String(m.combos)); set('#r3', m.code);
     set('#inNO', String(S.n)); val('#inN', S.n);
@@ -775,6 +929,12 @@ function partsList() {
     { id: 'tape', icon: ICON.tape, name: 'Бумажная лента', spec: 'В старых телеграфах аппарат выдавливал точки и тире на ленте, а телеграфист потом расшифровывал.' },
     { id: 'decoded', icon: ICON.decoded, name: 'Расшифровка', spec: 'Каждая группа знаков переводится в букву по таблице. Пунктирная рамка — буква, которая ещё набирается.' },
     { id: 'table', icon: ICON.table, name: 'Кодовая таблица', spec: 'Правило «буква → код». Без общей таблицы отправитель и получатель не поймут друг друга.' }];
+  if (id === 'compress') return [
+    { id: 'grid', icon: ICON.grid, name: 'Поле чисел', spec: 'Загаданное число где-то среди светлых клеток. Нажатие на k — вопрос «больше k?». Ведущий честный, но хитрый: из двух ответов выбирает тот, после которого чисел останется больше.' },
+    { id: 'log', icon: ICON.log, name: 'Ответы', spec: 'Каждый ответ «да» или «нет» несёт не больше 1 бита. Поэтому меньше чем за ⌈log₂N⌉ вопросов не угадать.' },
+    { id: 'text', icon: ICON.text, name: 'Строка', spec: 'Сообщение из 14 символов. Под каждой буквой её текущий код — сообщение это просто все коды подряд.' },
+    { id: 'table', icon: ICON.ctable, name: 'Таблица кодов', spec: 'Длину кода каждой буквы меняют − и +. Сами коды строятся так, чтобы ни один не был началом другого.' },
+    { id: 'bars', icon: ICON.bars, name: 'Объём', spec: 'Сравнение: по байту на символ, равный код по 3 бита и ваш код переменной длины. Пунктир — цель задания.' }];
   return [
     { id: 'lamps', icon: ICON.lamps, name: 'Лампочки — биты', spec: 'Каждая лампочка хранит 1 бит: горит (1) или нет (0).' },
     { id: 'codeL', icon: ICON.codeL, name: 'Код', spec: 'Цепочка нулей и единиц, которую сейчас показывают лампочки, и её номер среди всех комбинаций.' },
@@ -820,6 +980,27 @@ function calcHTML(m) {
     h += `<p class="note" style="margin-top:10px">Частые буквы (Е, Т, И, А) получили самые короткие коды, чтобы телеграмма шла быстрее.</p>`;
     return h;
   }
+  if (id === 'compress') {
+    const N = m.N;
+    let h = `<h2>Количество информации</h2><div class="formula">N = 2ᴵ &nbsp;⇔&nbsp; I = log₂N</div><h3>Угадайка: делим пополам</h3><div class="steps">`;
+    let n = N, k = 0;
+    while (n > 1) { const nn = Math.ceil(n / 2); k++; h += step(`вопрос ${k}`, `${n} → ${nn}`); n = nn; }
+    h += step(`I = log₂${N}`, `${Number.isInteger(Math.log2(N)) ? Math.log2(N) : '≈ ' + fmt(Math.log2(N), 2)} бит → нужно ${m.min} ${plural(m.min, 'вопрос', 'вопроса', 'вопросов')}`, 'sum') + `</div>`;
+    h += `<h3>Ваши вопросы</h3>` + (S.glog.length ? `<div class="steps">` + S.glog.map((g, i) => step(`${i + 1}. больше ${g.k}? — ${g.ans ? 'да' : 'нет'}`, `осталось ${g.left}${g.left > Math.ceil((i ? S.glog[i - 1].left : N) / 2) ? ' ⚠' : ''}`)).join('') + `</div><p class="note" style="margin-top:8px">⚠ — вопрос делил числа не пополам, и ведущий оставил большую часть.</p>` : `<p class="note">Пока нет. Нажмите на число на сцене.</p>`);
+    h += `<h3>Объём строки: I = K × i</h3><div class="steps">` +
+      step('по 1 байту', `${m.K} × 8 = ${m.bytes} бит`) +
+      step('равный код', `${CSYM.length} букв → i = ⌈log₂${CSYM.length}⌉ = ${minQ(CSYM.length)}; ${m.K} × ${minQ(CSYM.length)} = ${m.eq} бит`) +
+      step('ваш код', m.valid ? CSYM.map(c => `${CFREQ(c)}×${S.lens[c]}`).join(' + ') + ` = ${m.bits} бит` : 'коды неоднозначны') +
+      step('условие Фано', `Σ 2^(−длина) = ${fmt(m.kraft, 3)} ${m.valid ? '≤ 1 ✓' : '> 1 ✗'}`) +
+      step('сжатие', m.valid ? `${m.bytes} / ${m.bits} ≈ ${fmt(m.bytes / m.bits, 1)} раза` : '—', 'sum') + `</div>`;
+    h += S.done.compress
+      ? `<h3>Код Хаффмана</h3><p class="note">Две самые редкие «кучки» объединяют, пока не останется одна. Каждое объединение добавляет бит к кодам внутри.</p><div class="steps">` +
+        step('А(1) + _(1)', '→ 2') + step('2 + Л(3)', '→ 5') + step('К(3) + 5', '→ 8') + step('О(6) + 8', '→ 14') +
+        step('длины', `${CSYM.map(c => `${c}${HUFF[c]}`).join(' ')} → ${CSYM.reduce((s, c) => s + CFREQ(c) * HUFF[c], 0)} бит`, 'sum') + `</div>`
+      : `<p class="note" style="margin-top:10px">Разбор по алгоритму Хаффмана появится здесь после выполнения задания.</p>`;
+    h += `<h3>С потерями и без</h3><div class="steps">` + step('без потерь', 'ZIP, PNG, FLAC — всё до бита') + step('с потерями', 'MP3, JPEG, видео — убирают незаметное') + `</div>`;
+    return h;
+  }
   const N = L().students;
   let h = `<h2>Сколько кодов дают N бит</h2><div class="formula">N бит → 2ᴺ комбинаций</div><h3>Удваиваем</h3><div class="steps">`;
   for (let n = 1; n <= S.n; n++) { const c = 2 ** n; h += step(`${n} ${plural(n, 'бит', 'бита', 'бит')}`, `${n > 1 ? `${2 ** (n - 1)} × 2 = ` : ''}${c} ${c >= N ? '≥' : '<'} ${N}`, n === S.n ? 'sum' : ''); }
@@ -833,6 +1014,7 @@ function renderMeter(m) {
   const el = $('#meter'), id = LID(), ok = !!S.done[id];
   if (m.kind === 'sort') el.innerHTML = `<div class="k">Разложено</div><div class="v ${ok ? 'ok' : ''}">${m.placed} из ${m.total}</div><div class="gauge"><b style="width:${(m.placed / m.total * 100).toFixed(1)}%"></b></div><div class="lr"><span>промахи</span><span>${m.miss}</span></div>`;
   else if (m.kind === 'morse') el.innerHTML = `<div class="k">Принято</div><div class="v ${ok ? 'ok' : ''}">${m.text || '—'}${m.buf ? `<span style="color:var(--force)">${m.preview}</span>` : ''}</div><div class="lr"><span>${S.keyDown ? 'сигнал…' : 'ключ'}</span><span>${m.buf || ' '}</span></div>`;
+  else if (m.kind === 'comp') el.innerHTML = `<div class="k">Вопросы · сжатие</div><div class="v ${ok ? 'ok' : ''}">${m.q} / ${m.min} · ${m.valid ? m.bits : '—'} бит</div><div class="gauge"><b style="width:${m.valid ? clamp(m.bits / m.bytes * 100, 0, 100).toFixed(1) : 0}%;background:${m.valid && m.bits <= m.limit ? 'var(--ok)' : 'var(--arm)'}"></b></div><div class="lr"><span>цель</span><span>≤ ${m.min} · ≤ ${m.limit} бит</span></div>`;
   else el.innerHTML = `<div class="k">Кодов</div><div class="v ${ok ? 'ok' : ''}">2^${m.n} = ${m.combos}</div><div class="gauge"><b style="width:${clamp(m.combos / L().students * 100, 0, 100).toFixed(1)}%;background:${m.enough ? 'var(--ok)' : 'var(--arm)'}"></b></div><div class="lr"><span>учеников</span><span>${L().students}</span></div>`;
 }
 
@@ -854,6 +1036,7 @@ function update() {
 const MINI = {
   what: '<path d="M6 15Q15 6 24 15Q15 24 6 15Z" fill="none" stroke="#e8ecf4" stroke-width="1.3"/><circle cx="15" cy="15" r="3" fill="#72d4e8"/><path d="M36 22Q33 18 33 13Q33 7 38 7Q43 7 43 12Q43 15 40 17Q39 18 39 20" fill="none" stroke="#e8ecf4" stroke-width="1.3"/><rect x="50" y="13" width="9" height="8" rx="3" fill="none" stroke="#e8ecf4" stroke-width="1.2"/><path d="M52 13V7M55 13V5M58 14V8" stroke="#e8ecf4" stroke-width="1.3" stroke-linecap="round"/>',
   code: '<circle cx="10" cy="15" r="2.6" fill="#ffb547"/><rect x="16" y="13" width="11" height="4" rx="2" fill="#ffb547"/><circle cx="33" cy="15" r="2.6" fill="#ffb547"/><circle cx="40" cy="15" r="2.6" fill="#ffb547"/><rect x="48" y="13" width="11" height="4" rx="2" fill="#e8ecf4"/>',
+  compress: '<rect x="5" y="6" width="56" height="5" rx="2" fill="#3a4762"/><rect x="5" y="13" width="22" height="5" rx="2" fill="#72d4e8"/><rect x="5" y="20" width="15" height="5" rx="2" fill="#86e0a8"/><text x="46" y="24" font-size="8" fill="#ffb547" text-anchor="middle" font-family="monospace">log₂</text>',
   bits: [0, 1, 0, 1, 1].map((b, i) => `<circle cx="${9 + i * 12}" cy="12" r="4.4" fill="${b ? '#ffd27a' : '#2a3348'}" stroke="#e8ecf4" stroke-width=".8"/><text x="${9 + i * 12}" y="26" font-size="6" fill="#8b96ad" text-anchor="middle" font-family="monospace">${b}</text>`).join(''),
 };
 function renderStrip() {
@@ -873,6 +1056,7 @@ function setLesson(i) {
   clearTimeout(letterTimer); if (S.keyDown) { S.keyDown = false; tone(false); }
   if (Ls.id === 'code' && !audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; } }
   S.lesson = i; S.place = {}; S.miss = 0; S.sel = null; S.lastBad = null; S.letters = []; S.buf = ''; S.n = 1; S.bits = []; S.answer = null; S.hl = null;
+  S.gN = Ls.gameN || 64; newGame(); S.gWin = false; resetLens();
   drag = null;
   save(); resetProps();
   $('#taskK').textContent = `Задание · урок ${i + 1}`;
@@ -900,8 +1084,14 @@ window.LUCH_CONTEXT = () => {
     now = `На сцене ${S.n} ${plural(S.n, 'лампочка', 'лампочки', 'лампочек')} (бит), код на лампочках ${m.code}, это комбинация № ${m.v + 1}. Всего комбинаций 2^${S.n} = ${m.combos}. В классе ${Ls.students} учеников, кодов ${m.enough ? 'хватает' : 'не хватает'}. ${m.answer !== null && m.answer !== undefined ? `Ученик нажал «Хватит!» при ${m.answer} лампочках.` : 'Ответ ещё не дан.'}`;
     guide = 'Не называй нужное число лампочек: спроси, сколько комбинаций даёт каждая следующая лампочка, и пусть ученик сам найдёт наименьшее подходящее.';
   }
+  if (id === 'compress') {
+    const qs = S.glog.map((g, i) => `${i + 1}) больше ${g.k}? — ${g.ans ? 'да' : 'нет'}, осталось ${g.left}`).join('; ');
+    now = `Две части. 1) Угадайка: ведущий загадал число от 1 до ${m.N}; ученик нажимает на число k — это вопрос «больше k?». Ведущий честный, но из двух ответов выбирает тот, после которого чисел остаётся больше, поэтому угадать за минимум ⌈log₂N⌉ = ${m.min} можно, только каждый раз деля оставшиеся числа ровно пополам. Вопросы: ${qs || 'пока нет'}. Сейчас осталось ${m.left} (от ${S.lo} до ${S.hi})${m.found ? ', число найдено' : ''}. Часть с 1…${Ls.gameN} ${m.gWin ? 'выполнена' : 'не выполнена'}. ` +
+      `2) Сжатие строки «${Ls.text2}» (${m.K} символов; частоты: ${CSYM.map(c => `${c}×${CFREQ(c)}`).join(', ')}). Ученик выбирает длины кодов: ${CSYM.map(c => `${c} — ${S.lens[c]}`).join(', ')}; программа строит префиксный код. ${m.valid ? `Коды: ${CSYM.map(c => `${c}=${m.codes[c]}`).join(', ')}; объём ${m.bits} бит` : 'Набор длин нарушает условие Фано (сумма 2^−длина больше 1), коды неоднозначны'}. По байту на символ — ${m.bytes} бит, равным кодом по 3 бита — ${m.eq} бит. Цель — не больше ${m.limit} бит.`;
+    guide = 'Не называй, какое число k спросить следующим, и не диктуй готовые длины кодов: спроси, сколько чисел останется после ответа «да» и после «нет», и какая буква встречается чаще всего.';
+  }
   return [
-    `Раздел: информатика, 5 класс, тема «Информация». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Раздел: информатика, ${id === 'compress' ? '7 класс (формулы Хартли и Шеннона — 10 класс)' : '5 класс'}, тема «Информация». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
     `Объяснение урока: ${Ls.text.join(' ')}`,
     `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
     `Сейчас на экране: ${now}`,
@@ -915,6 +1105,7 @@ window.LUCH_SUGGEST = () => {
     what: 'Почему больше всего информации мы получаем глазами?',
     code: 'Зачем в азбуке Морзе у разных букв коды разной длины?',
     bits: 'Почему каждая новая лампочка удваивает число кодов?',
+    compress: 'Чем сжатие ZIP отличается от сжатия MP3?',
   }[Ls.id];
   return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
 };
