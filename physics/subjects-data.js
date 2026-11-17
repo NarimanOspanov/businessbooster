@@ -1,7 +1,7 @@
 // Программы обучения по предметам «Луча» (кроме физики, она описана в index.html).
 // Формат как у физики: branches — ветки-разделы, topics — темы { id, b, g, t, items, req },
 // b: 'base' — общие основы (верх карты); g — класс; req — что нужно пройти до темы.
-// Порядок классов и содержание опираются на школьную программу Казахстана (обновлённое содержание).
+// Порядок классов и содержание опираются на школьные программы и эталонные учебники (Казахстан, Россия, советская школа); примеры в уроках — мировые.
 window.LUCH_SUBJECTS = {
   math: {
     title: 'Математика от простого к сложному',
@@ -84,7 +84,7 @@ window.LUCH_SUBJECTS = {
       { id: 'classes', b: 'inorg', g: 8, t: 'Классы веществ', items: ['Оксиды', 'Кислоты', 'Основания', 'Соли', 'Как они превращаются друг в друга'], req: ['oxy', 'valence'], status: 'done', href: '/labs/chem-classes/', lessons: 5, doneItems: 5 },
       { id: 'nonmet', b: 'inorg', g: 9, t: 'Неметаллы', items: ['Галогены', 'Сера', 'Азот и аммиак', 'Фосфор', 'Углерод и кремний'], req: ['classes', 'table'], status: 'done', href: '/labs/chem-nonmet/', lessons: 5, doneItems: 5 },
       { id: 'metals', b: 'inorg', g: 9, t: 'Металлы', items: ['Щелочные металлы', 'Кальций и магний', 'Алюминий', 'Железо', 'Сплавы'], req: ['classes', 'table'], status: 'done', href: '/labs/chem-metals/', lessons: 5, doneItems: 5 },
-      { id: 'industry', b: 'inorg', g: 11, t: 'Химическое производство', items: ['Аммиак и серная кислота', 'Металлургия Казахстана', 'Минеральные удобрения'], req: ['nonmet', 'metals', 'kinetics'], status: 'done', href: '/labs/chem-industry/', lessons: 3, doneItems: 3 },
+      { id: 'industry', b: 'inorg', g: 11, t: 'Химическое производство', items: ['Аммиак и серная кислота', 'Металлургия', 'Минеральные удобрения'], req: ['nonmet', 'metals', 'kinetics'], status: 'done', href: '/labs/chem-industry/', lessons: 3, doneItems: 3 },
 
       { id: 'orgbase', b: 'org', g: 10, t: 'Основы органики', items: ['Почему углерод особенный', 'Строение органических молекул', 'Изомерия', 'Названия веществ'], req: ['bonds'], status: 'done', href: '/labs/chem-orgbase/', lessons: 4, doneItems: 4 },
       { id: 'hydro', b: 'org', g: 10, t: 'Углеводороды', items: ['Алканы', 'Алкены и алкины', 'Арены', 'Нефть и газ'], req: ['orgbase'], status: 'done', href: '/labs/chem-hydro/', lessons: 4, doneItems: 4 },
@@ -142,7 +142,7 @@ window.LUCH_SUBJECTS = {
       { id: 'env', b: 'eco', g: 8, t: 'Организм и среда', items: ['Факторы среды', 'Приспособления', 'Биоритмы'], req: ['plants'], status: 'done', href: '/labs/bio-env/', lessons: 3, doneItems: 3 },
       { id: 'ecosys', b: 'eco', g: 10, t: 'Экосистемы', items: ['Пищевые цепи', 'Круговорот веществ', 'Устойчивость экосистем'], req: ['env', 'metab'], status: 'done', href: '/labs/bio-ecosys/', lessons: 3, doneItems: 3 },
       { id: 'biosphere', b: 'eco', g: 11, t: 'Биосфера', items: ['Учение Вернадского', 'Природные зоны планеты', 'Человек и биосфера'], req: ['ecosys', 'evolution'], status: 'done', href: '/labs/bio-biosphere/', lessons: 3, doneItems: 3 },
-      { id: 'protect', b: 'eco', g: 11, t: 'Охрана природы', items: ['Красная книга', 'Заповедники Казахстана', 'Устойчивое развитие'], req: ['biosphere'], status: 'done', href: '/labs/bio-protect/', lessons: 3, doneItems: 3 },
+      { id: 'protect', b: 'eco', g: 11, t: 'Охрана природы', items: ['Красная книга', 'Заповедники и национальные парки', 'Устойчивое развитие'], req: ['biosphere'], status: 'done', href: '/labs/bio-protect/', lessons: 3, doneItems: 3 },
     ],
   },
 
