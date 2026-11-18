@@ -629,6 +629,34 @@
   })();
   window.LuchProgress = prog;
 
+  // ---------- схему можно сдвинуть мышью (18.11.2026) ----------
+  // Зажал на пустом месте схемы и повёл — картинка сдвигается (как в «Как в жизни»); двойной щелчок по пустому
+  // месту или смена урока — обратно. Предметы опыта (свой курсор), кнопки и ссылки не трогаем; короткий щелчок —
+  // как раньше. Только мышь и перо: на телефоне палец прокручивает страницу. Не дальше трети размера.
+  (() => {
+    const scene = document.getElementById('scene'), stage = document.getElementById('stage');
+    if (!scene || !stage || scene.hasAttribute('data-nopan')) return;
+    const BUSY = /pointer|grab|move|resize|crosshair|cell|text|copy|alias|zoom/;
+    let pan = { x: 0, y: 0 }, drag = null, lesson = lessonIdx();
+    const apply = (anim) => { scene.style.transition = anim ? 'transform .3s ease' : ''; scene.style.transform = pan.x || pan.y ? 'translate(' + pan.x + 'px,' + pan.y + 'px)' : ''; };
+    const free = (t) => t && t.closest && t.closest('#scene') && !t.closest('a,button,input,select,textarea,[role="button"],[data-k],[data-drag]') && !BUSY.test(getComputedStyle(t).cursor);
+    stage.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || e.pointerType === 'touch' || e.defaultPrevented || !free(e.target)) return;
+      drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, x0: pan.x, y0: pan.y, on: false };
+    });
+    addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+      if (!drag.on) { if (Math.hypot(dx, dy) < 6) return; drag.on = true; stage.style.cursor = 'grabbing'; }
+      const r0 = scene.getBoundingClientRect(), lx = r0.width / 3, ly = r0.height / 3;
+      pan = { x: Math.max(-lx, Math.min(lx, drag.x0 + dx)), y: Math.max(-ly, Math.min(ly, drag.y0 + dy)) }; apply(false);
+    });
+    const end = (e) => { if (!drag || (e && e.pointerId !== drag.id)) return; if (drag.on) { stage.style.cursor = ''; const stop = (ev) => { ev.stopPropagation(); ev.preventDefault(); }; addEventListener('click', stop, { capture: true, once: true }); setTimeout(() => removeEventListener('click', stop, { capture: true }), 0); } drag = null; };
+    addEventListener('pointerup', end); addEventListener('pointercancel', end);
+    stage.addEventListener('dblclick', (e) => { if ((pan.x || pan.y) && free(e.target)) { pan = { x: 0, y: 0 }; apply(true); } });
+    setInterval(() => { const i = lessonIdx(); if (i !== lesson) { lesson = i; if (pan.x || pan.y) { pan = { x: 0, y: 0 }; apply(false); } } }, 500);
+  })();
+
   // карточка в начале урока: «Прослушать лекцию» или «Перейти к практике» — каждый раз, когда открывается урок
   const seenKey = () => 'oe-start:' + location.pathname + ':' + lessonIdx();
   let startShown = false;
