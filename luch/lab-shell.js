@@ -204,6 +204,12 @@
   .ls-start h3{font:500 22px/1.25 var(--font-display,"Unbounded",sans-serif);margin:8px 0 10px;text-wrap:balance}
   .ls-start p{margin:0 0 18px;color:var(--muted,#8b96ad);font-size:14.5px;line-height:1.55}
   .ls-start .acts{display:flex;flex-direction:column;gap:8px}
+  .ls-start .ls-lsn{list-style:none;margin:0 0 14px;padding:0;display:flex;flex-direction:column;gap:3px}
+  .ls-start .ls-lsn li{display:flex;gap:10px;align-items:center;font-size:13.5px;color:var(--muted,#8b96ad);padding:5px 8px;border-radius:8px}
+  .ls-start .ls-lsn li b{font:500 11px var(--font-mono,monospace);min-width:18px;height:18px;display:grid;place-items:center;border-radius:50%;border:1px solid var(--line,#26324a)}
+  .ls-start .ls-lsn li.ok b{background:rgba(94,220,150,.15);border-color:rgba(94,220,150,.5);color:#5edc96}
+  .ls-start .ls-lsn li.cur{background:rgba(255,181,71,.1);color:var(--fg,#e8ecf4)}.ls-start .ls-lsn li.cur b{background:var(--accent,#ffb547);border-color:var(--accent,#ffb547);color:#1a1300}
+  .ls-start .flow{font:500 11px/1.4 var(--font-mono,monospace);letter-spacing:.06em;color:var(--muted,#8b96ad);margin:0 0 14px}
   .ls-start .ls-btn{padding:13px 16px;font-size:15px;border-radius:12px}
   .ls-start .ls-btn.main{background:var(--accent,#ffb547)}
   .ls-stage{position:fixed;inset:0;z-index:72;display:grid;place-items:center;background:rgba(5,8,14,.86);padding:16px;animation:ls-in .25s ease}
@@ -582,10 +588,24 @@
     if (startShown || st || document.querySelector('.ls-start')) return false;
     try { localStorage.setItem(seenKey(), '1'); } catch (e) {} // отметка «урок открывали» — для прогресса и наставника
     startShown = true;
-    const reel = reelBtn(), h = lessonTitle(), n = lessonIdx() + 1, total = cards().length;
+    // Лаборатории перерисовывают обзор урока, только когда открыта его вкладка: перешёл к следующему
+    // уроку с «Практики» — в обзоре ещё прошлый урок. Тихо «щёлкаем» обзор и возвращаем вкладку назад,
+    // чтобы и карточка, и обзор были про текущий урок.
+    try { const was = PANES.find(x => P(x) && !P(x).hidden); if (was && was !== 'overview' && T('overview') && T(was)) { T('overview').click(); T(was).click(); } } catch (e) {}
+    const reel = reelBtn(), n = lessonIdx() + 1, cs = cards(), total = cs.length;
+    // раздел — из заголовка страницы; о чём урок — первая фраза его текста (раньше тут был общий абзац,
+    // одинаковый во всех уроках, и казалось, что открывается одно и то же)
+    const section = String(document.title || '').split(/\s+[—–|·]\s+/)[0].trim();
+    const ov = P('overview'), p1 = ov ? [...ov.querySelectorAll('p')].find(p => !p.closest('.life,.taskbox,[class*="task"]') && p.textContent.trim().length > 30) : null;
+    let about = p1 ? p1.textContent.replace(/\s+/g, ' ').trim() : '';
+    if (about.length > 170) { const cut = about.slice(0, 170), dot = cut.search(/[.!?…](?=[^.!?…]*$)/); about = dot > 70 ? cut.slice(0, dot + 1) : cut.replace(/\s+\S*$/, '') + '…'; }
+    const titleOf = c => { const t = c.querySelector('.t'); return (t ? t.textContent : c.textContent).replace(/^\s*\d+\s*/, '').replace(/✓/g, '').replace(/\s+/g, ' ').trim(); };
+    const h = (cs[n - 1] && titleOf(cs[n - 1])) || lessonTitle(); // название — из ленты уроков (она всегда про текущий урок)
+    const list = total > 1 && total <= 10 ? '<ol class="ls-lsn">' + cs.map((c, k) => `<li class="${k === n - 1 ? 'cur' : ''}${c.querySelector('.chk') ? ' ok' : ''}"><b>${k + 1}</b><span>${esc(titleOf(c))}</span></li>`).join('') + '</ol>' : '';
     const w = document.createElement('div'); w.className = 'ls-start'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-label', 'Начало урока');
-    w.innerHTML = `<div class="card"><div class="k">Урок ${n} из ${total}</div><h3>${esc(h)}</h3>
-      <p>Сначала — лекция: что это, зачем нужно, как работает, формулы и что предстоит в опыте. Потом попробуешь сам в опыте, а в конце закрепим домашним заданием.</p>
+    w.innerHTML = `<div class="card"><div class="k">${section ? esc(section) + ' · ' : ''}Урок ${n} из ${total}</div><h3>${esc(h)}</h3>
+      ${about ? `<p>${esc(about)}</p>` : ''}${list}
+      <div class="flow">Лекция → Опыт → Домашнее задание</div>
       <div class="acts">${reel ? '<button class="ls-btn main" data-a="reel">▶ Смотреть видео</button>' : ''}<button class="ls-btn ${reel ? '' : 'main'}" data-a="story">▶ Прослушать лекцию</button><button class="ls-btn ghost" data-a="practice">Перейти к практике</button></div></div>`;
     const close = () => { w.remove(); startShown = false; };
     w.addEventListener('click', e => {
