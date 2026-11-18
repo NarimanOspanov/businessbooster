@@ -349,7 +349,7 @@
   }
   // скорость лекции — как в плеерах; общая с аудиогидом, запоминается
   const RATES = [1, 1.2, 1.5, 2];
-  let rate = 1; try { rate = RATES.includes(+localStorage.getItem('ag-rate')) ? +localStorage.getItem('ag-rate') : 1; } catch (e) {}
+  let rate = 1.2; try { rate = RATES.includes(+localStorage.getItem('ag-rate')) ? +localStorage.getItem('ag-rate') : 1.2; } catch (e) {} // по умолчанию 1,2×
   function paintRate() { const b = st && st.el.querySelector('[data-a="rate"]'); if (!b) return; const t = String(rate).replace('.', ',') + '×'; b.textContent = t; b.setAttribute('aria-label', 'Скорость ' + t); }
   function stPaint() {
     paintRate();
@@ -396,7 +396,7 @@
       '<div class="txt" data-noi18n><b>Готовлю лекцию</b><div class="fact"></div></div>' +
       '<div class="dots"></div>' +
       '<div class="ctl"><button class="ic" data-a="prev" aria-label="Назад">‹</button><button class="pp" data-a="pp"></button><button class="ic" data-a="next" aria-label="Дальше">›</button>' +
-      '<button class="ic rate" data-a="rate" aria-label="Скорость 1×" title="Скорость: 1×, 1,2×, 1,5×, 2×">1×</button>' +
+      '<button class="ic rate" data-a="rate" aria-label="Скорость 1,2×" title="Скорость: 1×, 1,2×, 1,5×, 2×">1,2×</button>' +
       '<span class="sp"></span><button class="ls-btn ghost" data-a="practice">К практике →</button></div></div>';
     el.addEventListener('click', e => {
       if (e.target === el) return stopStory();
