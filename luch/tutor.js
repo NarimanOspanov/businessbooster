@@ -904,9 +904,13 @@
   // Компьютер: распознавание речи слушает всё время, пока наставник говорит; пара слов, которых нет в его
   // собственной речи (эхо из динамиков), — это ученик: озвучка обрывается, а договорённое сразу уходит вопросом.
   // Телефон: громкость с микрофона (с подавлением эха); ученик громче эха дольше трети секунды — замолкаем и слушаем.
-  const wordsOf = t => String(t || '').toLowerCase().replace(/ё/g, 'е').match(/[а-яa-zәғқңөұүһі]{3,}/g) || [];
-  const echoOf = t => { const ws = wordsOf(t); if (!ws.length) return true; const sp = spoken.toLowerCase().replace(/ё/g, 'е'); return ws.filter(w => sp.includes(w)).length / ws.length >= 0.6; };
-  const userTalk = t => wordsOf(t).length >= 2 && !echoOf(t);
+  const wordsOf = t => String(t || '').toLowerCase().replace(/ё/g, 'е').match(/[а-яa-zәғқңөұүһі]{2,}/g) || [];
+  // эхо — только то, что повторяет ПОСЛЕДНИЕ фразы наставника парами слов подряд (раньше хватало отдельных
+  // слов из всего ответа — и «а почему так» ученика считалось эхом: в ответе были «почему» и «так»)
+  const echoOf = t => { const ws = wordsOf(t); if (!ws.length) return true; const sp = ' ' + wordsOf(spoken.slice(-400)).join(' ') + ' ';
+    if (ws.length === 1) return sp.includes(' ' + ws[0] + ' '); let hit = 0; for (let i = 0; i < ws.length - 1; i++) if (sp.includes(' ' + ws[i] + ' ' + ws[i + 1] + ' ')) hit++; return hit / (ws.length - 1) >= 0.5; };
+  const HOLD_RE = /(^|[^а-я])(подожди|подождите|погоди|постой|стой|секунду|минутку|слушай|послушай|а можно|можно вопрос)([^а-я]|$)/i;
+  const userTalk = t => !echoOf(t) && (wordsOf(t).length >= 2 || HOLD_RE.test(String(t).toLowerCase().replace(/ё/g, 'е')));
   function interrupt(heard) { if (ctrl) ctrl.abort(); speaker.stop(); spoken = ''; barging = true; setVoice('listening', heard || ''); }
   async function bargeAsk(q) {
     stopWatchEnd();
@@ -935,7 +939,7 @@
         let t = ''; for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript + ' ';
         const w = (String(t).toLowerCase().match(STOP_RE) || [])[2]; // своё же слово из динамиков — не команда
         if (isStop(t) && !(w && spoken.toLowerCase().includes(w))) return stopTalk(true);
-        if (!userTalk(t)) return;
+        if (!userTalk(t)) { if (!echoOf(t)) vh.textContent = 'слышу: ' + t.trim(); return; } // видно, что микрофон слышит
         interrupt(t.trim()); heard = t.trim(); return;
       }
       heard = all; vh.textContent = heard;
