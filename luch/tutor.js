@@ -1002,7 +1002,7 @@
         // из рамки задания берём только саму задачу: без «Задание · урок 1» и счётчиков после неё
         task = String(task || '').replace(/\s+/g, ' ').replace(/^Задание\s*·\s*урок\s*\d+\s*/i, '').trim();
         const sent = task.match(/^.{12,200}?[.!?](?=\s|$)/); if (sent) task = sent[0];
-        return { i, n: L ? L.length : document.querySelectorAll('.lessons .lesson, .lessons button').length, title: h ? h.textContent.trim() : '', task: task.slice(0, 200) };
+        return { i, n: L ? L.length : document.querySelectorAll('.lessons .lesson, .lessons button').length, title: (l && l.title && String(l.title).replace(/<[^>]+>/g, '')) || (h ? h.textContent.trim() : ''), task: task.slice(0, 200) }; // название — из списка уроков: обзор бывает от прошлого урока
       };
       const taskEl = () => [...document.querySelectorAll('[class*="task"]')].find(e => e.offsetParent && !e.closest('.lt-panel,.lt-tip,#pane-hw') && e.getBoundingClientRect().width > 120);
       const remember = () => { const x = info(); store.set('luch-last', JSON.stringify({ url: sh.lessonUrl(), title: x.title, at: Date.now() })); };
@@ -1050,7 +1050,7 @@
       if (!document.getElementById('subjects')) return false;
       let last = null; try { last = JSON.parse(store.get('luch-last') || 'null'); } catch (e) {}
       setTimeout(() => {
-        if (last && last.url) return show(`С возвращением! Продолжим урок «${last.title}»?`, [['Продолжить', () => { location.href = last.url; }], ['Выбрать другое', () => gradeAsk()]], { force: true });
+        if (last && last.url) return show(`С возвращением! Мы с тобой остановились на уроке «${last.title}». Если хочешь, продолжим его — или можем перейти к другому разделу.`, [['Да, продолжим', () => { location.href = last.url; }], ['Другой раздел', () => gradeAsk()]], { force: true });
         gradeAsk();
       }, 1200);
       function gradeAsk() {
