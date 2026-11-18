@@ -729,11 +729,11 @@
   // ---------- voice conversation ----------
   // Разговор без рук: пока панель открыта, наставник всё время слушает.
   // Тишина не выключает микрофон; выключить — нажать на кружок (и нажать снова, чтобы включить).
-  let vListen = null, vState = 'idle', micOff = false, vErr = 0;
-  const VS = { idle: 'Микрофон выключен · нажмите 🎤', listening: 'Слушаю · говорите в любой момент', thinking: 'Смотрю на экран…', speaking: 'Говорю · скажите «стоп» или нажмите ■' };
+  let vListen = null, vState = 'idle', micOff = false, vErr = 0, barging = false;
+  const VS = { idle: 'Микрофон выключен · нажмите 🎤', listening: 'Слушаю · говорите в любой момент', thinking: 'Смотрю на экран…', speaking: 'Говорю · можно перебить — просто начните говорить' };
   function setVoice(s, hint) { vState = s; orb.dataset.s = s; vs.textContent = VS[s]; if (hint !== undefined) vh.textContent = hint; orb.setAttribute('aria-label', s === 'listening' ? 'Выключить микрофон' : s === 'idle' ? 'Включить микрофон' : 'Перебить'); }
   async function turn() {
-    if (!voiceMode || busy || micOff || vListen) return;
+    if (!voiceMode || busy || micOff || vListen || barging) return;
     if (document.hidden) { setVoice('idle', 'Вернитесь на вкладку — я снова буду слушать.'); return; }
     if (mediaBusy()) { waitMedia(); return; }
     setVoice('listening', '');
@@ -877,27 +877,85 @@
     if (voiceMode) { micOff = false; setVoice('idle', said ? 'Хорошо, молчу. Говорите, когда нужно.' : ''); setTimeout(turn, 350); }
   }
   stopBtn.addEventListener('click', () => stopTalk());
-  // пока наставник говорит — слушаем только команду «стоп» (на компьютере; на телефоне — кнопкой)
+  // ---------- перебить наставника голосом (18.11.2026) ----------
+  // Как в живом разговоре: наставник говорит, ученик начинает говорить — наставник замолкает и слушает.
+  // Компьютер: распознавание речи слушает всё время, пока наставник говорит; пара слов, которых нет в его
+  // собственной речи (эхо из динамиков), — это ученик: озвучка обрывается, а договорённое сразу уходит вопросом.
+  // Телефон: громкость с микрофона (с подавлением эха); ученик громче эха дольше трети секунды — замолкаем и слушаем.
+  const wordsOf = t => String(t || '').toLowerCase().replace(/ё/g, 'е').match(/[а-яa-zәғқңөұүһі]{3,}/g) || [];
+  const echoOf = t => { const ws = wordsOf(t); if (!ws.length) return true; const sp = spoken.toLowerCase().replace(/ё/g, 'е'); return ws.filter(w => sp.includes(w)).length / ws.length >= 0.6; };
+  const userTalk = t => wordsOf(t).length >= 2 && !echoOf(t);
+  function interrupt(heard) { if (ctrl) ctrl.abort(); speaker.stop(); spoken = ''; barging = true; setVoice('listening', heard || ''); }
+  async function bargeAsk(q) {
+    stopWatchEnd();
+    for (let i = 0; i < 20 && busy; i++) await new Promise(res => setTimeout(res, 50)); // прерванный ответ закрывается
+    barging = false;
+    if (!q || !voiceMode) { setTimeout(turn, 120); return; }
+    if (isStop(q)) { setVoice('listening', 'Хорошо, молчу. Говорите, когда нужно.'); setTimeout(turn, 120); return; }
+    vh.textContent = q; setVoice('thinking');
+    await ask(q, { voice: true });
+    if (!voiceMode) return;
+    await speaker.idle();
+    if (voiceMode && !micOff) turn();
+  }
   let sw = null;
   function stopWatchStart() {
-    if (sw || !SR || MOBILE || !voiceMode || panel.hidden) return;
+    if (sw || !voiceMode || panel.hidden) return;
+    if (!SR || MOBILE) return vadStart();
     let rec; try { rec = new SR(); } catch (e) { return; }
     rec.lang = LOCALE; rec.continuous = true; rec.interimResults = true;
+    let heard = '', done = false;
     rec.onresult = e => {
-      let t = ''; for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript + ' ';
-      // своё же слово из динамиков — не команда
-      const w = (String(t).toLowerCase().match(STOP_RE) || [])[2];
-      if (isStop(t) && !(w && spoken.toLowerCase().includes(w))) stopTalk(true);
+      let all = '', fin = true;
+      for (let i = 0; i < e.results.length; i++) { all += e.results[i][0].transcript + ' '; if (!e.results[i].isFinal) fin = false; }
+      all = all.trim();
+      if (!barging) {
+        let t = ''; for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript + ' ';
+        const w = (String(t).toLowerCase().match(STOP_RE) || [])[2]; // своё же слово из динамиков — не команда
+        if (isStop(t) && !(w && spoken.toLowerCase().includes(w))) return stopTalk(true);
+        if (!userTalk(t)) return;
+        interrupt(t.trim()); heard = t.trim(); return;
+      }
+      heard = all; vh.textContent = heard;
+      if (fin && !done) { done = true; bargeAsk(heard); } // ученик договорил — это его вопрос
     };
     rec.onerror = () => {};
-    rec.onend = () => { if (sw === rec) { sw = null; if (talking()) setTimeout(stopWatchStart, 250); } };
+    rec.onend = () => {
+      if (sw !== rec) return; sw = null;
+      if (barging && !done) { done = true; bargeAsk(heard); return; } // распознавание закрылось само — берём, что успели
+      if (talking()) setTimeout(stopWatchStart, 250);
+    };
     try { rec.start(); sw = rec; } catch (e) {}
   }
-  function stopWatchEnd() { const r = sw; sw = null; if (r) { try { r.onend = null; r.abort(); } catch (e) {} } }
+  // телефон: следим за громкостью, пока наставник говорит
+  let vad = null;
+  async function vadStart() {
+    if (vad || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    const me = vad = { stop: () => {} };
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false } });
+      if (vad !== me) { stream.getTracks().forEach(t => t.stop()); return; }
+      const AC = window.AudioContext || window.webkitAudioContext, ac = new AC(), an = ac.createAnalyser(); an.fftSize = 1024;
+      ac.createMediaStreamSource(stream).connect(an);
+      const buf = new Float32Array(an.fftSize); let loud = 0, last = performance.now(), raf = 0;
+      me.stop = () => { cancelAnimationFrame(raf); stream.getTracks().forEach(t => t.stop()); ac.close().catch(() => {}); };
+      const tick = () => {
+        if (vad !== me) return;
+        an.getFloatTimeDomainData(buf); let sum = 0; for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+        const rms = Math.sqrt(sum / buf.length), now = performance.now(), dt = now - last; last = now;
+        loud = rms > 0.07 ? loud + dt : Math.max(0, loud - dt * 0.5);
+        if (loud > 350 && talking()) { vadEnd(); interrupt(''); barging = false; setTimeout(turn, 60); return; } // ученик заговорил
+        raf = requestAnimationFrame(tick);
+      };
+      tick();
+    } catch (e) { if (vad === me) vad = null; }
+  }
+  function vadEnd() { const v = vad; vad = null; if (v) v.stop(); }
+  function stopWatchEnd() { vadEnd(); const r = sw; sw = null; if (r) { try { r.onend = null; r.abort(); } catch (e) {} } }
   let wasTalking = false;
   setInterval(() => {
     const t = talking();
-    if (t !== wasTalking) { wasTalking = t; stopBtn.hidden = !t; if (t) stopWatchStart(); else { stopWatchEnd(); spoken = ''; } }
+    if (t !== wasTalking) { wasTalking = t; stopBtn.hidden = !t; if (t) stopWatchStart(); else if (!barging) { stopWatchEnd(); spoken = ''; } }
   }, 200);
   panel.addEventListener('keydown', e => { if (e.key === 'Escape') { if (talking()) { e.preventDefault(); stopTalk(); } else close(); } });
   sug.addEventListener('click', e => {
