@@ -203,6 +203,7 @@
   .ls-done{position:fixed;left:50%;top:14px;z-index:80;transform:translate(-50%,-30px);opacity:0;pointer-events:none;background:#16a34a;color:#fff;border-radius:14px;padding:10px 18px;box-shadow:0 12px 32px -8px rgba(0,0,0,.5);display:flex;flex-direction:column;align-items:center;gap:2px;font:500 14px/1.35 var(--font-body,system-ui,sans-serif);transition:opacity .25s,transform .25s;max-width:calc(100vw - 28px);text-align:center}
   .ls-done b{font-size:16px}.ls-done.on{opacity:1;transform:translate(-50%,0)}
   @media (prefers-reduced-motion:reduce){#taskState.ls-ok{animation:none}.ls-done{transition:none}}
+  .lr-cover{display:none!important}
   .ls-start{position:fixed;inset:0;z-index:70;display:grid;place-items:center;background:rgba(5,8,14,.72);padding:16px}
   .ls-start .card{width:min(440px,100%);background:var(--surface,#121a28);border:1px solid var(--line,#26324a);border-radius:20px;padding:24px;box-shadow:0 30px 80px -20px rgba(0,0,0,.8);color:var(--fg,#e8ecf4)}
   .ls-start .k{font:500 11px/1.4 var(--font-mono,monospace);letter-spacing:.1em;text-transform:uppercase;color:var(--muted,#8b96ad)}
@@ -311,7 +312,8 @@
   const story = document.createElement('div'); story.className = 'ls-story';
   sub.after(story);
   const LANG2 = (window.LuchI18n && window.LuchI18n.lang) || 'ru';
-  const reelBtn = () => P('overview') && P('overview').querySelector('[data-reel]');
+  // Старые ролики-рилсы (разделы «Механика», «Оптика») больше не показываем: везде одинаково — лекция, потом практика
+  const reelBtn = () => null;
   const taskBox = () => [...document.querySelectorAll('[class*="task"]')].find(e => e.offsetParent && !e.closest('.ls-story,.ls-start,#pane-hw,.lt-panel,.lt-tip') && e.getBoundingClientRect().width > 120);
   const toPractice = () => { stopStory(); openTab('scheme'); const t = taskBox(); if (t && window.LuchTutor && window.LuchTutor.highlight) window.LuchTutor.highlight(t); };
   let cache = {};
