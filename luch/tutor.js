@@ -181,8 +181,22 @@
   .lt-m.a code{font:500 13px "IBM Plex Mono",monospace;background:#0b1019;padding:1px 5px;border-radius:5px}
   .lt-panel,.lt-board,.lt-btn{transition:opacity .3s}
   .lt-peek{opacity:.1!important;pointer-events:none!important}
+  .lt-cap{display:none}
+  .lt-panel.lt-compact{min-height:0;max-height:none;width:min(430px,calc(100vw - 36px))}
+  .lt-compact .lt-log,.lt-compact .lt-sug{display:none!important}
+  .lt-compact .lt-head{align-items:flex-start;border-bottom:0;padding:9px 8px 2px 10px}
+  .lt-compact .lt-head .lt-av{margin-top:1px}
+  .lt-compact .lt-sp b{display:none}
+  .lt-compact .lt-cap{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font:14px/1.42 "Golos Text",system-ui,sans-serif;color:#e8ecf4;cursor:pointer;padding-top:3px}
+  .lt-compact .lt-cap.empty{color:#8b96ad}
+  .lt-compact .lt-cap.full{display:block;-webkit-line-clamp:unset;max-height:40vh;overflow-y:auto}
+  .lt-compact .lt-form{border-top:0;padding:6px 8px 8px}
+  .lt-compact .lt-form textarea{padding:8px 11px;min-height:38px}
+  .lt-compact .lt-send,.lt-compact .lt-mic{width:38px;height:38px;border-radius:11px}
+  .lt-compact .lt-voice{padding:6px 8px 8px}
+  #lt-hist[aria-pressed="true"]{color:#e8ecf4;border-color:#8b96ad}
   .lt-panel.lt-mini{min-height:0;max-height:none;cursor:pointer}.lt-panel.lt-mini > :not(.lt-head){display:none!important}.lt-panel.lt-mini .lt-head{border-bottom:0}
-  .lt-panel.lt-mini .lt-head b:after{content:' · нажми, чтобы открыть';font-weight:400;color:#8b96ad;font-size:12px}
+  .lt-panel.lt-mini:not(.lt-compact) .lt-head b:after{content:' · нажми, чтобы открыть';font-weight:400;color:#8b96ad;font-size:12px}.lt-panel.lt-mini.lt-compact .lt-head{padding-bottom:9px}
   /* закрывает показания или задание — переезжает в левый нижний угол */
   .lt-panel.lt-left,.lt-btn.lt-left{right:auto;left:calc(18px + env(safe-area-inset-left,0px))}.lt-btn.lt-left{flex-direction:row}
   .lt-m .lt-say{display:inline-flex;margin:6px 14px 0 0;background:none;border:0;padding:0;color:#8b96ad;font:500 11.5px "Golos Text",sans-serif;cursor:pointer;gap:5px;align-items:center}
@@ -277,11 +291,11 @@
   const panel = document.createElement('section');
   panel.className = 'lt-panel'; panel.hidden = true; panel.setAttribute('aria-label', 'ИИ-наставник');
   panel.innerHTML = `
-    <div class="lt-head">${AV}<div class="lt-sp"><b>Наставник</b></div>
+    <div class="lt-head">${AV}<div class="lt-sp"><b>Наставник</b><div class="lt-cap empty" id="lt-cap" title="Нажмите, чтобы прочитать целиком">Спросите — объясню, подскажу, проверю.</div></div>
       <button class="lt-ib" id="lt-vm" type="button" aria-pressed="false" title="Разговор голосом" hidden>${WAVE}<span class="lt-tx">Голосом</span></button>
       <button class="lt-ib" id="lt-bd" type="button" title="Доска: рисовать и показывать наставнику" aria-label="Доска">✎</button>
       <button class="lt-ib lt-stop" id="lt-stop" type="button" title="Остановить озвучку (или скажите «стоп»)" hidden>■ Стоп</button>
-      <button class="lt-ib" id="lt-close" type="button" aria-label="Свернуть">✕</button></div>
+      <button class="lt-ib" id="lt-hist" type="button" aria-pressed="false" title="Вся переписка" aria-label="Вся переписка">☰</button><button class="lt-ib" id="lt-close" type="button" aria-label="Свернуть" title="Свернуть">✕</button></div>
     <div class="lt-log" id="lt-log" aria-live="polite"></div>
     <div class="lt-sug" id="lt-sug"></div>
     <form class="lt-form" id="lt-form">
@@ -297,6 +311,17 @@
   const $ = s => panel.querySelector(s);
   const log = $('#lt-log'), inp = $('#lt-in'), send = $('#lt-send'), sug = $('#lt-sug'), mic = $('#lt-mic');
   const form = $('#lt-form'), voiceBox = $('#lt-voice'), orb = $('#lt-orb'), vs = $('#lt-vs'), vh = $('#lt-vh'), vmBtn = $('#lt-vm');
+  // Компактное окно по умолчанию (18.11.2026): вместо ленты чата — одна строка с тем, что наставник сейчас
+  // говорит/ответил, поле вопроса, микрофон и «Стоп». «☰» — вся переписка (выбор запоминается).
+  const cap = $('#lt-cap'), hist = $('#lt-hist'), FULL_KEY = 'luch-tutor-full';
+  const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  function setCompact(c) { panel.classList.toggle('lt-compact', c); hist.setAttribute('aria-pressed', String(!c)); hist.title = c ? 'Вся переписка' : 'Компактно'; try { localStorage.setItem(FULL_KEY, c ? '0' : '1'); } catch (e) {} if (!c) setTimeout(() => { log.scrollTop = log.scrollHeight; }, 0); }
+  setCompact(lsGet(FULL_KEY) !== '1');
+  hist.addEventListener('click', () => setCompact(!panel.classList.contains('lt-compact')));
+  const lastAnswer = () => { const a = [...log.querySelectorAll('.lt-m.a')].pop(); if (!a) return ''; const c = a.cloneNode(true); c.querySelectorAll('button,svg').forEach((x) => x.remove()); return c.textContent.replace(/\s+/g, ' ').trim(); };
+  const paintCap = () => { const t = lastAnswer(); cap.textContent = t || 'Спросите — объясню, подскажу, проверю.'; cap.classList.toggle('empty', !t); };
+  new MutationObserver(paintCap).observe(log, { childList: true, subtree: true, characterData: true });
+  cap.addEventListener('click', () => cap.classList.toggle('full'));
 
   const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   function md(text) {
