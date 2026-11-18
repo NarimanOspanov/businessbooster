@@ -731,7 +731,7 @@
   // Разговор без рук: пока панель открыта, наставник всё время слушает.
   // Тишина не выключает микрофон; выключить — нажать на кружок (и нажать снова, чтобы включить).
   let vListen = null, vState = 'idle', micOff = false, vErr = 0, barging = false;
-  const VS = { idle: 'Микрофон выключен · нажмите 🎤', listening: 'Слушаю · говорите в любой момент', thinking: 'Смотрю на экран…', speaking: 'Говорю · можно перебить — просто начните говорить' };
+  const VS = { idle: 'Микрофон выключен · нажмите 🎤', listening: 'Слушаю · говорите в любой момент', thinking: 'Смотрю на экран…', speaking: 'Говорю · перебить: скажите «подожди» или нажмите ■' };
   function setVoice(s, hint) { vState = s; orb.dataset.s = s; vs.textContent = VS[s]; if (hint !== undefined) vh.textContent = hint; orb.setAttribute('aria-label', s === 'listening' ? 'Выключить микрофон' : s === 'idle' ? 'Включить микрофон' : 'Перебить'); }
   async function turn() {
     if (!voiceMode || busy || micOff || vListen || barging) return;
@@ -939,8 +939,11 @@
         let t = ''; for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript + ' ';
         const w = (String(t).toLowerCase().match(STOP_RE) || [])[2]; // своё же слово из динамиков — не команда
         if (isStop(t) && !(w && spoken.toLowerCase().includes(w))) return stopTalk(true);
-        if (!userTalk(t)) { if (!echoOf(t)) vh.textContent = 'слышу: ' + t.trim(); return; } // видно, что микрофон слышит
-        interrupt(t.trim()); heard = t.trim(); return;
+        // Распознавание слышит и колонки: по тексту ученика от эха не отличить (наставник отвечал сам себе).
+        // Поэтому перебивает только слово-команда, которого нет в речи наставника, — и дальше слушаем заново в тишине.
+        const tl = String(t).toLowerCase().replace(/ё/g, 'е'), hw = (tl.match(HOLD_RE) || [])[2];
+        if (!hw || spoken.toLowerCase().replace(/ё/g, 'е').includes(hw)) return;
+        if (ctrl) ctrl.abort(); speaker.stop(); spoken = ''; stopWatchEnd(); setVoice('listening', 'Слушаю тебя.'); setTimeout(turn, 200); return;
       }
       heard = all; vh.textContent = heard;
       if (fin && !done) { done = true; bargeAsk(heard); } // ученик договорил — это его вопрос
@@ -969,8 +972,8 @@
         if (vad !== me) return;
         an.getFloatTimeDomainData(buf); let sum = 0; for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
         const rms = Math.sqrt(sum / buf.length), now = performance.now(), dt = now - last; last = now;
-        loud = rms > 0.07 ? loud + dt : Math.max(0, loud - dt * 0.5);
-        if (loud > 350 && talking()) { vadEnd(); interrupt(''); barging = false; setTimeout(turn, 60); return; } // ученик заговорил
+        loud = rms > 0.11 ? loud + dt : Math.max(0, loud - dt * 0.5);
+        if (loud > 450 && talking()) { vadEnd(); interrupt(''); barging = false; setTimeout(turn, 60); return; } // ученик заговорил
         raf = requestAnimationFrame(tick);
       };
       tick();
