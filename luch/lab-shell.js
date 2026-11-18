@@ -491,7 +491,7 @@
       journal(j => { j.theoryDone = true; });
       el.classList.add('done');
       const outro = 'Ну что, давай попробуем на практике! Если что-то осталось непонятным — ничего страшного: задай мне любой вопрос, я отвечу. Не переживай.';
-      txt.innerHTML = '<b>Объяснение закончено</b><p>' + esc(outro) + '</p><div class="end"><button class="ls-btn main" data-a="askq">🎤 Задать вопрос</button><button class="ls-btn" data-a="practice">Перейти к практике →</button><button class="ls-btn ghost" data-a="again">Посмотреть ещё раз</button></div>';
+      txt.innerHTML = '<b>Объяснение закончено</b><p>' + esc(outro) + '</p><div class="end"><button class="ls-btn main" data-a="practice">Перейти к практике →</button><button class="ls-btn ghost" data-a="again">Посмотреть ещё раз</button></div>';
       // наставник говорит это вслух, как продолжение объяснения (если раздел «на практике» уже сказал это сам — не повторяем)
       if (!(secs[secs.length - 1] || {}).scheme) tts(outro).then(blob => {
         if (!st || st.run !== my || !blob || blob.size < 100) return;
