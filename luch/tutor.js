@@ -183,7 +183,8 @@
   .lt-peek{opacity:.1!important;pointer-events:none!important}
   .lt-cap{display:none}
   .lt-panel.lt-compact{min-height:0;max-height:none;width:min(430px,calc(100vw - 36px))}
-  .lt-compact .lt-log,.lt-compact .lt-sug{display:none!important}
+  .lt-compact .lt-log,.lt-compact:not(.lt-ask) .lt-sug{display:none!important}
+  .lt-compact.lt-ask .lt-sug{padding:2px 8px 4px}
   .lt-compact .lt-head{align-items:flex-start;border-bottom:0;padding:9px 8px 2px 10px}
   .lt-compact .lt-head .lt-av{margin-top:1px}
   .lt-compact .lt-sp b{display:none}
@@ -351,7 +352,7 @@
   let tipChips = [];
   function suggestions() {
     if (tipChips.length) {
-      sug.innerHTML = tipChips.map((c, i) => `<button type="button" data-tc="${i}">${esc(c[0])}</button>`).join('') + '<button type="button" data-ant="1">💡 Помоги</button>';
+      sug.innerHTML = tipChips.map((c, i) => `<button type="button" data-tc="${i}">${esc(c[0])}</button>`).join('') + (tipChips.some(c => /Подскажи/.test(c[0])) ? '' : '<button type="button" data-ant="1">💡 Помоги</button>');
       sug.hidden = busy; return;
     }
     let list = [];
@@ -675,7 +676,7 @@
   // ---------- asking ----------
   async function ask(q, opts = {}) {
     q = q.trim(); if (!q || busy) return '';
-    busy = true; send.disabled = true; sug.hidden = true;
+    busy = true; send.disabled = true; sug.hidden = true; panel.classList.remove('lt-ask');
     if (!chat.length) log.innerHTML = '';
     chat.push({ role: 'user', content: q + (opts.image ? '\n(рисунок с доски)' : ''), show: opts.show }); bubble('user', (opts.show || q) + (opts.image ? ' 🖼' : ''));
     const a = bubble('assistant', ''); a.innerHTML = '<span class="lt-dots"><i></i><i></i><i></i></span>'; scroll();
@@ -799,6 +800,27 @@
   const ANT_BASE = 'Я нажал «Помоги». Не жди вопроса и не спрашивай, чем помочь. Сам пойми, что мне сейчас нужно, по всему, что знаешь: что на экране и в каком состоянии опыт, что я нажимал и выставлял (журнал действий), какие сообщения показывал опыт, прослушал ли я теорию и смотрел ли видео, сколько времени где провёл, как дела с ДЗ, и что мы уже обсуждали в этом разговоре (голосом и текстом). Найди одну самую вероятную причину, почему я застрял или что мне сейчас пригодится, и помоги точно в эту точку. Не повторяй дословно то, что уже говорил раньше. Если ошибка в понимании идеи и теорию я не слушал — объясни идею одной-двумя фразами на примере из жизни. Если всё уже сделано — коротко похвали и предложи следующий шаг (ДЗ или следующий урок). Ответ короткий: 1–3 предложения, подсвети нужное место на странице.';
   const ANT_LEVEL = ['', ' Это первая просьба о помощи: дай наводящий вопрос или намёк, не говори ответ.', ' Я уже просил помощи: теперь скажи конкретный следующий шаг — что нажать или какое значение выставить.', ' Я прошу помощи уже не в первый раз и, видимо, застрял всерьёз: разбери решение по шагам (2–4 коротких шага) и объясни, почему так.'];
   let antAt = 0;
+  // Совёнок (18.11.2026): по нажатию наставник сперва спрашивает, с чем помочь, — голосом и текстом, сразу,
+  // без запроса к ИИ — и предлагает три варианта; «Подскажи, что делать» — прежний разбор ситуации.
+  const GREET = ['Привет! С чем помочь?', 'Я здесь. С чем помочь?', 'Слушаю. Что непонятно?'];
+  async function askQ(q, show) {
+    if (voiceMode) { setVoice('thinking', ''); await ask(q, { voice: true, show }); await speaker.idle(); if (voiceMode && !micOff) turn(); }
+    else await ask(q, { show });
+  }
+  function greet() {
+    if (busy) return;
+    const first = GREET[Math.floor(Math.random() * GREET.length)];
+    const text = first + ' Спроси про задание, про теорию или про то, что видишь на экране.';
+    bubble('assistant', text); chat.push({ role: 'assistant', content: text }); saveChat();
+    tipChips = [
+      ['💡 Подскажи, что делать', () => anticipate()],
+      ['📖 Объясни идею урока', () => askQ('Объясни коротко главную идею этого урока на примере из жизни — 2–3 предложения.', '📖 Объясни идею урока')],
+      ['✅ Проверь, правильно ли я делаю', () => askQ('Посмотри, что у меня сейчас на экране, и скажи, правильно ли я выполняю задание. Коротко.', '✅ Проверь меня')],
+    ];
+    panel.classList.add('lt-ask'); suggestions(); scroll();
+    if (voiceMode) { setVoice('speaking', ''); speaker.stop(); speaker.add(first); speaker.end(); speaker.idle().then(() => { if (voiceMode && !micOff && !busy) turn(); }); }
+    else setTimeout(() => inp.focus(), 30);
+  }
   async function anticipate() {
     if (busy) return;
     antAt = Date.now();
@@ -861,7 +883,7 @@
     if (guide && guide.takeTip()) return;
     open(); unlockAudio();
     if (canListen && ls.get('luch-tutor-mode') !== 'text') setMode(true, true);
-    anticipate();
+    greet(); // сначала спросить, с чем помочь
   });
   $('#lt-close').addEventListener('click', close);
 
