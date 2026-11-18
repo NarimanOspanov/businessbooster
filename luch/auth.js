@@ -21,10 +21,16 @@
     .oe-acc a:focus-visible,.oe-acc button:focus-visible{outline:2px solid #ffb347;outline-offset:2px}
     .oe-acc .bd{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#ff8a73;color:#1b0b06;font:700 11px/18px inherit;text-align:center;margin-right:-4px}
     .oe-acc img,.oe-acc .av{width:24px;height:24px;border-radius:50%;margin-left:-6px;object-fit:cover;display:grid;place-items:center;background:#ff9f1c;color:#1b1206;font-size:12px}
+    .oe-acc{position:relative}.oe-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:90;min-width:190px;background:#151d2c;border:1px solid #2a3650;border-radius:14px;padding:6px;box-shadow:0 18px 40px -12px rgba(0,0,0,.7);display:flex;flex-direction:column;gap:2px}
+    .oe-menu[hidden]{display:none}.oe-acc .oe-menu a,.oe-acc .oe-menu button{all:unset;cursor:pointer;display:block;padding:10px 12px;border-radius:9px;font:500 14px/1.2 inherit;color:#e8ecf4;white-space:nowrap}
+    .oe-acc .oe-menu a:hover,.oe-acc .oe-menu button:hover,.oe-acc .oe-menu a:focus-visible,.oe-acc .oe-menu button:focus-visible{background:rgba(255,255,255,.08)}.oe-acc .oe-menu [data-out]{color:#ff8a73}
     @media (max-width:480px){header .brand h1{font-size:17px!important;letter-spacing:.1em!important}header .brand small{font-size:9.5px!important;letter-spacing:.08em!important}header .brand svg{width:34px!important;height:34px!important}header{column-gap:8px!important}.oe-acc{padding-left:0!important}}
     @media (max-width:600px){.oe-acc{margin-left:8px}.oe-acc .nm{display:none}.oe-acc a,.oe-acc button{padding:0 10px}}`;
   document.head.appendChild(css);
   const acc = document.createElement('div'); acc.className = 'oe-acc'; acc.dataset.noi18n = '';
+  // меню аккаунта закрывается нажатием мимо и клавишей Esc
+  document.addEventListener('click', (e) => { const m = acc.querySelector('.oe-menu'); if (m && !m.hidden && !acc.contains(e.target)) { m.hidden = true; const b = acc.querySelector('[aria-haspopup]'); if (b) b.setAttribute('aria-expanded', 'false'); } });
+  document.addEventListener('keydown', (e) => { const m = acc.querySelector('.oe-menu'); if (e.key === 'Escape' && m && !m.hidden) { m.hidden = true; const b = acc.querySelector('[aria-haspopup]'); if (b) { b.setAttribute('aria-expanded', 'false'); b.focus(); } } });
   function mount() { const h = document.querySelector('header'); if (h && !acc.isConnected) h.appendChild(acc); }
   function paint() {
     mount();
@@ -32,7 +38,12 @@
     if (!u) { acc.innerHTML = '<button type="button">Войти</button>'; acc.firstChild.onclick = () => clerk ? A.openSignIn() : null; acc.firstChild.title = 'Войти: прогресс сохранится и будет на любом устройстве'; return; }
     const nick = A.data && A.data.user && A.data.user.nick;
     const first = esc((nick || u.firstName || u.fullName || u.primaryEmailAddress?.emailAddress || 'Кабинет').split(' ')[0]);
-    acc.innerHTML = `<a href="/me/" title="Мой кабинет: прогресс и история занятий">${u.imageUrl ? `<img src="${esc(u.imageUrl)}" alt="">` : `<span class="av">${first[0] || '•'}</span>`}<span class="nm">${first}</span></a>`;
+    acc.innerHTML = `<a href="/me/" role="button" aria-haspopup="menu" aria-expanded="false" title="Аккаунт">${u.imageUrl ? `<img src="${esc(u.imageUrl)}" alt="">` : `<span class="av">${first[0] || '•'}</span>`}<span class="nm">${first}</span></a>` +
+      `<div class="oe-menu" role="menu" hidden><a role="menuitem" href="/me/">Мой кабинет</a><a role="menuitem" href="/social/">Друзья и группы</a><button role="menuitem" type="button" data-out>Выйти</button></div>`;
+    const btn = acc.querySelector('a[aria-haspopup]'), menu = acc.querySelector('.oe-menu');
+    const show = (on) => { menu.hidden = !on; btn.setAttribute('aria-expanded', String(on)); };
+    btn.onclick = (e) => { e.preventDefault(); show(menu.hidden); if (!menu.hidden) menu.querySelector('a').focus(); };
+    menu.querySelector('[data-out]').onclick = async () => { show(false); try { await A.signOut(); } catch (e) {} location.href = '/'; };
     if (A.social) setBadge(A.social);
   }
   // значок: новые заявки в друзья и непрочитанные сообщения
@@ -40,6 +51,7 @@
   async function socialPoll() { if (!A.user || document.hidden || FRAMED) return; try { const t = await token(); if (!t) return; const j = await (await fetch('/api/social/me', { headers: { Authorization: 'Bearer ' + t } })).json(); if (j.ok) setBadge(j); } catch (e) {} }
   setInterval(socialPoll, 60000);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  A.repaint = paint; // перерисовать шапку (и для проверки без входа)
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', paint); else paint();
 
   // ---------- очередь событий и изменений прогресса ----------
