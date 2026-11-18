@@ -8,6 +8,13 @@ const path = require("path");
 
 const CLAUDE_MODEL = process.env.TUTOR_MODEL || "claude-opus-5-5";
 const GEMINI_MODEL = process.env.TUTOR_GEMINI_MODEL || process.env.GEMINI_MODEL || "gemini-3.7-flash";
+// Живой разговор с наставником (18.11.2026). Замер на запросе «помоги»: gemini-3.7-flash с «думанием» по умолчанию —
+// первое слово через 12 с; flash-lite без размышлений — через ~1 с, весь ответ ~2 с, объясняет так же по делу.
+// Поэтому чат и голос — на быстрой модели; рисунок ученика разбирает модель посильнее, но думающая мало (~2 с).
+const CHAT_MODEL = process.env.TUTOR_CHAT_MODEL || "gemini-3.5-flash-lite";
+const CHAT_THINK = process.env.TUTOR_CHAT_THINK || "minimal";
+const CHAT_IMAGE_MODEL = process.env.TUTOR_CHAT_IMAGE_MODEL || GEMINI_MODEL;
+const CHAT_IMAGE_THINK = process.env.TUTOR_CHAT_IMAGE_THINK || "low";
 const PER_HOUR = Number(process.env.TUTOR_PER_HOUR) || 40;   // вопросов в час с одного адреса
 const PER_DAY = Number(process.env.TUTOR_PER_DAY) || 3000;   // вопросов в сутки на всех
 const MAX_MSG = 2000, MAX_CTX = 4000, MAX_TURNS = 24;
@@ -143,10 +150,13 @@ async function streamClaude(client, system, messages, write, signal) {
   }
 }
 
-async function streamGemini(system, messages, write, signal, userKey) {
+async function streamGemini(system, messages, write, signal, userKey, fast) {
   const key = userKey || keyFrom("GEMINI_API_KEY", ".gemini-key");
   if (!key) throw new Error("no_model_key");
-  const model = userKey ? USER_GEMINI_MODEL : GEMINI_MODEL;
+  const pic = messages.some((m) => m.image);
+  // свой ключ ученика — его модель, но тоже без долгого «думания»; наш ключ — быстрая модель (с рисунком — посильнее)
+  const model = userKey ? USER_GEMINI_MODEL : fast ? (pic ? CHAT_IMAGE_MODEL : CHAT_MODEL) : GEMINI_MODEL;
+  const think = userKey ? "low" : fast ? (pic ? CHAT_IMAGE_THINK : CHAT_THINK) : null;
   const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":streamGenerateContent?alt=sse", {
     method: "POST", signal,
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
@@ -154,7 +164,7 @@ async function streamGemini(system, messages, write, signal, userKey) {
       systemInstruction: { parts: [{ text: system }] },
       contents: messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user",
         parts: m.image ? [{ inlineData: { mimeType: m.image.mime, data: m.image.data } }, { text: m.content }] : [{ text: m.content }] })),
-      generationConfig: { maxOutputTokens: 8192, temperature: 0.6 },
+      generationConfig: Object.assign({ maxOutputTokens: 8192, temperature: 0.6 }, think ? { thinkingConfig: { thinkingLevel: think } } : {}),
     }),
   });
   if (!res.ok) throw new Error("gemini_" + res.status + ": " + (await res.text()).slice(0, 200));
@@ -357,13 +367,13 @@ function handleChat(req, res, { readBody, clientIp }) {
     const write = (t) => { if (!res.writableEnded) res.write(t); };
     try {
       if (own) {
-        if (own.p === "gemini") await streamGemini(system, messages, write, ac.signal, own.k);
+        if (own.p === "gemini") await streamGemini(system, messages, write, ac.signal, own.k, true);
         else if (own.p === "openai") await streamOpenAI(own.k, system, messages, write, ac.signal);
         else await streamUserClaude(own.k, system, messages, write, ac.signal);
       } else {
         const c = claudeClient();
         if (c) await streamClaude(c, system, messages, write, ac.signal);
-        else await streamGemini(system, messages, write, ac.signal);
+        else await streamGemini(system, messages, write, ac.signal, null, true);
       }
     } catch (e) {
       if (!ac.signal.aborted) {
