@@ -198,6 +198,11 @@
   .ls-story .play i{width:42px;height:42px;flex:none;border-radius:50%;background:var(--accent,#ffb547);display:grid;place-items:center;color:#0b1019;font-style:normal;font-size:16px}
   .ls-story .play b{display:block;font:600 15px/1.25 var(--font-body,"Golos Text",sans-serif)}
   .ls-story .play small{display:block;font:500 12px/1.35 var(--font-mono,monospace);color:var(--muted,#8b96ad);margin-top:3px}
+  #taskState.ls-ok{animation:ls-ok .9s ease-out}
+  @keyframes ls-ok{0%{color:#22c55e;text-shadow:0 0 12px rgba(34,197,94,.6)}100%{text-shadow:none}}
+  .ls-done{position:fixed;left:50%;top:14px;z-index:80;transform:translate(-50%,-30px);opacity:0;pointer-events:none;background:#16a34a;color:#fff;border-radius:14px;padding:10px 18px;box-shadow:0 12px 32px -8px rgba(0,0,0,.5);display:flex;flex-direction:column;align-items:center;gap:2px;font:500 14px/1.35 var(--font-body,system-ui,sans-serif);transition:opacity .25s,transform .25s;max-width:calc(100vw - 28px);text-align:center}
+  .ls-done b{font-size:16px}.ls-done.on{opacity:1;transform:translate(-50%,0)}
+  @media (prefers-reduced-motion:reduce){#taskState.ls-ok{animation:none}.ls-done{transition:none}}
   .ls-start{position:fixed;inset:0;z-index:70;display:grid;place-items:center;background:rgba(5,8,14,.72);padding:16px}
   .ls-start .card{width:min(440px,100%);background:var(--surface,#121a28);border:1px solid var(--line,#26324a);border-radius:20px;padding:24px;box-shadow:0 30px 80px -20px rgba(0,0,0,.8);color:var(--fg,#e8ecf4)}
   .ls-start .k{font:500 11px/1.4 var(--font-mono,monospace);letter-spacing:.1em;text-transform:uppercase;color:var(--muted,#8b96ad)}
@@ -580,6 +585,49 @@
   const syncStory = () => { story.hidden = group !== 'theory'; };
   new MutationObserver(syncStory).observe(bar, { attributes: true, subtree: true, attributeFilter: ['aria-selected'] });
   syncStory(); storyIdle();
+
+  // ---------- звук прогресса (18.11.2026) ----------
+  // Лаборатории пишут прогресс задания в #taskState: «Подписано: 3 из 9», «найдено: 2 из 3 типов», «✓ Выполнено».
+  // Выросло «N из M» или прибавилась галочка — короткое «тын» и зелёная вспышка строки; задание выполнено —
+  // мелодия из трёх нот и плашка сверху. При открытии и смене урока — тишина (только на действие ученика).
+  const prog = (() => {
+    let ctx = null;
+    const ac = () => { if (!ctx) { const A = window.AudioContext || window.webkitAudioContext; if (A) ctx = new A(); } if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {}); return ctx; };
+    addEventListener('pointerdown', ac, { passive: true, capture: true });
+    function note(f, t0, dur, vol) {
+      const c = ac(); if (!c) return; const t = c.currentTime + t0, o = c.createOscillator(), o2 = c.createOscillator(), g = c.createGain();
+      o.type = 'sine'; o.frequency.value = f; o2.type = 'sine'; o2.frequency.value = f * 2; // мягкий «колокольчик»: тон и октава
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      const g2 = c.createGain(); g2.gain.value = 0.25; o.connect(g); o2.connect(g2); g2.connect(g); g.connect(c.destination);
+      o.start(t); o2.start(t); o.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+    }
+    const tick = () => { note(1046.5, 0, 0.18, 0.14); note(1568, 0.06, 0.22, 0.1); };          // «тын»
+    const done = () => { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => note(f, i * 0.11, 0.5, 0.13)); };
+    const score = (t) => { let s = 0; String(t).replace(/(\d+)\s*(?:из|\/)\s*\d+/g, (_, n) => { s += +n; }); return s + (String(t).match(/✓/g) || []).length; };
+    let lesson = -1, base = null, wasDone = false, quietUntil = 0;
+    function flash(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+    function banner() {
+      let b = document.getElementById('lsDone');
+      if (!b) { b = document.createElement('div'); b.id = 'lsDone'; b.className = 'ls-done'; b.setAttribute('role', 'status'); document.body.appendChild(b); }
+      const last = lessonIdx() >= cards().length - 1;
+      b.innerHTML = '<b>✓ Задание выполнено</b><span>' + (last ? 'Это был последний урок темы — отличная работа!' : 'Можно переходить к следующему уроку') + '</span>';
+      b.classList.remove('on'); void b.offsetWidth; b.classList.add('on'); clearTimeout(banner.t); banner.t = setTimeout(() => b.classList.remove('on'), 4200);
+    }
+    function check() {
+      const el = document.getElementById('taskState'); if (!el) return;
+      const t = el.textContent || '', isDone = /Выполнено/.test(t) || el.classList.contains('done'), i = lessonIdx(), s = score(t);
+      if (i !== lesson) { lesson = i; base = s; wasDone = isDone; quietUntil = Date.now() + 800; return; } // новый урок — запоминаем, не звучим
+      if (Date.now() < quietUntil) { base = s; wasDone = isDone; return; }
+      if (isDone && !wasDone) { done(); flash(el, 'ls-ok'); banner(); }
+      else if (!isDone && base !== null && s > base) { tick(); flash(el, 'ls-ok'); }
+      base = s; wasDone = isDone;
+    }
+    const el0 = document.getElementById('taskState');
+    if (el0) new MutationObserver(check).observe(el0, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    setTimeout(check, 0);
+    return { tick, done };
+  })();
+  window.LuchProgress = prog;
 
   // карточка в начале урока: «Прослушать лекцию» или «Перейти к практике» — каждый раз, когда открывается урок
   const seenKey = () => 'oe-start:' + location.pathname + ':' + lessonIdx();

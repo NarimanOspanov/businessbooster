@@ -156,7 +156,7 @@
   .lt-btn .lt-dot:after{content:"";position:absolute;inset:0;border-radius:50%;background:#22c55e;animation:lt-online 1.8s ease-out infinite}
   @keyframes lt-online{0%{transform:scale(1);opacity:.7}80%,100%{transform:scale(2.6);opacity:0}}
   @media (prefers-reduced-motion:reduce){.lt-btn .lt-dot:after{animation:none;opacity:0}}
-  .lt-panel{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:51;width:min(360px,calc(100vw - 36px));min-height:180px;max-height:min(480px,calc(100vh - 36px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));display:flex;flex-direction:column;background:#121a28;border:1px solid #26324a;border-radius:18px;box-shadow:0 24px 60px -12px rgba(0,0,0,.75);color:#e8ecf4;font:15px/1.5 "Golos Text",system-ui,sans-serif;overflow:hidden}
+  .lt-panel{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:51;width:min(330px,calc(100vw - 36px));min-height:160px;max-height:min(400px,56vh,calc(100vh - 36px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));display:flex;flex-direction:column;background:#121a28;border:1px solid #26324a;border-radius:18px;box-shadow:0 24px 60px -12px rgba(0,0,0,.75);color:#e8ecf4;font:15px/1.5 "Golos Text",system-ui,sans-serif;overflow:hidden}
   .lt-head{display:flex;align-items:center;gap:8px;padding:7px 7px 7px 10px;border-bottom:1px solid #26324a}
   .lt-head .lt-av{width:28px;height:28px;flex:none}
   .lt-head b{display:block;font-size:14px}
@@ -181,6 +181,10 @@
   .lt-m.a code{font:500 13px "IBM Plex Mono",monospace;background:#0b1019;padding:1px 5px;border-radius:5px}
   .lt-panel,.lt-board,.lt-btn{transition:opacity .3s}
   .lt-peek{opacity:.1!important;pointer-events:none!important}
+  .lt-panel.lt-mini{min-height:0;max-height:none;cursor:pointer}.lt-panel.lt-mini > :not(.lt-head){display:none!important}.lt-panel.lt-mini .lt-head{border-bottom:0}
+  .lt-panel.lt-mini .lt-head b:after{content:' · нажми, чтобы открыть';font-weight:400;color:#8b96ad;font-size:12px}
+  /* закрывает показания или задание — переезжает в левый нижний угол */
+  .lt-panel.lt-left,.lt-btn.lt-left{right:auto;left:calc(18px + env(safe-area-inset-left,0px))}.lt-btn.lt-left{flex-direction:row}
   .lt-m .lt-say{display:inline-flex;margin:6px 14px 0 0;background:none;border:0;padding:0;color:#8b96ad;font:500 11.5px "Golos Text",sans-serif;cursor:pointer;gap:5px;align-items:center}
   .lt-m .lt-say:hover{color:#72d4e8}
   .lt-dots{display:inline-flex;gap:4px;padding:4px 0}
@@ -310,7 +314,7 @@
     return out;
   }
   const sayBtn = text => { const b = document.createElement('button'); b.type = 'button'; b.className = 'lt-say'; b.innerHTML = `${SPK}Озвучить`; b.onclick = () => { unlockAudio(); speaker.stop(); speaker.add(text); speaker.end(); }; return b; };
-  const bubble = (role, text, withSay) => {
+  const bubble = (role, text, withSay) => { if (role !== 'user') panel.classList.remove('lt-mini'); // пришёл ответ — окно разворачивается
     const d = document.createElement('div'); d.className = 'lt-m ' + (role === 'user' ? 'u' : 'a');
     if (role === 'user') d.textContent = text; else { d.innerHTML = md(shown(text)); boardBtn(d, text); if (withSay && text) d.appendChild(sayBtn(shown(text))); }
     log.appendChild(d); return d;
@@ -810,6 +814,20 @@
   }
   const open = () => { panel.hidden = false; btn.hidden = true; render(); setTimeout(() => (voiceMode ? orb : inp).focus(), 30); };
   function openPanel() { if (panel.hidden) open(); }
+  // окно наставника и его кнопка с репликой не должны закрывать показания стенда (#meter) и карточку задания:
+  // если перекрывают — переезжают в левый нижний угол (если и там мешают — остаются справа)
+  const hitRect = (a, b) => b.left < a.right && b.right > a.left && b.top < a.bottom && b.bottom > a.top;
+  const avoidEls = () => { const ts = document.getElementById('taskState'); return [document.getElementById('meter'), ts && ts.closest('[class*="task"]')].filter((e) => e && e.offsetParent); };
+  function dodge(w) {
+    if (!w || w.hidden || innerWidth <= 600) { if (w) w.classList.remove('lt-left'); return; }
+    const hit = () => { const r = w.getBoundingClientRect(); return avoidEls().some((e) => hitRect(r, e.getBoundingClientRect())); };
+    const was = w.classList.contains('lt-left'); w.classList.remove('lt-left');
+    if (hit()) { w.classList.add('lt-left'); if (hit()) w.classList.remove('lt-left'); }
+    else if (was) { w.classList.add('lt-left'); if (hit()) w.classList.remove('lt-left'); } // не прыгаем туда-обратно, если слева тоже свободно
+  }
+  setInterval(() => { dodge(panel); dodge(btn); }, 700);
+  /* ученик работает со стендом (нажал вне окна) — окно сворачивается в полоску-заголовок и не закрывает ползунки и показания; нажал на полоску — разворачивается. Разговор и озвучка не прерываются. */
+  addEventListener('pointerdown', (e) => { if (panel.hidden) return; if (panel.contains(e.target)) { if (panel.classList.contains('lt-mini') && !e.target.closest('.lt-ib,.lt-stop')) { panel.classList.remove('lt-mini'); e.preventDefault(); } return; } if (e.target.closest('.lt-btn,.lt-board,.lt-tip,.ls-start,.ls-story')) return; panel.classList.add('lt-mini'); }, { capture: true, passive: false });
   $('#lt-bd').addEventListener('click', () => (board.open ? board.hide() : board.show()));
   window.LuchTutor = { ask: q => { openPanel(); ask(q); }, open: openPanel, board, highlight: el => highlightEl(el), hideTip: () => guide && guide.hide(), talk: t => guide && guide.talk(t) };
   const close = () => { setMode(false); if (dict) dict.abort(); panel.hidden = true; btn.hidden = false; btn.focus(); };
@@ -920,6 +938,7 @@
       pend = { text, chips };
       btn.querySelector('.lt-bt').textContent = text;
       btn.classList.add('has-tip', 'tip-open');
+      clearTimeout(show.t); show.t = setTimeout(() => { if (pend && pend.text === text && !btn.matches(':hover')) btn.classList.remove('tip-open'); }, 12000); // не висит над стендом
       btn.setAttribute('aria-label', 'Наставник: ' + text);
       if (o.el) highlightEl(o.el);
     }
