@@ -290,7 +290,9 @@
     .ls-stage .txt{flex:1}
     .ls-stage .txt p{font-size:16px}
     .ls-stage .pp span{display:none}
-    .ls-stage .ctl{padding-bottom:max(16px,env(safe-area-inset-bottom))}
+    .ls-stage .ctl{padding-bottom:max(16px,env(safe-area-inset-bottom));flex-wrap:wrap;row-gap:10px}
+    .ls-stage .ctl .ls-btn[data-a="practice"]{flex:1 1 100%;order:9}
+    .ls-stage .volp{left:auto;right:-70px;transform:none}
   }
   .ls-stage .pv{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:22px 28px;background:radial-gradient(120% 120% at 20% 0%,rgba(255,181,71,.16),transparent 60%),linear-gradient(135deg,#16213a,#0e1626);transition:opacity .5s ease}
   .ls-stage .pic.has .pv{opacity:0;pointer-events:none}
