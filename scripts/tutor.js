@@ -516,8 +516,8 @@ function handleStory(req, res, { readBody, clientIp }) {
     if (!/^\/[\w\-/]*\|\d+\|\w+$/.test(key)) return send(400, { error: "key" });
     const withF = storyFormulas(key), sk = storeKey(key);
     const have = await storyGet(sk);
-    const topic = (!b.lang || b.lang === "ru") ? lessonTopic(b.context) : "";
-    if (have) return send(200, practiceFix(have, topic));
+    const isRu = !b.lang || b.lang === "ru", topic = isRu ? lessonTopic(b.context) : ""; // вставки «Тема лекции…» и «А теперь давай…» — только в русской лекции
+    if (have) return send(200, isRu ? practiceFix(have, topic) : have);
     const block = allowed(clientIp(req));
     if (block) return send(429, { error: block });
     try {
@@ -538,7 +538,7 @@ function handleStory(req, res, { readBody, clientIp }) {
         })();
         storyPending.set(sk, p); p.finally(() => storyPending.delete(sk)).catch(() => {});
       }
-      send(200, practiceFix(await p, topic));
+      send(200, isRu ? practiceFix(await p, topic) : await p);
     } catch (e) { console.log("[story] " + (e && e.message)); send(502, { error: "Не получилось подготовить историю. Попробуйте ещё раз." }); }
   })().catch(() => { try { send(500, { error: "error" }); } catch { /* уже ответили */ } });
 }
@@ -692,7 +692,8 @@ function handleStoryImg(req, res, { clientIp }) {
   const u = new URL(req.url, "http://x"), key = String(u.searchParams.get("k") || "").slice(0, 300), i = parseInt(u.searchParams.get("i"), 10);
   const fail = (code, msg) => { res.writeHead(code, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" }); res.end(msg); };
   if (!/^\/[\w\-/]*\|\d+\|\w+$/.test(key) || !(i >= 0 && i < 8)) return fail(400, "bad");
-  const sk = storeKey(key);
+  // картинки общие для всех языков: казахская/английская лекция показывает картинки русской (сюжеты те же)
+  const sk = storeKey(key.replace(/\|\w+$/, "|ru"));
   (async () => {
     let v = await imgGet(sk, i);
     if (!v) {
