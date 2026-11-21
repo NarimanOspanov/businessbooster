@@ -39,6 +39,8 @@
   .ls-toast a{color:inherit;font-weight:600}
   `;
   const css1 = document.createElement('style'); css1.textContent = css; document.head.appendChild(css1);
+  // рамка задания на стенде; на телефоне её переносим над опытом (см. «телефон» внизу), поэтому запоминаем сразу
+  const stageTask = document.querySelector('#stage .task');
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   // ---------- вкладки ----------
@@ -729,7 +731,7 @@
   function taskPlay(j) {
     document.querySelectorAll('.ls-tplay').forEach(x => x.remove());
     const idx = j && j.sections ? j.sections.findIndex(x => x.scheme) : -1;
-    const box = document.querySelector('#stage .task') || taskBox();
+    const box = stageTask || taskBox();
     if (idx < 0 || !box) return;
     const b = document.createElement('button'); b.type = 'button'; b.className = 'ls-tplay';
     b.innerHTML = '<i>▶</i>Как выполнить задание'; b.title = 'Наставник объяснит задание голосом';
@@ -834,7 +836,7 @@
   .ls-fx .f .v b{font-family:var(--font-mono,monospace)}
   .ls-fx .f.open .v{display:block}`;
   document.head.appendChild(css3);
-  const taskEl = document.querySelector('#stage .task');
+  const taskEl = stageTask;
   const fxCache = {};
   let fxFor = '';
   function renderFx() {
@@ -964,6 +966,100 @@
   }
   // заранее, как только задание выполнено — чтобы не ждать
   const prefetchQuiz = () => fetchQuiz().catch(() => {});
+
+  // ---------- телефон (≤600 px, 22.11.2026) ----------
+  // На узком экране рамка задания и полоса кнопок лежали поверх опыта: задание закрывало чуть не половину
+  // схемы, а кнопки опыта уезжали вбок за край экрана. Теперь на телефоне задание стоит над стендом во всю
+  // ширину, кнопки опыта — под стендом, крупные и в несколько рядов (видны все). Стенд укорачиваем на
+  // освободившуюся снизу полосу — сама схема остаётся того же размера. «Схема / Как в жизни» — в левый верхний
+  // угол стенда, где раньше была рамка. Шире 600 px всё возвращается на место. Лаборатории, которые сами
+  // раскладывают схему под рамкой задания (задают сцене top/height), рамку оставляют у себя.
+  (() => {
+    const stage = document.getElementById('stage'), scene = document.getElementById('scene');
+    if (!stage) return;
+    const mcss = document.createElement('style');
+    mcss.textContent = `@media (max-width:600px){
+    html .task.ls-mv{position:relative;inset:auto;width:auto;max-width:none;margin:0;transform:none;z-index:auto;pointer-events:auto;background:var(--surface,#121a28);padding:12px 14px 12px}
+    html .task.ls-mv .k{display:inline-block;vertical-align:middle;margin:0 10px 0 0}
+    html .task.ls-mv .ls-tplay{vertical-align:middle;margin:3px 0}
+    html .task.ls-mv p{margin:8px 0 6px;font-size:15px}
+    html .tools.ls-mv{position:relative;inset:auto;transform:none;width:auto;max-width:none;margin:0;flex-wrap:wrap;justify-content:center;overflow:visible;gap:6px;padding:6px;z-index:auto;border-radius:14px;background:var(--surface,#121a28)}
+    html .tools.ls-mv .sep{display:none}
+    html .task{min-width:0}
+    html .tools:not(.ls-mv){flex-wrap:wrap;justify-content:center;overflow:visible;align-self:stretch;gap:4px}
+    html .tools button{min-height:44px;padding:8px 13px;font-size:14px;border-radius:10px}
+    html .tools.ls-mv button{flex:1 1 auto;background:rgba(255,255,255,.045)}
+    html .tools.ls-mv button[aria-pressed="true"]{background:var(--surface-2,#1a2438);box-shadow:inset 0 0 0 1px var(--line,#26324a);color:var(--fg,#e8ecf4)}
+    html #stage.ls-mvs > .scene{height:calc(100% - var(--ls-top,0px))!important}
+    html #stage.ls-mvt > .rl-tog{top:10px;left:10px;right:auto;bottom:auto}
+    html .rl-tog button{padding:12px 13px;font-size:13.5px}
+    html .ls-tabs button.g{padding:16px 4px 14px;font-size:12.5px}
+    html .ls-sub button{padding:10px 15px;font-size:14px}
+    html .ls-task .ls-btn,html .ls-hw > .ls-btn{padding:12px 15px;font-size:14px}
+    html .ls-task input{font-size:16px;padding:11px 12px}
+    html .ls-fx .hd{padding:7px 0 4px}
+    html .chips button{min-height:40px;padding:8px 12px;font-size:14px}
+    html .ghostbtn{min-height:42px}
+    html .primary{min-height:44px}
+  }`;
+    document.head.appendChild(mcss);
+    const mq = matchMedia('(max-width:600px)');
+    const task = stageTask && stageTask.parentElement === stage ? stageTask : null;
+    const tools = [...stage.children].find(e => e.classList.contains('tools')) || null;
+    const phT = document.createComment('ls-task'), phB = document.createComment('ls-tools');
+    const abs = el => !!el && getComputedStyle(el).position === 'absolute';
+    const selfLaid = () => !!scene && !!(scene.style.top || scene.style.height); // схема уже разложена под рамкой самой лабораторией
+    let on = false, at = 0;
+    function undo() {
+      stage.classList.remove('ls-mvs', 'ls-mvt'); stage.style.height = ''; stage.style.removeProperty('--ls-top');
+      if (phT.parentNode) { phT.replaceWith(task); task.classList.remove('ls-mv'); }
+      if (phB.parentNode) { phB.replaceWith(tools); tools.classList.remove('ls-mv'); }
+      on = false;
+    }
+    function apply() {
+      if (on) undo();
+      if (!mq.matches) return;
+      at = innerWidth;
+      const mvTask = abs(task) && !selfLaid(), mvTools = abs(tools);
+      if (!mvTask && !mvTools) return;
+      on = true;
+      if (mvTask) { task.replaceWith(phT); stage.before(task); task.classList.add('ls-mv'); stage.classList.add('ls-mvt'); }
+      if (mvTools) {
+        // полоса под схемой, где лежали кнопки: стенд короче на неё, схема — того же размера
+        let band = 0, top = 0;
+        if (scene && !selfLaid()) { const sr = stage.getBoundingClientRect(), cr = scene.getBoundingClientRect(), bw = stage.clientTop || 0; band = Math.round(sr.bottom - bw - cr.bottom); top = Math.round(cr.top - sr.top - bw); }
+        tools.replaceWith(phB); stage.after(tools); tools.classList.add('ls-mv');
+        if (band >= 30 && band <= 90 && top >= 0) { const h = stage.offsetHeight; stage.style.setProperty('--ls-top', top + 'px'); stage.classList.add('ls-mvs'); stage.style.height = (h - band) + 'px'; }
+      }
+      if (mvTask) [400, 1500].forEach(ms => setTimeout(trimTop, ms));
+    }
+    // Схемы рисуются прижатыми к низу, а сверху оставлено место под рамку задания. Рамка ушла над стендом —
+    // убираем пустое место сверху (оставляем его под прибор и переключатель вида). Схема не мельчает:
+    // высота не меньше 0,86 ширины — столько нужно обычному полю опыта 520 × 440.
+    function trimTop() {
+      if (!on || !stage.classList.contains('ls-mvt') || selfLaid() || !scene || scene.tagName.toLowerCase() !== 'svg') return;
+      const sr = scene.getBoundingClientRect(); if (sr.height < 100) return;
+      let top = Infinity;
+      for (const el of scene.querySelectorAll('path,rect,circle,ellipse,line,polyline,polygon,text,image,use,foreignObject')) {
+        if (el.closest('defs,clipPath,mask,pattern,marker,symbol')) continue;
+        const r = el.getBoundingClientRect(); if (!r.width && !r.height) continue;
+        if (r.width >= sr.width * 0.85 && r.height >= sr.height * 0.5) continue; // фон, сетка
+        if (r.bottom < sr.top || r.top > sr.bottom) continue;
+        top = Math.min(top, r.top);
+      }
+      if (!isFinite(top)) return;
+      let need = 8; // под приборы и переключатель, что стоят вверху стенда
+      for (const el of stage.children) {
+        if (el === scene || !el.offsetParent || el.classList.contains('rl-view') || getComputedStyle(el).position !== 'absolute') continue;
+        const r = el.getBoundingClientRect(); if (r.height && r.top - sr.top < sr.height / 2) need = Math.max(need, r.bottom - sr.top + 8);
+      }
+      const cut = Math.floor(Math.min(top - sr.top - need, sr.height - sr.width * 0.86));
+      if (cut > 24) stage.style.height = (stage.offsetHeight - cut) + 'px';
+    }
+    apply();
+    mq.addEventListener('change', apply);
+    let rt = 0; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (on && innerWidth !== at) apply(); }, 250); });
+  })();
 
   window.LuchShell = { lessonIdx, lessonUrl, openHw, openTab, learnState, noteHelp, whatNext, nextTopic: () => nextTopic, goNext, startPending: () => startShown, storyPlaying: () => !!st, mediaBusy: () => !!(st && st.audio && !st.audio.paused && !st.audio.ended) || [...document.querySelectorAll('video,audio')].some(m => !m.paused && !m.ended && !m.muted), openQuiz, prefetchQuiz };
 })();

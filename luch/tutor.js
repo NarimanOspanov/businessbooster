@@ -265,7 +265,7 @@
     .lt-board{left:0;right:0;top:0;border-radius:0 0 16px 16px}
     body.lt-board-on .lt-panel{max-height:min(48vh,420px)}
     .lt-bf{display:none}
-    .lt-panel{right:0;left:0;bottom:0;width:100%;max-height:min(70vh,560px);border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
+    .lt-panel,.lt-panel.lt-compact{right:0;left:0;bottom:0;width:100%;max-height:min(70vh,560px);border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
     .lt-btn{opacity:.96;bottom:calc(92px + env(safe-area-inset-bottom,0px))}
     .lt-btn .lt-bt{max-width:calc(100vw - 110px)}
     .lt-ib .lt-tx{display:none}

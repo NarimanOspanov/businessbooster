@@ -637,7 +637,9 @@
       const cw = Math.max(...xs) - Math.min(...xs), ch = Math.max(...ys) - Math.min(...ys);
       const narrow = W < 520; let topPad = narrow ? 0.36 : H > 520 ? 0.2 : 0.12;
       // сверху — карточка задания: меряем её настоящую высоту, чтобы приборы не прятались под ней
-      const tk = stage.querySelector('.task'), vr = view.getBoundingClientRect();
+      // на телефоне рамка задания стоит над стендом (lab-shell.js) — сверху остаются прибор и переключатель вида
+      let tk = stage.querySelector('.task'); const vr = view.getBoundingClientRect();
+      if (!tk && narrow) { tk = stage.querySelector('.meter'); topPad = 0.16; }
       if (tk && tk.offsetParent && vr.height > 0) { const tb = tk.getBoundingClientRect(); const over = (tb.bottom - vr.top) / vr.height; if (over > 0 && over < 0.6 && (narrow || tb.right - vr.left > vr.width * 0.45)) topPad = Math.max(narrow ? 0.12 : 0.08, over + 0.03); }
       const availH = H * (1 - topPad - 0.06);
       const s = Math.min(W / cw * (narrow ? 1.12 : 1), availH / ch) * 0.94 * zoom;
