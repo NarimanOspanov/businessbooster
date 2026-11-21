@@ -1,0 +1,1104 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по химии, 8–9 класс: массовая доля вещества в растворе, разбавление, упаривание и смешивание растворов, молярная концентрация, кристаллогидраты.">
+<title>Растворы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /chemistry. Lab bench (SVG) on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+.scene [data-drag] text{pointer-events:none}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.meter .big{font:700 30px/1 var(--font-display);margin-top:8px;letter-spacing:.02em}
+.meter .big small{font:500 12px/1 var(--font-body);color:var(--muted);letter-spacing:0;margin-left:6px}
+.pairs{display:grid;gap:6px;margin-top:10px}
+.pairs label{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface-2);border-radius:9px;padding:7px 10px;font-size:13.5px}
+.pairs select{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:500 13px var(--font-mono)}
+.pairs select:disabled{color:var(--ok);opacity:1}
+.cnt{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-top:10px}
+.cnt div{display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--surface-2);border-radius:9px;padding:6px 8px;font-size:13px}
+.cnt b{font:500 14px var(--font-mono)}
+.cnt button{width:30px;height:30px;border-radius:7px;background:var(--bg);border:1px solid var(--line);cursor:pointer;font:500 15px/1 var(--font-mono)}
+.vtab{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}
+.vtab span{background:var(--surface-2);border-radius:8px;padding:7px 4px;text-align:center;font:500 12px/1.3 var(--font-mono);color:var(--muted)}
+.vtab span b{display:block;color:var(--fg);font-size:15px}
+.vtab span.on{outline:2px solid var(--ok);color:var(--fg)}
+.tgts{display:grid;gap:6px;margin-top:10px}
+.tgts div{display:flex;justify-content:space-between;gap:10px;background:var(--surface-2);border-radius:9px;padding:8px 10px;font-size:13px}
+.tgts div span:last-child{font:500 12.5px var(--font-mono);color:var(--muted);white-space:nowrap}
+.tgts div.on span:last-child{color:var(--ok)}
+.cnt.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.ent{background:var(--surface-2);border-radius:12px;padding:11px 12px;margin-top:8px}
+.ent p{margin:0 0 8px;font-size:14px;line-height:1.5}
+.ent .row{margin-top:0;flex-wrap:nowrap}
+.ent input{flex:1;min-width:0;max-width:150px;min-height:40px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;font:500 16px var(--font-mono)}
+.ent .u{font:500 13px var(--font-mono);color:var(--muted)}
+.ent .ghostbtn{min-height:40px}
+.ent .state{margin-top:8px;line-height:1.45}
+.ent .state.bad{color:var(--warn)}
+.ent.ok{outline:1px solid rgba(134,224,168,.45)}
+.bigbtn{min-height:40px}
+@media (max-width:600px){.cnt button{width:40px;height:40px}.chips button{min-height:40px;padding:8px 12px}}
+</style>
+</head>
+<body>
+<script src="/luch/splash.js"></script>
+<div class="app">
+  <header>
+    <div class="brand" role="link" tabindex="0" title="Карта предметов" style="cursor:pointer" onclick="location.href='/#chem'" onkeydown="if(event.key==='Enter')location.href='/#chem'">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9.6 14.6 9.2 6.2 15 10.6Q20 9.4 25 10.6L30.8 6.2 30.4 14.6Q34.6 22 31.6 29Q27.6 36 20 36Q12.4 36 8.4 29Q5.4 22 9.6 14.6Z" fill="#ffb547"/><path d="M20 14Q15.2 10.8 10.9 13.4Q7.6 17.2 9.4 21.8Q11.6 25.8 15.9 25.4Q18.5 25.1 20 27.1Q21.5 25.1 24.1 25.4Q28.4 25.8 30.6 21.8Q32.4 17.2 29.1 13.4Q24.8 10.8 20 14Z" fill="#ffd896"/><circle cx="15" cy="18.8" r="5" fill="#fffaf0"/><circle cx="25" cy="18.8" r="5" fill="#fffaf0"/><circle cx="15.6" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="24.4" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="16.6" cy="18.1" r="1" fill="#fff"/><circle cx="25.4" cy="18.1" r="1" fill="#fff"/><path d="M18.6 23.4h2.8L20 26.6z" fill="#ff8a73"/><path d="M10.5 29.6Q15.3 27.4 20 29.7Q24.7 27.4 29.5 29.6V34.6Q24.7 32.6 20 34.8Q15.3 32.6 10.5 34.6Z" fill="#72d4e8"/><path d="M20 29.7V34.8" stroke="#0b1019" stroke-width="1.1"/><path d="M8.2 23.5Q5.6 28.6 9.4 32.6Q11.6 33.2 12.4 31Q10.4 28.4 8.2 23.5Z" fill="#e8962a"/><path d="M31.8 23.5Q34.4 28.6 30.6 32.6Q28.4 33.2 27.6 31Q29.6 28.4 31.8 23.5Z" fill="#e8962a"/><path d="M35 3.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="#86e0a8"/></svg>
+      <div><h1>OPEN SCHOOL AI</h1><small>Доступное образование для всех</small></div>
+    </div>
+    <div class="headr">
+      <div class="prog" aria-label="Прогресс"><b>Растворы</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Лабораторный стол: весы со стаканом, банки с веществами, бутыли с растворами и водой, мерная колба. Предметы можно нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-chem-solutions';
+const SUBD = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
+// индексы в формулах: цифры после буквы или скобки; коэффициент после «·» остаётся обычным (CuSO₄·5H₂O)
+const low = s => String(s).replace(/([A-Za-z)])(\d+)/g, (q, a, d) => a + d.replace(/\d/g, x => SUBD[x]));
+const fmt = (x, d = 2) => String(+(+x).toFixed(d)).replace('.', ',');
+const near = (a, b) => Math.abs(a - b) < 1e-6;
+const pc = w => fmt(w * 100, 2) + ' %';
+const rnd = k => { const s = Math.sin(k * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+
+// ---------- урок 1: массовая доля ----------
+const SOL_NACL = 0.359;              // растворимость NaCl при 20 °C: 35,9 г на 100 г воды
+const TARG1 = [
+  { s: 5, w: 45, txt: '50 г 10%-го раствора' },
+  { s: 6, w: 194, txt: '200 г 3%-го раствора' },
+  { s: 20, w: 60, txt: '25%-й раствор из 20 г соли' },
+];
+const SMAX = 60, WMAX = 300;
+// ---------- урок 2: разбавление, упаривание, смешивание ----------
+const PROB2 = [
+  { id: 'dil', name: 'Разбавление', sub: 'CH3COOH', sname: 'уксусная кислота', init: null, evap: false, tm: 250, tw: 0.12,
+    src: [{ k: 'a', w: 0.30, lab: '30 %', col: '#ffb547' }, { k: 'water', w: 0, lab: 'вода', col: '#5fb4d9' }],
+    q: 'Из 30%-го раствора уксусной кислоты и воды приготовьте 250 г 12%-го раствора.',
+    ask: 'Сколько граммов 30%-го раствора и воды нужно взять?' },
+  { id: 'evap', name: 'Упаривание', sub: 'K2SO4', sname: 'сульфат калия', init: { m: 180, w: 0.10 }, evap: true, tm: null, tw: 0.15, src: [],
+    q: '180 г 10%-го раствора K₂SO₄ кипятят, пока массовая доля соли не станет 15 %.',
+    ask: 'Сколько воды испарится?' },
+  { id: 'mix', name: 'Смешивание', sub: 'NaOH', sname: 'гидроксид натрия', init: null, evap: false, tm: 300, tw: 0.20,
+    src: [{ k: 'a', w: 0.10, lab: '10 %', col: '#72d4e8' }, { k: 'b', w: 0.40, lab: '40 %', col: '#b88cf0' }],
+    q: 'Смешав 10%-й и 40%-й растворы NaOH, приготовьте 300 г 20%-го раствора.',
+    ask: 'Сколько граммов каждого раствора взять?' },
+];
+const AMAX = 400;
+// ---------- урок 3: молярная концентрация ----------
+const SUB3 = {
+  NaOH: { M: 40, name: 'гидроксид натрия', solid: '#f2f5f8', liq: '#5fb4d9', la: 0.16 },
+  CuSO4: { M: 160, name: 'сульфат меди(II)', solid: '#eef1f4', liq: '#2f7fe0', la: 0.55 },
+  MgSO4: { M: 120, name: 'сульфат магния', solid: '#f6f7f9', liq: '#5fb4d9', la: 0.16 },
+};
+const SUBS3 = Object.keys(SUB3);
+const FLASKS = [100, 250, 500, 1000];
+const TARG3 = [
+  { f: 'NaOH', V: 250, C: 0.2, m: 2, txt: '250 мл 0,2 М NaOH' },
+  { f: 'CuSO4', V: 1000, C: 0.05, m: 8, txt: '1 л 0,05 М CuSO₄' },
+  { f: 'MgSO4', V: 100, C: 1, m: 12, txt: '100 мл 1 М MgSO₄' },
+];
+const MMAX3 = 40;
+// ---------- урок 4: кристаллогидраты ----------
+const HYD = {
+  cu: { f: 'CuSO4·5H2O', s: 'CuSO4', k: 5, M: 250, Ms: 160, name: 'медный купорос', col: '#3f8fe0', liq: '#2f7fe0', la: 0.5 },
+  mg: { f: 'MgSO4·7H2O', s: 'MgSO4', k: 7, M: 246, Ms: 120, name: 'английская соль', col: '#e8eef6', liq: '#5fb4d9', la: 0.16 },
+};
+const HYDS = Object.keys(HYD);
+const TARG4 = [
+  { h: 'cu', m: 25, w: 175, txt: '200 г 8%-го CuSO₄ из медного купороса' },
+  { h: 'mg', m: 82, w: 118, txt: '200 г 20%-го MgSO₄ из MgSO₄·7H₂O' },
+  { h: 'cu', m: 50, w: 270, txt: '10%-й CuSO₄ из 50 г медного купороса' },
+];
+const HMAX = 100;
+
+const LESSONS = [
+  { id: 'mass', title: 'Массовая доля вещества',
+    text: ['Раствор состоит из растворителя (чаще всего воды) и растворённого вещества. Масса раствора — это сумма: m(р-ра) = m(в-ва) + m(воды). Объёмы при растворении складываются неточно, а массы — всегда.',
+           'Массовая доля ω (омега) показывает, какую часть массы раствора составляет вещество: ω = m(в-ва) : m(р-ра). Её пишут долей единицы (0,1) или в процентах (10 %).',
+           'Из формулы получаются ещё две: m(в-ва) = ω · m(р-ра) и m(р-ра) = m(в-ва) : ω. Пример: для 200 г 3%-го раствора нужно 200 · 0,03 = 6 г вещества и 200 − 6 = 194 г воды. Частая ошибка — делить на массу воды, а не раствора.'],
+    why: 'Физраствор в капельнице — это 0,9%-й раствор NaCl: в 1 л около 9 г соли. Провизоры аптек готовят растворы по массовой доле, а технологи пищевых заводов так задают рассол для огурцов и сыра. На этикетке уксуса «9 %» — тоже массовая доля.',
+    task: 'Приготовьте на весах три раствора поваренной соли: 50 г 10%-го; 200 г 3%-го; 25%-й раствор, в котором 20 г соли.',
+    hint: 'Сначала найдите m(соли) = ω · m(р-ра), потом m(воды) = m(р-ра) − m(соли). Для третьего: m(р-ра) = m(соли) : ω.',
+    stage: 'Нажмите на банку с солью (+1 г) или на промывалку с водой (+10 г). Держите палец — сыплется и льётся дальше.',
+    init: {},
+    check: m => TARG1.every((x, i) => m.found[i]) },
+  { id: 'dilute', title: 'Разбавление, упаривание, смешивание',
+    text: ['Главное правило: при добавлении воды и при упаривании масса растворённого вещества не меняется — меняется только масса раствора. Поэтому ω₁ · m₁ = ω₂ · m₂.',
+           'Разбавили водой: m(в-ва) та же, m(р-ра) выросла, ω упала. Упарили: m(р-ра) уменьшилась на массу испарившейся воды, ω выросла.',
+           'Смешали два раствора одного вещества: складывают и массы веществ, и массы растворов: ω = (m₁ω₁ + m₂ω₂) : (m₁ + m₂). Быстрый приём — «правило креста»: масса каждого раствора пропорциональна разности между ω другого раствора и нужной ω.'],
+    why: 'Уксусную эссенцию 70 % на кухне разводят до 9 %, а концентрат моющего средства — по инструкции на этикетке. Агрономы разводят удобрения и средства защиты растений в баке опрыскивателя, а на сахарных заводах сок упаривают, пока не выпадет сахар. Ошибка в разбавлении — сожжённые листья или невкусный продукт.',
+    safe: 'Кислоту льют в воду, а не воду в кислоту. Концентрированные кислоты и щёлочи разбавляет только учитель, в очках и перчатках.',
+    task: 'Решите на столе три задачи: разбавление 30%-го раствора, упаривание 10%-го раствора до 15 % и смешивание 10%-го и 40%-го растворов.',
+    hint: 'Масса вещества при разбавлении и упаривании не меняется: m(в-ва) = ω · m(р-ра). Для смешивания приравняйте массу вещества в смеси к сумме масс в двух растворах.',
+    stage: 'Нажимайте на бутыли — каждое нажатие наливает 10 г. Плитка под стаканом выпаривает воду. Задачу меняйте кнопками снизу.',
+    init: { pi: 0 },
+    check: m => PROB2.every((x, i) => m.solved[i]) },
+  { id: 'molar', title: 'Молярная концентрация',
+    text: ['Молярная концентрация C показывает, сколько моль вещества в 1 литре раствора: C = n : V. Единица — моль/л, её пишут буквой М: «0,2 М раствор» — это 0,2 моль/л.',
+           'Объём здесь — объём всего раствора, а не воды. Поэтому раствор готовят в мерной колбе: насыпают вещество, растворяют в части воды и доливают до метки на горлышке.',
+           'Цепочка задач ЕНТ: m → n = m : M → C = n : V (V в литрах!). Обратно: n = C · V, m = n · M. Пример: в 250 мл 0,2 М NaOH n = 0,2 · 0,25 = 0,05 моль, m = 0,05 · 40 = 2 г.'],
+    why: 'Лаборанты больниц, водоканалов и заводов готовят титрованные растворы в моль/л: по ним определяют, сколько кислоты в соке или железа в воде. Анализ крови тоже приходит в ммоль/л. Фармацевты так рассчитывают концентрацию лекарства в растворе для инъекций.',
+    safe: 'Гидроксид натрия разъедает кожу и глаза. Его берут шпателем, а не руками, и работают в очках.',
+    task: 'Приготовьте в мерных колбах три раствора: 250 мл 0,2 М NaOH; 1 л 0,05 М CuSO₄; 100 мл 1 М MgSO₄.',
+    hint: 'n = C · V, где V в литрах (250 мл = 0,25 л). Потом m = n · M: M(NaOH) = 40, M(CuSO₄) = 160, M(MgSO₄) = 120 г/моль.',
+    stage: 'Нажмите на банку — выбрать вещество, ещё раз — +1 г в лодочку на весах. Колбу меняйте кнопкой «Колба». Нажмите на колбу — пересыпать и долить до метки.',
+    init: {},
+    check: m => TARG3.every((x, i) => m.found[i]) },
+  { id: 'hydrate', title: 'Кристаллогидраты',
+    text: ['Многие соли кристаллизуются вместе с водой. Медный купорос CuSO₄·5H₂O — синие кристаллы, в которых на каждую частицу CuSO₄ приходится 5 молекул воды. Такие вещества называют кристаллогидратами.',
+           'M(CuSO₄·5H₂O) = 160 + 5 · 18 = 250 г/моль. Значит, в 250 г купороса только 160 г CuSO₄, а 90 г — вода. При растворении эта вода переходит в раствор и становится частью растворителя.',
+           'Алгоритм: 1) m(соли) = ω · m(р-ра); 2) m(гидрата) = m(соли) · M(гидрата) : M(соли); 3) m(воды) = m(р-ра) − m(гидрата). Частая ошибка — взять массу гидрата равной массе безводной соли.'],
+    why: 'Медный купорос садоводы разводят для опрыскивания винограда и яблонь, английскую соль MgSO₄·7H₂O применяют в медицине и для ванн, а гипс CaSO₄·2H₂O — в строительстве и травматологии. Технологи всегда пересчитывают кристаллогидрат на безводную соль: на мешке написано одно, а в раствор переходит другое.',
+    safe: 'Медный купорос ядовит: не пробуйте на вкус, мойте руки после работы.',
+    task: 'Приготовьте из кристаллогидратов: 200 г 8%-го раствора CuSO₄; 200 г 20%-го раствора MgSO₄; 10%-й раствор CuSO₄ из 50 г медного купороса.',
+    hint: 'Масса соли в растворе — это только «безводная» часть гидрата: m(соли) = m(гидрата) · M(соли) : M(гидрата). Для купороса это 160/250 от массы кристаллов.',
+    stage: 'Нажмите на банку — выбрать гидрат, ещё раз — +1 г кристаллов в стакан. Промывалка — +10 г воды. Держите палец, чтобы сыпать и лить дальше.',
+    init: { hyd: 'cu' },
+    check: m => TARG4.every((x, i) => m.found[i]) },
+];
+
+// ---------- задачи в духе ЕНТ для вкладки «Расчёты» ----------
+const ENT = {
+  mass: [
+    { q: 'Для приготовления 300 г 15%-го раствора соли нужно взять соль массой (г):', a: 45, u: 'г', hint: 'm(в-ва) = ω · m(р-ра); 15 % = 0,15.', sol: '300 · 0,15 = 45 г соли и 255 г воды.' },
+    { q: 'В 120 г воды растворили 30 г сахара. Массовая доля сахара в растворе (%):', a: 20, u: '%', hint: 'Делите на массу раствора, а не воды: m(р-ра) = 120 + 30.', sol: '30 : 150 = 0,2 → 20 %.' },
+    { q: 'Хлороводород, полученный из 585 г NaCl, растворили в 1460 г воды. Массовая доля HCl в растворе (%):', a: 20, u: '%', hint: 'n(HCl) = n(NaCl) = 585 : 58,5. Найдите m(HCl), затем m(р-ра) = m(HCl) + 1460.', sol: 'n = 10 моль, m(HCl) = 365 г; ω = 365 : 1825 = 0,2 → 20 %.' },
+  ],
+  dilute: [
+    { q: 'После кипячения 200 г раствора NaCl массовая доля соли выросла с 10 % до 16 %. Масса испарившейся воды (г):', a: 75, u: 'г', hint: 'Соль не испаряется: m(соли) = 200 · 0,1. Новая масса раствора = m(соли) : 0,16.', sol: 'm(соли) = 20 г, m(р-ра) = 20 : 0,16 = 125 г, испарилось 200 − 125 = 75 г.' },
+    { q: 'Для приготовления 320 г 10%-го раствора соляной кислоты из 20%-го раствора и воды нужно взять воды (г):', a: 160, u: 'г', hint: 'm(HCl) = 320 · 0,1; масса 20%-го раствора = m(HCl) : 0,2; вода — остальное.', sol: 'm(HCl) = 32 г, 20%-го раствора 160 г, воды 320 − 160 = 160 г.' },
+    { q: 'Смешали 200 г 10%-го и 300 г 20%-го растворов одной соли. Массовая доля соли в новом растворе (%):', a: 16, u: '%', hint: 'Сложите массы соли в обоих растворах и разделите на общую массу.', sol: '(20 + 60) : 500 = 0,16 → 16 %.' },
+  ],
+  molar: [
+    { q: 'В 250 мл раствора гидроксида бария содержится 6,8 г гидроксид-ионов (диссоциация полная). Молярная концентрация Ba(OH)₂ (моль/л):', a: 0.8, u: 'моль/л', hint: 'n(OH⁻) = 6,8 : 17. На одну Ba(OH)₂ приходится два OH⁻. V = 0,25 л.', sol: 'n(OH⁻) = 0,4 моль, n(Ba(OH)₂) = 0,2 моль, C = 0,2 : 0,25 = 0,8 моль/л.' },
+    { q: 'С магнием прореагировало 60 мл 0,1 М раствора H₂SO₄. Количество выделившегося водорода (моль):', a: 0.006, u: 'моль', hint: 'n(H₂SO₄) = C · V, V = 0,06 л. Mg + H₂SO₄ → MgSO₄ + H₂.', sol: 'n(H₂SO₄) = 0,1 · 0,06 = 0,006 моль = n(H₂).' },
+    { q: 'В 12 л раствора 5 моль Ca(NO₃)₂, 2 моль NaNO₃ и 3 моль Ba(NO₃)₂. Молярная концентрация нитрат-ионов (моль/л):', a: 1.5, u: 'моль/л', hint: 'Посчитайте NO₃⁻ в каждой соли по индексу: в Ca(NO₃)₂ их два.', sol: 'n(NO₃⁻) = 10 + 2 + 6 = 18 моль; C = 18 : 12 = 1,5 моль/л.' },
+  ],
+  hydrate: [
+    { q: 'Сколько граммов воды содержится в 50 г медного купороса CuSO₄·5H₂O?', a: 18, u: 'г', hint: 'В 250 г купороса 90 г воды. Составьте пропорцию.', sol: '50 · 90 : 250 = 18 г.' },
+    { q: 'Для 400 г 5%-го раствора CuSO₄ нужна масса медного купороса (г):', a: 31.25, u: 'г', hint: 'm(CuSO₄) = 400 · 0,05; m(купороса) = m(CuSO₄) · 250 : 160.', sol: 'm(CuSO₄) = 20 г, купороса 20 · 250 : 160 = 31,25 г, воды 368,75 г.' },
+    { q: 'Для 200 г 10,6%-го раствора Na₂CO₃ нужна масса кристаллической соды Na₂CO₃·10H₂O (г):', a: 57.2, u: 'г', hint: 'M(Na₂CO₃) = 106, M(Na₂CO₃·10H₂O) = 286. Сначала найдите n(Na₂CO₃).', sol: 'm(Na₂CO₃) = 21,2 г = 0,2 моль; 0,2 · 286 = 57,2 г.' },
+  ],
+};
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, ent: saved.ent || {}, tab: 'overview', hl: null, fx: null,
+            salt: 0, water: 0, f1: {}, pi: 0, amt: { a: 0, b: 0, water: 0, evap: 0 }, solved: {}, sub3: 'NaOH', V: 250, m3: 0, fill: false, f3: {},
+            hyd: 'cu', mh: 0, w4: 0, f4: {} };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done, ent: S.ent })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function model() {
+  const id = LID();
+  if (id === 'mass') {
+    const m = S.salt + S.water, w = m > 0 ? S.salt / m : 0;
+    return { kind: 'mass', s: S.salt, wt: S.water, m, w, sat: S.salt > S.water * SOL_NACL + 1e-9, found: S.f1 };
+  }
+  if (id === 'dilute') {
+    const P = PROB2[S.pi], A = S.amt;
+    let ms = P.init ? P.init.m * P.init.w : 0, m = P.init ? P.init.m : 0;
+    P.src.forEach(s => { ms += A[s.k] * s.w; m += A[s.k]; });
+    m -= A.evap;
+    const w = m > 0 ? ms / m : 0;
+    const ok = m > 0 && (P.tm === null || near(m, P.tm)) && near(w, P.tw);
+    return { kind: 'dil', P, ms, m, w, ok, A, solved: S.solved };
+  }
+  if (id === 'molar') {
+    const X = SUB3[S.sub3], n = S.m3 / X.M, C = S.fill ? n / (S.V / 1000) : 0;
+    return { kind: 'molar', f: S.sub3, X, M: X.M, m: S.m3, n, V: S.V, C, fill: S.fill, found: S.f3 };
+  }
+  const H = HYD[S.hyd], ms = S.mh * H.Ms / H.M, m = S.mh + S.w4, w = m > 0 ? ms / m : 0;
+  return { kind: 'hyd', h: S.hyd, H, mh: S.mh, wt: S.w4, ms, mw: S.mh - ms, m, w, found: S.f4 };
+}
+
+// ---------- рисование ----------
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2360" fill="url(#tile)"/>
+    <rect x="-2000" y="360" width="4520" height="1200" fill="#1a2232"/>
+    <rect x="-2000" y="358" width="4520" height="4" fill="#2c3954"/>
+    <rect x="-2000" y="362" width="4520" height="2" fill="${INK}" opacity=".6"/>`;
+}
+const T = (x, y, txt, o = {}) => `<text x="${x}" y="${y}" font-size="${o.fs || 11}" fill="${o.c || '#8b96ad'}" text-anchor="${o.a || 'middle'}"${o.b ? ' font-weight="500"' : ''}${o.pe ? '' : ' pointer-events="none"'}>${txt}</text>`;
+const DOTS = Array.from({ length: 90 }, (_, i) => ({ u: rnd(i + 1), v: rnd(i + 51), ph: i * 1.7 }));
+// стакан: x — левый край, yb — дно; liq — высота жидкости
+function beaker(x, yb, w, h, liq, col, alpha, o = {}) {
+  let s = '';
+  const top = yb - h;
+  if (liq > 3.5) {
+    s += `<rect x="${x + 3}" y="${(yb - liq).toFixed(1)}" width="${w - 6}" height="${(liq - 3).toFixed(1)}" rx="3" fill="${col}" fill-opacity="${alpha.toFixed(3)}"/>`;
+    s += `<path d="M${x + 3} ${(yb - liq).toFixed(1)}h${w - 6}" stroke="${col}" stroke-opacity=".85" stroke-width="1.5"/>`;
+    const nd = Math.min(DOTS.length, o.dots | 0), t = o.t || 0;
+    for (let i = 0; i < nd; i++) {
+      const d = DOTS[i], j = reduce ? 0 : 1;
+      const px = x + 9 + d.u * (w - 18) + j * Math.sin(t / 520 + d.ph) * 2.5, py = yb - 6 - d.v * Math.max(0, liq - 12) + j * Math.cos(t / 610 + d.ph) * 2.5;
+      s += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="1.9" fill="${o.dc || '#e8ecf4'}" opacity=".75"/>`;
+    }
+  }
+  if (o.grains) for (let i = 0; i < o.grains; i++) s += `<rect x="${(x + 10 + rnd(i + 7) * (w - 24)).toFixed(1)}" y="${(yb - 7 - rnd(i + 3) * 4).toFixed(1)}" width="4" height="3.4" rx="1" fill="${o.gc || '#f2f5f8'}" stroke="${INK}" stroke-width=".6"/>`;
+  s += `<path d="M${x - 5} ${top}l5 5V${yb - 7}a7 7 0 0 0 7 7h${w - 14}a7 7 0 0 0 7 -7V${top + 5}l5 -5" fill="rgba(95,180,217,.05)" stroke="#8fb9d6" stroke-width="1.7"/>`;
+  if (o.ticks) for (let k = 1; k <= o.ticks; k++) { const y = yb - h * 0.88 * k / o.ticks; s += `<path d="M${x + w - 14} ${y.toFixed(1)}h10" stroke="#8fb9d6" stroke-opacity=".6"/>`; }
+  return s;
+}
+// электронные весы: cx — центр, top — верх платформы
+function scales(cx, top, w, reading, ok) {
+  return `<rect x="${cx - w / 2 + 2}" y="${top + 8}" width="${w}" height="${358 - top - 8}" rx="8" fill="${INK}"/><rect x="${cx - w / 2}" y="${top + 6}" width="${w}" height="${358 - top - 8}" rx="8" fill="#2a3550" stroke="#56688f" stroke-width="1.4"/>` +
+    `<rect x="${cx - w / 2 + 14}" y="${top}" width="${w - 28}" height="7" rx="3" fill="#8b96ad"/>` +
+    `<rect x="${cx - 40}" y="${top + 16}" width="80" height="22" rx="4" fill="#0e1520" stroke="#56688f"/>` + T(cx, top + 32, reading, { fs: 13, c: ok ? '#86e0a8' : '#86e0a8', b: 1 }) +
+    `<circle cx="${cx + w / 2 - 18}" cy="${top + 27}" r="5" fill="#3a4762" stroke="#56688f"/>`;
+}
+function jar(x, y, w, h, label, col, id, o = {}) {
+  let s = `<g data-tap="${id}" data-rep="${o.rep ? 1 : 0}" style="cursor:pointer"><rect x="${x - 6}" y="${y - 18}" width="${w + 12}" height="${h + 40}" fill="transparent"/>`;
+  s += `<rect x="${x + 1.5}" y="${y + 2}" width="${w}" height="${h}" rx="7" fill="${INK}"/><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="rgba(95,180,217,.1)" stroke="${o.on ? '#ffb547' : '#8fb9d6'}" stroke-width="${o.on ? 2 : 1.4}"/>`;
+  for (let i = 0; i < 16; i++) s += `<rect x="${(x + 5 + rnd(i + o.seed * 3 + 1) * (w - 14)).toFixed(1)}" y="${(y + h * 0.45 + rnd(i + 17 + o.seed) * (h * 0.5 - 8)).toFixed(1)}" width="5" height="4" rx="1" fill="${col}" stroke="${INK}" stroke-width=".5"/>`;
+  s += `<rect x="${x - 3}" y="${y - 9}" width="${w + 6}" height="10" rx="3" fill="#56688f"/>`;
+  s += `<rect x="${x + 5}" y="${y + 10}" width="${w - 10}" height="20" rx="3" fill="#fff6e6"/>` + T(x + w / 2, y + 24, label, { fs: o.fs || 10.5, c: '#1b1610', b: 1 });
+  return s + '</g>';
+}
+function washBottle(x, y, id, label) {
+  return `<g data-tap="${id}" data-rep="1" style="cursor:pointer"><rect x="${x - 8}" y="${y - 30}" width="74" height="${358 - y + 32}" fill="transparent"/>` +
+    `<path d="M${x + 6} ${y + 18}q-6 0 -6 10V${351}a7 7 0 0 0 7 7h44a7 7 0 0 0 7 -7V${y + 28}q0 -10 -6 -10z" fill="rgba(95,180,217,.22)" stroke="#8fb9d6" stroke-width="1.5"/>` +
+    `<rect x="${x + 20}" y="${y + 8}" width="18" height="11" rx="2" fill="#e5533f"/><path d="M${x + 29} ${y + 8}V${y - 8}l-22 -10" fill="none" stroke="#c8d1e2" stroke-width="3" stroke-linecap="round"/>` +
+    `<rect x="${x + 7}" y="${y + 50}" width="44" height="20" rx="3" fill="#fff6e6"/>` + T(x + 29, y + 64, label || 'H₂O', { fs: 10.5, c: '#1b1610', b: 1 }) + '</g>';
+}
+function reagent(x, y, label, col, id, amt) {
+  return `<g data-tap="${id}" data-rep="1" style="cursor:pointer"><rect x="${x - 6}" y="${y - 22}" width="68" height="${358 - y + 24}" fill="transparent"/>` +
+    `<path d="M${x + 18} ${y}h20v14q18 6 18 26V${351}a7 7 0 0 1 -7 7h-42a7 7 0 0 1 -7 -7V${y + 40}q0 -20 18 -26z" fill="${col}" fill-opacity=".22" stroke="#8fb9d6" stroke-width="1.5"/>` +
+    `<rect x="${x + 16}" y="${y - 12}" width="24" height="13" rx="3" fill="#56688f"/>` +
+    `<rect x="${x + 6}" y="${y + 56}" width="44" height="30" rx="3" fill="#fff6e6"/>` + T(x + 28, y + 69, label, { fs: 11, c: '#1b1610', b: 1 }) + T(x + 28, y + 81, amt, { fs: 9, c: '#6a5a40', b: 1 }) +
+    T(x + 28, y - 28, '+10 г', { fs: 9.5 }) + '</g>';
+}
+function pourFX(t) {
+  const F = S.fx; if (!F) return '';
+  const k = (t - F.t) / 520; if (k >= 1) { S.fx = null; return ''; }
+  const mx = (F.a[0] + F.b[0]) / 2, my = Math.min(F.a[1], F.b[1]) - 40;
+  let s = `<path d="M${F.a[0]} ${F.a[1]}Q${mx} ${my} ${F.b[0]} ${F.b[1]}" fill="none" stroke="${F.c}" stroke-width="${F.grain ? 0 : 3.2}" stroke-opacity="${(0.8 * (1 - k)).toFixed(2)}" stroke-linecap="round" pointer-events="none"/>`;
+  if (F.grain) for (let i = 0; i < 6; i++) { const u = clamp(k * 1.4 - i * 0.07, 0, 1), x = (1 - u) * (1 - u) * F.a[0] + 2 * u * (1 - u) * mx + u * u * F.b[0], y = (1 - u) * (1 - u) * F.a[1] + 2 * u * (1 - u) * my + u * u * F.b[1]; if (u > 0 && u < 1) s += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="4" height="3.4" fill="${F.c}" stroke="${INK}" stroke-width=".5" pointer-events="none"/>`; }
+  return s;
+}
+const fx = (a, b, c, grain) => { S.fx = { a, b, c, grain, t: performance.now() }; };
+
+// ----- урок 1 -----
+const B1 = { x: 150, yb: 312, w: 120, h: 190, cap: 360 };
+const liqH = (m, cap, h) => clamp(m / cap, 0, 1) * h * 0.88;
+function massSVG(m, t) {
+  let h = '';
+  h += scales(210, 312, 200, fmt(m.m, 1) + ' г');
+  const grains = m.sat ? Math.min(24, Math.round((m.s - m.wt * SOL_NACL) * 1.2) + 3) : 0;
+  h += beaker(B1.x, B1.yb, B1.w, B1.h, liqH(m.m, B1.cap, B1.h), '#5fb4d9', 0.14 + Math.min(0.3, m.w * 1.2), { dots: Math.round(Math.min(m.s, m.wt * SOL_NACL) * 1.4), t, ticks: 6, grains });
+  if (m.m === 0) h += T(210, 250, 'стакан пустой', { fs: 11 });
+  h += jar(338, 270, 58, 88, 'NaCl', '#f2f5f8', 'salt', { rep: 1, seed: 1 });
+  h += T(367, 252, '+1 г соли', { fs: 10 });
+  h += washBottle(424, 246, 'water');
+  h += T(453, 214, '+10 г воды', { fs: 10 });
+  h += T(210, 382, `соль ${m.s} г + вода ${m.wt} г = ${m.m} г раствора`, { fs: 11, c: '#e8ecf4' });
+  h += T(210, 399, m.m ? `ω = ${m.s} : ${m.m} = ${pc(m.w)}` : 'ω = m(в-ва) : m(р-ра)', { fs: 12, c: '#ffb547', b: 1 });
+  if (m.sat) h += T(210, 114, 'раствор насыщен: соль не растворяется', { fs: 10.5, c: '#ff8a73' });
+  return h + pourFX(t);
+}
+// ----- урок 2 -----
+const B2 = { x: 232, yb: 334, w: 120, h: 190, cap: 460 };
+function dilSVG(m, t) {
+  let h = '';
+  const P = m.P;
+  // плитка
+  const hot = S.steamT && t - S.steamT < 1400;
+  h += `<g data-tap="${P.evap ? 'evap' : 'noevap'}" data-rep="1" style="cursor:pointer"><rect x="214" y="334" width="156" height="24" rx="5" fill="#3a4762" stroke="#56688f"/><rect x="226" y="330" width="132" height="5" rx="2" fill="${hot ? '#ff8a3c' : '#56688f'}"/>` +
+    `<circle cx="352" cy="346" r="6" fill="#2a3550" stroke="#8b96ad"/>` + T(262, 350, P.evap ? 'нагреть' : 'плитка', { fs: 9.5, c: '#e8ecf4' }) + '</g>';
+  h += beaker(B2.x, B2.yb, B2.w, B2.h, liqH(m.m, B2.cap, B2.h), P.id === 'mix' ? '#9f8cf0' : '#5fb4d9', 0.12 + Math.min(0.4, m.w * 1.3), { dots: Math.round(m.ms * 0.8), t, ticks: 6 });
+  if (hot) for (let i = 0; i < 5; i++) { const k = ((t - S.steamT) / 1400 + i * 0.2) % 1; h += `<circle cx="${(260 + i * 16 + Math.sin(k * 6 + i) * 5).toFixed(1)}" cy="${(B2.yb - B2.h - 6 - k * 50).toFixed(1)}" r="${(5 + k * 8).toFixed(1)}" fill="#e8ecf4" opacity="${(0.35 * (1 - k)).toFixed(2)}" pointer-events="none"/>`; }
+  // источники
+  if (P.src.length) P.src.forEach((s, i) => { h += reagent(30 + i * 92, 236, s.k === 'water' ? 'H₂O' : s.lab, s.col, 'src-' + s.k, `${m.A[s.k]} г`); });
+  else {
+    h += `<rect x="24" y="214" width="170" height="122" rx="12" fill="#121a28" stroke="#26324a"/>` + T(109, 236, 'БЫЛО В СТАКАНЕ', { fs: 9 }) +
+      T(109, 262, `${P.init.m} г · ${pc(P.init.w)}`, { fs: 14, c: '#e8ecf4', b: 1 }) + T(109, 284, `m(${low(P.sub)}) = ${fmt(P.init.m * P.init.w, 1)} г`, { fs: 11, c: '#e8ecf4' }) +
+      T(109, 312, `испарилось: ${m.A.evap} г воды`, { fs: 11.5, c: m.A.evap ? '#ffb547' : '#8b96ad', b: 1 });
+  }
+  // карточка «в стакане»
+  h += `<rect x="382" y="168" width="124" height="128" rx="12" fill="#121a28" stroke="${m.ok ? '#86e0a8' : '#26324a'}"/>` + T(444, 188, 'В СТАКАНЕ', { fs: 9 }) +
+    T(444, 210, `m(р-ра) = ${fmt(m.m, 1)} г`, { fs: 11, c: '#e8ecf4' }) + T(444, 230, `m(в-ва) = ${fmt(m.ms, 1)} г`, { fs: 11, c: '#e8ecf4' }) +
+    T(444, 258, m.m > 0 ? 'ω = ' + pc(m.w) : 'ω = —', { fs: 14, c: m.ok ? '#86e0a8' : '#ffb547', b: 1 }) +
+    T(444, 282, `цель: ${P.tm ? P.tm + ' г, ' : ''}${pc(P.tw)}`, { fs: 9.5 });
+  h += T(292, 382, `${P.name}: ${low(P.sub)} · ${P.sname}`, { fs: 11, c: '#e8ecf4' });
+  h += T(292, 399, P.id === 'mix' ? 'ω = (m₁ω₁ + m₂ω₂) : (m₁ + m₂)' : 'ω₁ · m₁ = ω₂ · m₂', { fs: 12, c: '#ffb547', b: 1 });
+  if (m.solved[S.pi]) h += T(292, 128, 'Задача решена ✓', { fs: 12, c: '#86e0a8', b: 1 });
+  return h + pourFX(t);
+}
+// ----- урок 3 -----
+const FL = { cx: 246, neckTop: 128, mark: 168 };
+const flR = V => 22 + 32 * Math.cbrt(V / 1000);
+function flaskSVG(V, fill, liq, la, on) {
+  const r = flR(V), cy = 358 - r, nw = 9, bt = cy - r * 0.92;
+  let s = `<g data-tap="flask" data-rep="0" style="cursor:pointer"><rect x="${FL.cx - r - 8}" y="${FL.neckTop - 10}" width="${2 * r + 16}" height="${358 - FL.neckTop + 10}" fill="transparent"/>`;
+  if (fill) {
+    s += `<circle cx="${FL.cx}" cy="${cy.toFixed(1)}" r="${(r - 2).toFixed(1)}" fill="${liq}" fill-opacity="${la}"/>`;
+    s += `<rect x="${FL.cx - nw + 2}" y="${FL.mark}" width="${2 * nw - 4}" height="${(bt - FL.mark + 6).toFixed(1)}" fill="${liq}" fill-opacity="${la}"/>`;
+    s += `<path d="M${FL.cx - nw + 2} ${FL.mark}q${nw - 2} 3 ${2 * nw - 4} 0" fill="none" stroke="${liq}" stroke-width="1.5"/>`;
+  }
+  s += `<path d="M${FL.cx - nw} ${FL.neckTop}V${bt.toFixed(1)}A${r} ${r} 0 1 0 ${FL.cx + nw} ${bt.toFixed(1)}V${FL.neckTop}" fill="rgba(95,180,217,.05)" stroke="${on ? '#ffb547' : '#8fb9d6'}" stroke-width="1.7"/>`;
+  s += `<path d="M${FL.cx - nw - 4} ${FL.mark}h${2 * nw + 8}" stroke="#e8ecf4" stroke-width="1.6"/>` + T(FL.cx + nw + 8, FL.mark + 4, 'метка', { fs: 9, a: 'start' });
+  s += `<rect x="${FL.cx - nw - 3}" y="${FL.neckTop - 8}" width="${2 * nw + 6}" height="9" rx="2" fill="#56688f"/>`;
+  s += `<rect x="${FL.cx - 26}" y="${(cy - 6).toFixed(1)}" width="52" height="18" rx="3" fill="#fff6e6" opacity=".92"/>` + T(FL.cx, cy + 7, V >= 1000 ? '1 л' : V + ' мл', { fs: 11, c: '#1b1610', b: 1 });
+  return s + '</g>';
+}
+function molarSVG(m, t) {
+  let h = '';
+  h += scales(98, 318, 124, fmt(m.fill ? 0 : m.m, 1) + ' г');
+  // лодочка для взвешивания с горкой вещества
+  h += `<path d="M66 304h64l-6 12h-52z" fill="#c8d1e2" stroke="#56688f"/>`;
+  if (!m.fill && m.m > 0) { const ph = 3 + Math.min(22, Math.sqrt(m.m) * 5); h += `<path d="M${98 - ph * 1.2} 305Q98 ${305 - ph * 1.6} ${98 + ph * 1.2} 305z" fill="${m.X.solid}" stroke="${INK}" stroke-width=".8"/>`; }
+  h += flaskSVG(m.V, m.fill, m.X.liq, m.X.la + 0.04, !m.fill && m.m > 0);
+  SUBS3.forEach((f, i) => { h += jar(330 + i * 60, 290, 50, 68, low(f), SUB3[f].solid, 'j-' + f, { on: f === m.f, rep: 1, seed: i * 5 + 2, fs: 10 }); });
+  h += T(415, 270, 'банка: выбрать, ещё раз — +1 г', { fs: 9.5 });
+  h += T(98, 252, m.fill ? 'пересыпано в колбу' : `в лодочке ${m.m} г ${low(m.f)}`, { fs: 10, c: '#e8ecf4' });
+  h += T(246, 384, `n = ${m.m} : ${m.M} = ${fmt(m.n, 4)} моль`, { fs: 11, c: '#e8ecf4' });
+  h += T(246, 401, m.fill ? `C = ${fmt(m.n, 4)} : ${fmt(m.V / 1000, 3)} = ${fmt(m.C, 4)} моль/л` : 'C = n : V — сначала долейте до метки', { fs: 12, c: '#ffb547', b: 1 });
+  if (!m.fill && m.m > 0) h += T(246, 112, 'нажмите на колбу: пересыпать и долить до метки', { fs: 10.5, c: '#ffb547' });
+  return h + pourFX(t);
+}
+// ----- урок 4 -----
+const B4 = { x: 230, yb: 312, w: 120, h: 190, cap: 400 };
+function hydSVG(m, t) {
+  let h = '';
+  const H = m.H;
+  // состав кристалла
+  const bx = 22, bw = 168, by = 150;
+  h += `<rect x="${bx - 6}" y="${by - 30}" width="${bw + 12}" height="104" rx="12" fill="#121a28" stroke="#26324a"/>` + T(bx + bw / 2, by - 13, `1 моль ${low(H.f)} = ${H.M} г`, { fs: 10.5, c: '#e8ecf4' });
+  const k = H.Ms / H.M;
+  h += `<rect x="${bx}" y="${by}" width="${(bw * k).toFixed(1)}" height="22" rx="3" fill="${H.col === '#e8eef6' ? '#c9d2e0' : H.col}"/><rect x="${(bx + bw * k).toFixed(1)}" y="${by}" width="${(bw * (1 - k)).toFixed(1)}" height="22" rx="3" fill="#5fb4d9" fill-opacity=".45"/>`;
+  h += T(bx + bw * k / 2, by + 15, `${low(H.s)} ${H.Ms}`, { fs: 10, c: '#1b1610', b: 1 }) + T(bx + bw * k + bw * (1 - k) / 2, by + 15, `${H.k}H₂O ${H.M - H.Ms}`, { fs: 9.5, c: '#e8ecf4' });
+  h += T(bx + bw / 2, by + 42, `в ${m.mh} г кристаллов: ${fmt(m.ms, 2)} г соли`, { fs: 10, c: '#e8ecf4' }) + T(bx + bw / 2, by + 58, `и ${fmt(m.mw, 2)} г воды`, { fs: 10, c: '#5fb4d9' });
+  HYDS.forEach((q, i) => { h += jar(26 + i * 86, 286, 66, 72, low(HYD[q].s) + '·' + HYD[q].k + 'H₂O', HYD[q].col, 'jh-' + q, { on: q === m.h, rep: 1, seed: i * 7 + 3, fs: 8.5 }); });
+  h += scales(290, 312, 190, fmt(m.m, 1) + ' г');
+  h += beaker(B4.x, B4.yb, B4.w, B4.h, liqH(m.wt > 0 ? m.m : 0, B4.cap, B4.h), H.liq, m.wt > 0 ? 0.1 + Math.min(0.55, m.w * (H.s === 'CuSO4' ? 4 : 1.2)) : 0.0, { dots: m.wt > 0 ? Math.round(m.ms * 1.2) : 0, t, ticks: 6, grains: m.wt > 0 ? 0 : Math.min(30, Math.round(m.mh / 2)), gc: H.col });
+  if (m.m === 0) h += T(290, 250, 'стакан пустой', { fs: 11 });
+  h += washBottle(432, 246, 'water');
+  h += T(461, 214, '+10 г воды', { fs: 10 });
+  h += T(290, 382, `кристаллы ${m.mh} г + вода ${m.wt} г = ${m.m} г раствора`, { fs: 11, c: '#e8ecf4' });
+  h += T(290, 399, m.m ? `ω(${low(H.s)}) = ${fmt(m.ms, 2)} : ${m.m} = ${pc(m.w)}` : `ω(${low(H.s)}) = m(${low(H.s)}) : m(р-ра)`, { fs: 12, c: '#ffb547', b: 1 });
+  return h + pourFX(t);
+}
+
+function hlBox(id) {
+  const r = flR(S.V);
+  return {
+    beaker: [B1.x - 10, B1.yb - B1.h - 8, B1.w + 20, B1.h + 14], scales: [106, 304, 208, 60], jar: [328, 256, 78, 108], wbottle: [416, 226, 76, 136], read: [70, 366, 280, 40],
+    src: [20, 210, 180, 172], beaker2: [B2.x - 10, B2.yb - B2.h - 8, B2.w + 20, B2.h + 14], plate: [208, 324, 168, 40], card: [376, 162, 136, 140],
+    scales3: [30, 296, 136, 66], flask: [FL.cx - r - 12, FL.neckTop - 14, 2 * r + 24, 358 - FL.neckTop + 18], jars3: [320, 266, 184, 98], read3: [130, 370, 240, 38],
+    bar: [12, 116, 188, 112], jars4: [18, 268, 170, 96], beaker4: [B4.x - 10, B4.yb - B4.h - 8, B4.w + 20, B4.h + 14], wbottle4: [424, 226, 76, 136], read4: [150, 366, 280, 40],
+  }[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = bench();
+  if (id === 'mass') h += massSVG(m, t);
+  else if (id === 'dilute') h += dilSVG(m, t);
+  else if (id === 'molar') h += molarSVG(m, t);
+  else h += hydSVG(m, t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="10" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let dirty = true;
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 500, hh / 410, 1.7);
+  const vw = w / s, vh = hh / s;
+  scene.setAttribute('viewBox', `${(260 - vw / 2).toFixed(1)} ${(408 - vh).toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- нажатия на предметы (держать — повторять) ----------
+let hold = null;
+const stopHold = () => { if (hold) { clearTimeout(hold.t0); clearInterval(hold.iv); hold = null; update(); } };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-tap]'); if (!el) return;
+  e.preventDefault();
+  const id = el.dataset.tap, rep = el.dataset.rep === '1';
+  stopHold();
+  const ok = tapItem(id, true);
+  if (rep && ok !== false) {
+    hold = { t0: setTimeout(() => { if (hold) hold.iv = setInterval(() => { if (tapItem(id, true) === false) stopHold(); }, 130); }, 420) };
+  } else update();
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => scene.addEventListener(ev, stopHold));
+
+function tapItem(id, live) {
+  const L = LID();
+  if (L === 'mass') { if (id === 'salt') return addSalt(1, live); if (id === 'water') return addWater1(10, live); }
+  if (L === 'dilute') { if (id.startsWith('src-')) return addSrc(id.slice(4), 10, live); if (id === 'evap') return evap(10, live); if (id === 'noevap') { toast('В этой задаче воду не выпаривают.'); return false; } }
+  if (L === 'molar') {
+    if (id.startsWith('j-')) { const f = id.slice(2); if (f !== S.sub3) { setSub3(f); return false; } return addM3(1, live); }
+    if (id === 'flask') { doFill(); return false; }
+  }
+  if (L === 'hydrate') {
+    if (id.startsWith('jh-')) { const q = id.slice(3); if (q !== S.hyd) { setHyd(q); return false; } return addHyd(1, live); }
+    if (id === 'water') return addW4(10, live);
+  }
+  return false;
+}
+
+// ---------- действия ----------
+function addSalt(d, live) {
+  if (S.salt + d > SMAX) { toast(`На столе только ${SMAX} г соли.`); return false; }
+  S.salt += d; fx([352, 262], [215, B1.yb - liqH(S.salt + S.water, B1.cap, B1.h) - 4], '#f2f5f8', true); update(live); return true;
+}
+function addWater1(d, live) {
+  if (S.water + d > WMAX) { toast(`Стакан рассчитан на ${WMAX} г воды. Вылейте и начните заново.`); return false; }
+  S.water += d; fx([438, 228], [200, B1.yb - liqH(S.salt + S.water, B1.cap, B1.h) - 4], '#5fb4d9'); update(live); return true;
+}
+function pour1() { S.salt = 0; S.water = 0; update(); }
+function addSrc(k, d, live) {
+  const P = PROB2[S.pi], i = P.src.findIndex(s => s.k === k); if (i < 0) return false;
+  if (S.amt[k] + d > AMAX) { toast(`Из бутыли можно взять не больше ${AMAX} г.`); return false; }
+  S.amt[k] += d; const m = model();
+  fx([58 + i * 92, 232], [292, B2.yb - liqH(m.m, B2.cap, B2.h) - 4], P.src[i].col); update(live); return true;
+}
+function evap(d, live) {
+  const P = PROB2[S.pi]; if (!P.evap) return false;
+  const m = model();
+  if ((m.ms) / (m.m - d) > 0.4 + 1e-9) { toast('Дальше соль начнёт выпадать в осадок — столько выпаривать не нужно.'); return false; }
+  S.amt.evap += d; S.steamT = performance.now(); update(live); return true;
+}
+function reset2() { S.amt = { a: 0, b: 0, water: 0, evap: 0 }; update(); }
+function setProb(i) { S.pi = (i + PROB2.length) % PROB2.length; S.amt = { a: 0, b: 0, water: 0, evap: 0 }; renderTools(); buildScheme(); update(); }
+function setSub3(f) { if (f === S.sub3 && !S.fill) return; S.sub3 = f; S.m3 = 0; S.fill = false; renderTools(); buildScheme(); update(); }
+function addM3(d, live) {
+  if (S.fill) { toast('Раствор уже готов. Вылейте его, чтобы приготовить новый.'); return false; }
+  const v = S.m3 + d;
+  if (v < 0) { toast('Лодочка уже пустая.'); return false; }
+  if (v > MMAX3) { toast(`В лодочку помещается не больше ${MMAX3} г.`); return false; }
+  S.m3 = v; if (d > 0) fx([340 + SUBS3.indexOf(S.sub3) * 60, 280], [98, 300], SUB3[S.sub3].solid, true); update(live); return true;
+}
+function setV(V) { if (S.fill) { toast('Сначала вылейте раствор из колбы.'); return; } S.V = V; renderTools(); buildScheme(); update(); }
+function cycleV() { setV(FLASKS[(FLASKS.indexOf(S.V) + 1) % FLASKS.length]); }
+function doFill() {
+  if (S.fill) { toast('Колба уже заполнена до метки. «Вылить» — начать заново.'); return; }
+  if (S.m3 <= 0) { toast('Сначала отвесьте вещество в лодочку.'); return; }
+  S.fill = true; fx([110, 300], [FL.cx, FL.neckTop], SUB3[S.sub3].solid, true); renderTools(); update();
+}
+function pour3() { S.m3 = 0; S.fill = false; renderTools(); update(); }
+function setHyd(q) { S.hyd = q; S.mh = 0; S.w4 = 0; renderTools(); buildScheme(); update(); }
+function addHyd(d, live) {
+  if (S.mh + d > HMAX) { toast(`На столе только ${HMAX} г кристаллов.`); return false; }
+  S.mh += d; fx([60 + HYDS.indexOf(S.hyd) * 86, 276], [290, B4.yb - liqH(S.mh + S.w4, B4.cap, B4.h) - 4], HYD[S.hyd].col, true); update(live); return true;
+}
+function addW4(d, live) {
+  if (S.w4 + d > 300) { toast('Стакан рассчитан на 300 г воды. Вылейте и начните заново.'); return false; }
+  S.w4 += d; fx([446, 228], [282, B4.yb - liqH(S.mh + S.w4, B4.cap, B4.h) - 4], '#5fb4d9'); update(live); return true;
+}
+function pour4() { S.mh = 0; S.w4 = 0; update(); }
+
+let last = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const m = LID();
+  const anim = !!S.hl || !!S.fx || (S.steamT && t - S.steamT < 1500);
+  const jig = !reduce && t - last > 70 && (m === 'mass' && S.salt > 0 || m === 'dilute' || m === 'hydrate' && S.w4 > 0);
+  if (dirty || anim || jig) { drawScene(t); dirty = false; last = t; }
+}
+
+// ---------- интерфейс ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  if (id === 'mass') tb.innerHTML = B('s+1', 'Соль +1 г') + B('s+5', 'Соль +5 г') + sep + B('w+1', 'Вода +1 г') + B('w+10', 'Вода +10 г') + B('w+50', 'Вода +50 г') + sep + B('pour', 'Вылить');
+  else if (id === 'dilute') {
+    const P = PROB2[S.pi];
+    tb.innerHTML = PROB2.map((x, i) => B('p-' + i, 'Задача ' + (i + 1) + (S.solved[i] ? ' ✓' : ''), S.pi === i)).join('') + sep +
+      (P.evap ? B('evap', 'Выпарить 10 г воды') : P.src.map(s => B('a-' + s.k + '-10', (s.k === 'water' ? 'Вода' : s.lab) + ' +10 г') + B('a-' + s.k + '-50', (s.k === 'water' ? 'Вода' : s.lab) + ' +50 г')).join('')) + sep + B('reset', 'Сначала');
+  } else if (id === 'molar') tb.innerHTML = SUBS3.map(f => B('f-' + f, low(f), S.sub3 === f)).join('') + sep + B('m-1', '−1 г') + B('m+1', '+1 г') + B('m+5', '+5 г') + sep +
+      B('flask', 'Колба: ' + (S.V >= 1000 ? '1 л' : S.V + ' мл')) + (S.fill ? B('pour', 'Вылить') : B('fill', 'Долить до метки'));
+  else tb.innerHTML = HYDS.map(q => B('h-' + q, low(HYD[q].f), S.hyd === q)).join('') + sep + B('h+1', 'Кристаллы +1 г') + B('h+10', '+10 г') + sep + B('w+1', 'Вода +1 г') + B('w+10', '+10 г') + B('w+50', '+50 г') + sep + B('pour', 'Вылить');
+}
+function act(a) {
+  const id = LID();
+  if (id === 'mass') {
+    if (a === 's+1') return addSalt(1); if (a === 's+5') return addSalt(5);
+    if (a.startsWith('w+')) return addWater1(+a.slice(2)); if (a === 'pour') return pour1();
+    if (a === 'salt') return addSalt(1); if (a === 'water') return addWater1(10);
+  }
+  if (id === 'dilute') {
+    if (a.startsWith('p-')) return setProb(+a.slice(2));
+    if (a.startsWith('a-')) { const [, k, d] = a.split('-'); return addSrc(k, +d); }
+    if (a.startsWith('src-')) return addSrc(a.slice(4), 10);
+    if (a === 'evap') return evap(10); if (a === 'reset') return reset2();
+  }
+  if (id === 'molar') {
+    if (a.startsWith('f-')) return setSub3(a.slice(2));
+    if (a.startsWith('j-')) return tapItem(a) !== false && update();
+    if (a === 'm-1') return addM3(-1); if (a === 'm+1') return addM3(1); if (a === 'm+5') return addM3(5);
+    if (a === 'flask') return cycleV(); if (a === 'fill') return doFill(); if (a === 'pour') return pour3();
+    if (a.startsWith('V-')) return setV(+a.slice(2));
+  }
+  if (id === 'hydrate') {
+    if (a.startsWith('h-')) return setHyd(a.slice(2));
+    if (a.startsWith('jh-')) return tapItem(a) !== false && update();
+    if (a === 'h+1') return addHyd(1); if (a === 'h+10') return addHyd(10);
+    if (a.startsWith('w+')) return addW4(+a.slice(2)); if (a === 'water') return addW4(10); if (a === 'pour') return pour4();
+  }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- значки деталей ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  beaker: IC('<path d="M8 6v20a3 3 0 0 0 3 3h12a3 3 0 0 0 3 -3V6" fill="none" stroke="#8fb9d6" stroke-width="1.5"/><rect x="9" y="15" width="16" height="13" fill="#5fb4d9" fill-opacity=".35"/>'),
+  scales: IC('<rect x="4" y="16" width="26" height="13" rx="3" fill="#2a3550" stroke="#56688f"/><rect x="7" y="13" width="20" height="3" rx="1" fill="#8b96ad"/><rect x="11" y="20" width="12" height="6" rx="1" fill="#0e1520"/>'),
+  jar: IC('<rect x="9" y="10" width="16" height="19" rx="3" fill="rgba(95,180,217,.15)" stroke="#8fb9d6"/><rect x="8" y="6" width="18" height="4" rx="1" fill="#56688f"/><rect x="11" y="21" width="3" height="3" fill="#f2f5f8"/><rect x="16" y="23" width="3" height="3" fill="#f2f5f8"/><rect x="20" y="20" width="3" height="3" fill="#f2f5f8"/>'),
+  wbottle: IC('<path d="M10 12q-2 0 -2 3v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2 -2V15q0 -3 -2 -3z" fill="rgba(95,180,217,.3)" stroke="#8fb9d6"/><path d="M17 12V5l-7 -3" fill="none" stroke="#c8d1e2" stroke-width="2"/>'),
+  read: IC('<text x="17" y="21" font-size="10" text-anchor="middle" fill="var(--fg)" font-family="IBM Plex Mono">ω</text>'),
+  src: IC('<path d="M14 4h6v5q6 2 6 8v11a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2V17q0 -6 6 -8z" fill="rgba(255,181,71,.25)" stroke="#8fb9d6"/>'),
+  plate: IC('<rect x="4" y="18" width="26" height="9" rx="2" fill="#3a4762"/><rect x="7" y="16" width="20" height="2.5" fill="#ff8a3c"/><path d="M12 13q-2 -3 0 -6M17 13q-2 -3 0 -6M22 13q-2 -3 0 -6" fill="none" stroke="#e8ecf4" opacity=".6"/>'),
+  card: IC('<rect x="5" y="7" width="24" height="20" rx="4" fill="none" stroke="var(--muted)"/><text x="17" y="21" font-size="9" text-anchor="middle" fill="#ffb547" font-family="IBM Plex Mono">%</text>'),
+  flask: IC('<path d="M15 3v13a8 8 0 1 0 4 0V3" fill="rgba(47,127,224,.25)" stroke="#8fb9d6"/><path d="M13 9h8" stroke="#e8ecf4"/>'),
+  bar: IC('<rect x="3" y="13" width="18" height="8" rx="1" fill="#3f8fe0"/><rect x="21" y="13" width="10" height="8" rx="1" fill="#5fb4d9" fill-opacity=".5"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const tg = (a, b, on) => `<div class="${on ? 'on' : ''}"><span>${a}</span><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'mass') return `Готово растворов: ${TARG1.filter((x, i) => m.found[i]).length} из 3 · сейчас ${m.m} г, ω = ${pc(m.w)}`;
+  if (m.kind === 'dil') return `Решено задач: ${PROB2.filter((x, i) => m.solved[i]).length} из 3 · в стакане ${fmt(m.m, 1)} г, ω = ${pc(m.w)}`;
+  if (m.kind === 'molar') return `Готово растворов: ${TARG3.filter((x, i) => m.found[i]).length} из 3 · ${low(m.f)}, ${m.m} г, колба ${m.V} мл`;
+  return `Готово растворов: ${TARG4.filter((x, i) => m.found[i]).length} из 3 · ω(${low(m.H.s)}) = ${pc(m.w)}`;
+}
+
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'mass') h = `<h2>Раствор на весах</h2>
+      <dl class="reads"><div><dt>m(соли), г</dt><dd id="r1"></dd></div><div><dt>m(р-ра), г</dt><dd id="r2"></dd></div><div><dt>ω</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><label for="sR">Соль NaCl <output id="sO"></output></label><input type="range" id="sR" min="0" max="${SMAX}" step="1"></div>
+      <div class="ctl"><label for="wR">Вода <output id="wO"></output></label><input type="range" id="wR" min="0" max="${WMAX}" step="1"></div>
+      <div class="row"><button class="ghostbtn bigbtn" id="pourB">Вылить и начать заново</button></div>
+      <h3>Растворы из задания</h3><div class="tgts" id="tg"></div>`;
+  if (id === 'dilute') {
+    const P = PROB2[S.pi];
+    h = `<h2>Задача ${S.pi + 1}. ${P.name}</h2><p>${P.q} ${P.ask}</p>
+      <div class="ctl"><div class="lbl">Задача</div><div class="chips" id="sChips">${PROB2.map((x, i) => `<button data-f="${i}" aria-pressed="${i === S.pi}">${i + 1}. ${x.name}</button>`).join('')}</div></div>
+      <dl class="reads"><div><dt>m(р-ра), г</dt><dd id="r1"></dd></div><div><dt>m(в-ва), г</dt><dd id="r2"></dd></div><div><dt>ω</dt><dd id="r3"></dd></div></dl>` +
+      (P.evap ? `<div class="ctl"><label for="eR">Испарилось воды <output id="eO"></output></label><input type="range" id="eR" min="0" max="120" step="5"></div>` :
+        P.src.map(s => `<div class="ctl"><label for="r-${s.k}">${s.k === 'water' ? 'Вода' : s.lab + '-й раствор'} <output id="o-${s.k}"></output></label><input type="range" id="r-${s.k}" data-k="${s.k}" min="0" max="${AMAX}" step="10"></div>`).join('')) +
+      `<div class="row"><button class="ghostbtn bigbtn" id="pourB">Начать задачу сначала</button></div>`;
+  }
+  if (id === 'molar') h = `<h2>Мерная колба</h2>
+      <dl class="reads"><div><dt>n, моль</dt><dd id="r1"></dd></div><div><dt>V, л</dt><dd id="r2"></dd></div><div><dt>C, моль/л</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Вещество</div><div class="chips" id="sChips">${SUBS3.map(f => `<button data-f="${f}" aria-pressed="${f === S.sub3}">${low(f)} · ${SUB3[f].M}</button>`).join('')}</div></div>
+      <div class="ctl"><div class="lbl">Колба</div><div class="chips" id="vChips">${FLASKS.map(V => `<button data-v="${V}" aria-pressed="${V === S.V}">${V >= 1000 ? '1 л' : V + ' мл'}</button>`).join('')}</div></div>
+      <div class="ctl"><label for="mR">Масса в лодочке <output id="mO"></output></label><input type="range" id="mR" min="0" max="${MMAX3}" step="1"></div>
+      <div class="row"><button class="ghostbtn bigbtn" id="fillB">Долить до метки</button><button class="ghostbtn bigbtn" id="pourB">Вылить</button></div>
+      <h3>Растворы из задания</h3><div class="tgts" id="tg"></div>`;
+  if (id === 'hydrate') h = `<h2>Раствор из кристаллогидрата</h2>
+      <dl class="reads"><div><dt>m(соли), г</dt><dd id="r1"></dd></div><div><dt>m(р-ра), г</dt><dd id="r2"></dd></div><div><dt>ω(соли)</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Кристаллогидрат</div><div class="chips" id="sChips">${HYDS.map(q => `<button data-f="${q}" aria-pressed="${q === S.hyd}">${low(HYD[q].f)} · ${HYD[q].M}</button>`).join('')}</div></div>
+      <div class="ctl"><label for="hR">Кристаллы <output id="hO"></output></label><input type="range" id="hR" min="0" max="${HMAX}" step="1"></div>
+      <div class="ctl"><label for="wR">Вода <output id="wO"></output></label><input type="range" id="wR" min="0" max="300" step="1"></div>
+      <div class="row"><button class="ghostbtn bigbtn" id="pourB">Вылить и начать заново</button></div>
+      <h3>Растворы из задания</h3><div class="tgts" id="tg"></div>`;
+  el.innerHTML = h;
+  el.querySelectorAll('#sChips button').forEach(b => b.onclick = () => id === 'dilute' ? setProb(+b.dataset.f) : id === 'molar' ? setSub3(b.dataset.f) : setHyd(b.dataset.f));
+  el.querySelectorAll('#vChips button').forEach(b => b.onclick = () => setV(+b.dataset.v));
+  const rng = (sel, fn) => el.querySelectorAll(sel).forEach(r => { r.oninput = () => fn(r, +r.value, true); r.onchange = () => fn(r, +r.value, false); });
+  rng('#sR', (r, v, live) => { S.salt = v; update(live); });
+  rng('#wR', (r, v, live) => { if (id === 'mass') S.water = v; else S.w4 = v; update(live); });
+  rng('#eR', (r, v, live) => { const P = PROB2[S.pi], ms = P.init.m * P.init.w; S.amt.evap = Math.min(v, Math.floor((P.init.m - ms / 0.4) / 5) * 5); if (live) S.steamT = performance.now(); update(live); });
+  rng('input[data-k]', (r, v, live) => { S.amt[r.dataset.k] = v; update(live); });
+  rng('#mR', (r, v, live) => { if (S.fill) { toast('Раствор уже готов. Вылейте его, чтобы приготовить новый.'); r.value = S.m3; return; } S.m3 = v; update(live); });
+  rng('#hR', (r, v, live) => { S.mh = v; update(live); });
+  const pb = el.querySelector('#pourB'); if (pb) pb.onclick = () => id === 'mass' ? pour1() : id === 'dilute' ? reset2() : id === 'molar' ? pour3() : pour4();
+  const fb = el.querySelector('#fillB'); if (fb) fb.onclick = doFill;
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  const val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  const tgEl = el.querySelector('#tg');
+  if (m.kind === 'mass') {
+    set('#r1', m.s); set('#r2', m.m); set('#r3', pc(m.w)); set('#sO', m.s + ' г'); set('#wO', m.wt + ' г'); val('#sR', m.s); val('#wR', m.wt);
+    if (tgEl) tgEl.innerHTML = TARG1.map((x, i) => tg(x.txt, m.found[i] ? `${x.s} г + ${x.w} г ✓` : '?', m.found[i])).join('');
+  } else if (m.kind === 'dil') {
+    set('#r1', fmt(m.m, 1)); set('#r2', fmt(m.ms, 1)); set('#r3', pc(m.w));
+    el.querySelectorAll('#sChips button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.f === S.pi));
+    set('#eO', m.A.evap + ' г'); val('#eR', m.A.evap);
+    m.P.src.forEach(s => { set('#o-' + s.k, m.A[s.k] + ' г'); val('#r-' + s.k, m.A[s.k]); });
+  } else if (m.kind === 'molar') {
+    set('#r1', fmt(m.n, 4)); set('#r2', fmt(m.V / 1000, 3)); set('#r3', m.fill ? fmt(m.C, 4) : '—'); set('#mO', m.m + ' г'); val('#mR', m.m);
+    el.querySelectorAll('#sChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === S.sub3));
+    el.querySelectorAll('#vChips button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.v === S.V));
+    const fb = el.querySelector('#fillB'); if (fb) fb.disabled = m.fill;
+    if (tgEl) tgEl.innerHTML = TARG3.map((x, i) => tg(x.txt, m.found[i] ? `${x.m} г ✓` : '?', m.found[i])).join('');
+  } else {
+    set('#r1', fmt(m.ms, 2)); set('#r2', m.m); set('#r3', pc(m.w)); set('#hO', m.mh + ' г'); set('#wO', m.wt + ' г'); val('#hR', m.mh); val('#wR', m.wt);
+    el.querySelectorAll('#sChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === S.hyd));
+    if (tgEl) tgEl.innerHTML = TARG4.map((x, i) => tg(x.txt, m.found[i] ? `${x.m} г + ${x.w} г ✓` : '?', m.found[i])).join('');
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'mass') return [
+    { id: 'beaker', icon: ICON.beaker, name: 'Стакан с раствором', spec: 'Точки — растворённые частицы соли. Чем больше соли на ту же массу раствора, тем больше ω. Если соли больше 35,9 г на 100 г воды, она уже не растворяется и лежит на дне.' },
+    { id: 'scales', icon: ICON.scales, name: 'Электронные весы', spec: 'Стакан уже обнулён (тара), поэтому весы показывают массу раствора: соль + вода.' },
+    { id: 'jar', icon: ICON.jar, name: 'Банка с солью NaCl', spec: 'Каждое нажатие — 1 г соли шпателем. Растворённую соль обратно не достать — лишнее приходится выливать.' },
+    { id: 'wbottle', icon: ICON.wbottle, name: 'Промывалка с водой', spec: 'Каждое нажатие — 10 г воды (10 мл: плотность воды 1 г/мл). Мелкие порции — кнопкой «Вода +1 г».' },
+    { id: 'read', icon: ICON.read, name: 'Расчёт под стаканом', spec: 'ω = m(в-ва) : m(р-ра). В знаменателе масса всего раствора, а не воды.' }];
+  if (id === 'dilute') return [
+    { id: 'src', icon: ICON.src, name: 'Бутыли с растворами и водой', spec: 'На этикетке — массовая доля. Каждое нажатие наливает в стакан 10 г, внизу — сколько уже взято.' },
+    { id: 'beaker2', icon: ICON.beaker, name: 'Стакан', spec: 'Здесь получается новый раствор. Цвет гуще — массовая доля больше.' },
+    { id: 'plate', icon: ICON.plate, name: 'Плитка', spec: 'В задаче об упаривании нагревает раствор: уходит только вода, соль остаётся в стакане.' },
+    { id: 'card', icon: ICON.card, name: 'Табло «В стакане»', spec: 'Масса раствора, масса вещества и ω. Рамка зелёная — получили то, что требует задача.' }];
+  if (id === 'molar') return [
+    { id: 'scales3', icon: ICON.scales, name: 'Весы с лодочкой', spec: 'Вещество взвешивают в лодочке, а потом пересыпают в колбу через воронку.' },
+    { id: 'flask', icon: ICON.flask, name: 'Мерная колба', spec: 'Объём точный только до метки на горлышке: 100, 250, 500 мл или 1 л. Объём раствора — это объём колбы, а не налитой воды.' },
+    { id: 'jars3', icon: ICON.jar, name: 'Банки с веществами', spec: 'NaOH (M = 40), CuSO₄ (M = 160), MgSO₄ (M = 120 г/моль). Безводный CuSO₄ белый, а его раствор — голубой.' },
+    { id: 'read3', icon: ICON.read, name: 'Расчёт под колбой', spec: 'n = m : M, затем C = n : V, объём — в литрах.' }];
+  return [
+    { id: 'bar', icon: ICON.bar, name: 'Состав кристалла', spec: 'Какая часть массы гидрата — соль, а какая — кристаллизационная вода. Для CuSO₄·5H₂O: 160 из 250.' },
+    { id: 'jars4', icon: ICON.jar, name: 'Банки с кристаллогидратами', spec: 'Медный купорос CuSO₄·5H₂O (синий) и английская соль MgSO₄·7H₂O (белая). Нажатие — 1 г кристаллов.' },
+    { id: 'beaker4', icon: ICON.beaker, name: 'Стакан на весах', spec: 'Весы показывают массу раствора: кристаллы + налитая вода.' },
+    { id: 'wbottle4', icon: ICON.wbottle, name: 'Промывалка с водой', spec: 'Каждое нажатие — 10 г воды. Вода из кристаллов добавится к ней сама.' },
+    { id: 'read4', icon: ICON.read, name: 'Расчёт под стаканом', spec: 'ω считают по безводной соли: m(соли) = m(гидрата) · M(соли) : M(гидрата).' }];
+}
+
+let calcFor = -1;
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      (L.safe ? `<div class="safe"><b>Безопасность</b>${L.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Детали опыта</h2><p class="note">Нажмите на деталь, чтобы найти её на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') {
+    const live = $('#calcLive');
+    if (!live || calcFor !== S.lesson) { $('#pane-calc').innerHTML = `<div id="calcLive">${calcHTML(m)}</div>` + entHTML(); calcFor = S.lesson; bindEnt(); }
+    else live.innerHTML = calcHTML(m);
+  }
+}
+
+function calcHTML(m) {
+  if (m.kind === 'mass') {
+    return `<h2>Ваш раствор</h2><div class="formula">ω = m(в-ва) : m(р-ра)</div><div class="steps">` +
+      step('m(соли)', m.s + ' г') + step('m(воды)', m.wt + ' г') + step('m(р-ра) = m(соли) + m(воды)', `${m.s} + ${m.wt} = ${m.m} г`) +
+      step('ω', m.m ? `${m.s} : ${m.m} = ${fmt(m.w, 4)} → ${pc(m.w)}` : '—', 'sum') + `</div>` +
+      `<h3>Обратные формулы</h3><div class="steps">${step('m(в-ва) = ω · m(р-ра)', '200 · 0,03 = 6 г')}${step('m(р-ра) = m(в-ва) : ω', '20 : 0,25 = 80 г')}${step('m(воды) = m(р-ра) − m(в-ва)', '80 − 20 = 60 г')}</div>`;
+  }
+  if (m.kind === 'dil') {
+    const P = m.P;
+    let h = `<h2>${P.name}</h2><p>${P.q}</p><div class="formula">${P.id === 'mix' ? 'ω = (m₁ω₁ + m₂ω₂) : (m₁ + m₂)' : 'm(в-ва) = const'}</div><div class="steps">`;
+    if (P.init) h += step('m(в-ва) в начале', `${P.init.m} · ${fmt(P.init.w)} = ${fmt(P.init.m * P.init.w, 1)} г`) + step('испарилось воды', m.A.evap + ' г') + step('m(р-ра)', `${P.init.m} − ${m.A.evap} = ${fmt(m.m, 1)} г`);
+    else P.src.forEach(s => { h += step(s.k === 'water' ? 'вода' : `${s.lab}-й раствор`, `${m.A[s.k]} г${s.w ? ` → ${m.A[s.k]} · ${fmt(s.w)} = ${fmt(m.A[s.k] * s.w, 1)} г в-ва` : ''}`); });
+    h += step('m(в-ва) всего', fmt(m.ms, 1) + ' г') + step('ω', m.m > 0 ? `${fmt(m.ms, 1)} : ${fmt(m.m, 1)} = ${pc(m.w)}` : '—', 'sum') + `</div>`;
+    if (P.id === 'mix') h += `<h3>Правило креста</h3><p class="note">Слева доли исходных растворов, в центре — нужная, по диагонали — разности. Они показывают, в каком отношении по массе брать растворы. Пример для 10 % и 40 % → 25 %: 40 − 25 = 15 частей 10%-го и 25 − 10 = 15 частей 40%-го, то есть поровну.</p>`;
+    return h;
+  }
+  if (m.kind === 'molar') {
+    return `<h2>${low(m.f)} · ${m.X.name}</h2><div class="formula">C = n : V,  n = m : M</div><div class="steps">` +
+      step('m', m.m + ' г') + step(`M(${low(m.f)})`, m.M + ' г/моль') + step('n = m : M', `${m.m} : ${m.M} = ${fmt(m.n, 4)} моль`) +
+      step('V колбы', `${m.V} мл = ${fmt(m.V / 1000, 3)} л`) + step('C = n : V', m.fill ? `${fmt(m.n, 4)} : ${fmt(m.V / 1000, 3)} = ${fmt(m.C, 4)} моль/л` : 'колба ещё не долита до метки', 'sum') + `</div>` +
+      `<h3>Обратно</h3><div class="steps">${step('n = C · V', '0,2 · 0,25 = 0,05 моль')}${step('m = n · M', '0,05 · 40 = 2 г')}</div><p class="note" style="margin-top:10px">«0,1 М» читают «децимолярный»: 0,1 моль в литре раствора. Миллилитры обязательно переводите в литры.</p>`;
+  }
+  const H = m.H;
+  return `<h2>${low(H.f)} · ${H.name}</h2><div class="formula">m(соли) = m(гидрата) · M(соли) : M(гидрата)</div><div class="steps">` +
+    step(`M(${low(H.f)})`, `${H.Ms} + ${H.k} · 18 = ${H.M} г/моль`) + step('m(гидрата)', m.mh + ' г') + step(`m(${low(H.s)})`, `${m.mh} · ${H.Ms} : ${H.M} = ${fmt(m.ms, 2)} г`) +
+    step('m(р-ра) = m(гидрата) + m(воды)', `${m.mh} + ${m.wt} = ${m.m} г`) + step(`ω(${low(H.s)})`, m.m ? `${fmt(m.ms, 2)} : ${m.m} = ${pc(m.w)}` : '—', 'sum') + `</div>` +
+    `<h3>Обратно</h3><div class="steps">${step('m(соли) = ω · m(р-ра)', '200 · 0,08 = 16 г CuSO₄')}${step('m(гидрата)', '16 · 250 : 160 = 25 г')}${step('m(воды)', '200 − 25 = 175 г')}</div>`;
+}
+function entHTML() {
+  const L = LID();
+  return `<h3>Задачи как на ЕНТ</h3><p class="note">Решите в тетради и введите число. Ответ можно писать с запятой.</p>` + ENT[L].map((P, i) => {
+    const ok = S.ent[L + '-' + i];
+    return `<div class="ent ${ok ? 'ok' : ''}" data-i="${i}"><p>${i + 1}. ${P.q}</p><div class="row"><input inputmode="decimal" autocomplete="off" aria-label="Ответ к задаче ${i + 1}" value="${ok ? fmt(P.a, 4) : ''}"><span class="u">${P.u}</span><button class="ghostbtn">Проверить</button></div>` +
+      `<div class="state ${ok ? 'done' : ''}">${ok ? '✓ Верно. ' + P.sol : ''}</div></div>`;
+  }).join('');
+}
+function bindEnt() {
+  const L = LID();
+  $('#pane-calc').querySelectorAll('.ent').forEach(box => {
+    const i = +box.dataset.i, P = ENT[L][i], inp = box.querySelector('input'), st = box.querySelector('.state');
+    const check = () => {
+      const v = parseFloat(String(inp.value).replace(',', '.').replace(/\s/g, ''));
+      if (!isFinite(v)) { st.className = 'state bad'; st.textContent = 'Введите число.'; return; }
+      if (Math.abs(v - P.a) <= Math.abs(P.a) * 0.01 + 1e-9) {
+        S.ent[L + '-' + i] = true; save(); box.classList.add('ok'); st.className = 'state done'; st.textContent = '✓ Верно. ' + P.sol;
+      } else if (Math.abs(v * 100 - P.a) <= Math.abs(P.a) * 0.01 || Math.abs(v / 100 - P.a) <= Math.abs(P.a) * 0.01) {
+        st.className = 'state bad'; st.textContent = 'Почти: проверьте единицы — проценты или доли, граммы или литры. ' + P.hint;
+      } else { st.className = 'state bad'; st.textContent = 'Пока не так. Подсказка: ' + P.hint; }
+    };
+    box.querySelector('button').onclick = check;
+    inp.onkeydown = e => { if (e.key === 'Enter') check(); };
+  });
+}
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'mass') el.innerHTML = `<div class="k">Стакан · NaCl</div><div class="v">ω = ${pc(m.w)}</div><div class="lr"><span>m(р-ра)</span><span>${m.m} г</span></div><div class="lr"><span>цели</span><span>${TARG1.filter((x, i) => m.found[i]).length} из 3</span></div>`;
+  else if (m.kind === 'dil') el.innerHTML = `<div class="k">Задача ${S.pi + 1} · ${m.P.name}</div><div class="v ${m.ok ? 'ok' : ''}">ω = ${pc(m.w)}</div><div class="lr"><span>m(р-ра)</span><span>${fmt(m.m, 1)} г</span></div><div class="lr"><span>решено</span><span>${PROB2.filter((x, i) => m.solved[i]).length} из 3</span></div>`;
+  else if (m.kind === 'molar') el.innerHTML = `<div class="k">Колба · ${low(m.f)}</div><div class="v">${m.fill ? fmt(m.C, 4) + ' М' : 'не долита'}</div><div class="lr"><span>${m.m} г</span><span>${m.V >= 1000 ? '1 л' : m.V + ' мл'}</span></div><div class="lr"><span>цели</span><span>${TARG3.filter((x, i) => m.found[i]).length} из 3</span></div>`;
+  else el.innerHTML = `<div class="k">Стакан · ${low(m.H.s)}</div><div class="v">ω = ${pc(m.w)}</div><div class="lr"><span>m(р-ра)</span><span>${m.m} г</span></div><div class="lr"><span>цели</span><span>${TARG4.filter((x, i) => m.found[i]).length} из 3</span></div>`;
+}
+
+function update(live) {
+  let m = model();
+  const L = LESSONS[S.lesson];
+  if (!live) {
+    if (m.kind === 'mass') TARG1.forEach((x, i) => { if (!S.f1[i] && m.s === x.s && m.wt === x.w) { S.f1[i] = true; toast(`Готово: ${x.txt} — ${x.s} г соли и ${x.w} г воды.`); } });
+    if (m.kind === 'mass' && m.m && !TARG1.some(x => x.s === m.s && x.w === m.wt)) {
+      const t = TARG1.find((x, i) => !S.f1[i] && near(x.s / (x.s + x.w), m.w));
+      if (t && m.m !== t.s + t.w) toast(`ω уже ${pc(m.w)}, но масса раствора ${m.m} г, а нужна ${t.s + t.w} г.`);
+    }
+    if (m.kind === 'dil' && m.ok && !S.solved[S.pi]) {
+      S.solved[S.pi] = true; renderTools();
+      const P = m.P, ans = P.id === 'dil' ? `30%-го раствора ${m.A.a} г, воды ${m.A.water} г` : P.id === 'evap' ? `испарилось ${m.A.evap} г воды` : `10%-го ${m.A.a} г и 40%-го ${m.A.b} г`;
+      toast(`Задача ${S.pi + 1} решена: ${ans}.`);
+    } else if (m.kind === 'dil' && !m.ok && m.P.tm && near(m.w, m.P.tw) && m.m > 0) toast(`ω = ${pc(m.w)}, но масса раствора ${fmt(m.m, 1)} г, а нужно ${m.P.tm} г.`);
+    else if (m.kind === 'dil' && m.P.tm && m.m > m.P.tm + 1e-9) toast(`Уже ${fmt(m.m, 1)} г — больше, чем нужно (${m.P.tm} г). Нажмите «Сначала».`);
+    if (m.kind === 'molar' && m.fill) {
+      TARG3.forEach((x, i) => { if (!S.f3[i] && x.f === m.f && x.V === m.V && x.m === m.m) { S.f3[i] = true; toast(`Готово: ${x.txt}. n = ${fmt(m.n, 4)} моль, C = ${fmt(m.C, 4)} моль/л.`); } });
+      const t = TARG3.find(x => x.f === m.f && near(x.C, m.C) && x.V !== m.V);
+      if (t && !TARG3.some(x => x.f === m.f && x.V === m.V && x.m === m.m)) toast(`Концентрация верная, но нужен объём ${t.V >= 1000 ? '1 л' : t.V + ' мл'}.`);
+    }
+    if (m.kind === 'hyd') {
+      TARG4.forEach((x, i) => { if (!S.f4[i] && x.h === m.h && x.m === m.mh && x.w === m.wt) { S.f4[i] = true; toast(`Готово: ${x.txt} — ${x.m} г кристаллов и ${x.w} г воды.`); } });
+    }
+    m = model();
+    if (!S.done[L.id] && L.check(m)) {
+      S.done[L.id] = true; save(); renderStrip();
+      toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Тема «Растворы» освоена!');
+    }
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  mass: '<rect x="10" y="22" width="30" height="6" rx="1.5" fill="#2a3550" stroke="#56688f"/><path d="M15 6v14h20V6" fill="none" stroke="#8fb9d6"/><rect x="16" y="12" width="18" height="8" fill="#5fb4d9" fill-opacity=".35"/><rect x="46" y="12" width="12" height="16" rx="2" fill="rgba(95,180,217,.15)" stroke="#8fb9d6"/><rect x="45" y="9" width="14" height="3" fill="#56688f"/>',
+  dilute: '<path d="M8 10h6v4q5 2 5 7v6h-16v-6q0 -5 5 -7z" fill="rgba(255,181,71,.3)" stroke="#8fb9d6"/><path d="M28 8v18h18V8" fill="none" stroke="#8fb9d6"/><rect x="29" y="16" width="16" height="10" fill="#5fb4d9" fill-opacity=".35"/><rect x="26" y="27" width="22" height="2" fill="#ff8a3c"/><path d="M53 12q-2 -3 0 -6M58 12q-2 -3 0 -6" fill="none" stroke="#e8ecf4" opacity=".6"/>',
+  molar: '<path d="M31 3v12a8 8 0 1 0 4 0V3" fill="rgba(47,127,224,.3)" stroke="#8fb9d6"/><path d="M29 8h8" stroke="#e8ecf4"/><rect x="6" y="22" width="16" height="6" rx="1.5" fill="#2a3550"/><path d="M9 20h10l-2 2h-6z" fill="#c8d1e2"/><text x="52" y="20" font-size="8" fill="#ffb547" text-anchor="middle" font-family="IBM Plex Mono">M</text>',
+  hydrate: '<rect x="5" y="10" width="34" height="8" rx="1.5" fill="#3f8fe0"/><rect x="39" y="10" width="20" height="8" rx="1.5" fill="#5fb4d9" fill-opacity=".5"/><rect x="10" y="21" width="4" height="4" fill="#3f8fe0"/><rect x="16" y="23" width="4" height="4" fill="#3f8fe0"/><rect x="22" y="21" width="4" height="4" fill="#3f8fe0"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i], init = JSON.parse(JSON.stringify(L.init || {}));
+  stopHold();
+  S.lesson = i; S.hl = null; S.fx = null; S.steamT = 0;
+  S.salt = 0; S.water = 0; S.f1 = {}; S.pi = 0; S.amt = { a: 0, b: 0, water: 0, evap: 0 }; S.solved = {};
+  S.sub3 = 'NaOH'; S.V = 250; S.m3 = 0; S.fill = false; S.f3 = {}; S.hyd = 'cu'; S.mh = 0; S.w4 = 0; S.f4 = {};
+  Object.assign(S, init);
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// для «Как в жизни» (/luch/real3d.js → /luch/real3d-chem-solutions.js): весы со стаканом, банки, бутыли, плитка, мерная колба
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-solutions' }, r2 = v => Math.round(v * 100) / 100;
+  if (id === 'mass') return { ...base, scene: 'chsol-mass', help: 'Банка — +1 г соли, промывалка — +10 г воды, клавиши — точнее и «вылить»',
+    s: m.s, wt: m.wt, m: m.m, w: r2(m.w * 100), sat: m.sat, done: TARG1.map((x, i) => !!m.found[i]), tg: TARG1.map(x => x.txt) };
+  if (id === 'dilute') return { ...base, scene: 'chsol-dil', help: 'Бутыль — +10 г, плитка — выпарить 10 г воды, клавиши — задача',
+    pi: S.pi, name: m.P.name, sub: m.P.sub, src: m.P.src.map(s => ({ k: s.k, w: s.w, lab: s.lab, amt: m.A[s.k] })), init: m.P.init, evap: m.P.evap, ev: m.A.evap,
+    m: r2(m.m), ms: r2(m.ms), w: r2(m.w * 100), tw: r2(m.P.tw * 100), tm: m.P.tm, ok: m.ok, solved: PROB2.map((x, i) => !!S.solved[i]) };
+  if (id === 'molar') return { ...base, scene: 'chsol-molar', help: 'Банка — выбрать вещество / +1 г, колба — долить до метки, клавиши — масса, объём, вылить',
+    f: m.f, subs: SUBS3.map(f => ({ f, M: SUB3[f].M })), M: m.M, m: m.m, V: m.V, n: Math.round(m.n * 10000) / 10000, C: Math.round(m.C * 10000) / 10000, fill: m.fill, done: TARG3.map((x, i) => !!m.found[i]) };
+  return { ...base, scene: 'chsol-hyd', help: 'Банка — выбрать гидрат / +1 г кристаллов, промывалка — +10 г воды, клавиши — точнее и «вылить»',
+    h: m.h, f: m.H.f, s: m.H.s, k: m.H.k, M: m.H.M, Ms: m.H.Ms, hyds: HYDS.map(q => ({ q, f: HYD[q].f })), mh: m.mh, wt: m.wt, ms: r2(m.ms), m: m.m, w: r2(m.w * 100), done: TARG4.map((x, i) => !!m.found[i]) };
+};
+window.LUCH_REAL.click = k => {
+  const id = LID();
+  if (k === 'salt' || k === 'water' || k === 'flask' || k === 'evap' || k.startsWith('src-') || k.startsWith('j-') || k.startsWith('jh-')) { const r = tapItem(k); update(); return r; }
+  if (id === 'molar' && k.startsWith('V-')) return setV(+k.slice(2));
+  if (id === 'molar' && k === 'vnext') return cycleV();
+  act(k);
+};
+
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'mass') now = `На столе электронные весы со стаканом, банка с поваренной солью NaCl (нажатие — 1 г) и промывалка с водой (нажатие — 10 г), есть кнопки «Соль +1/+5 г», «Вода +1/+10/+50 г», «Вылить». Сейчас в стакане ${m.s} г соли и ${m.wt} г воды, масса раствора ${m.m} г, ω = ${pc(m.w)}${m.sat ? '; соли больше, чем растворяется (35,9 г на 100 г воды), часть лежит на дне' : ''}. Цели: ${TARG1.map((x, i) => `${x.txt} — ${S.f1[i] ? 'готово' : 'ещё нет'}`).join('; ')}. Не называй нужные массы соли и воды — спроси, как найти m(в-ва) = ω · m(р-ра) и почему в знаменателе масса раствора, а не воды.`;
+  if (id === 'dilute') { const P = m.P; now = `Задача ${S.pi + 1} из 3 («${P.name}»): ${P.q} ${P.ask} На столе ${P.evap ? 'стакан с исходным раствором на плитке (нажатие на плитку — выпарить 10 г воды)' : 'бутыли: ' + P.src.map(s => s.k === 'water' ? 'вода' : s.lab + '-й раствор').join(' и ') + ' (нажатие — налить 10 г)'} и табло «В стакане». Сейчас: ${P.init ? `испарилось ${m.A.evap} г воды, ` : P.src.map(s => `${s.k === 'water' ? 'воды' : s.lab + '-го'} взято ${m.A[s.k]} г`).join(', ') + ', '}масса раствора ${fmt(m.m, 1)} г, масса вещества ${fmt(m.ms, 1)} г, ω = ${pc(m.w)}. Решено задач: ${PROB2.filter((x, i) => S.solved[i]).length} из 3. Не называй ответ — подводи к тому, что масса вещества при разбавлении и упаривании не меняется, а при смешивании складывается.`; }
+  if (id === 'molar') now = `На столе весы с лодочкой, банки NaOH (M = 40), CuSO4 (M = 160), MgSO4 (M = 120 г/моль) и мерная колба (сейчас ${m.V} мл). Выбрано ${m.f}, в лодочке ${m.fill ? 'пусто, вещество пересыпано в колбу и долито до метки' : m.m + ' г'}; n = ${fmt(m.n, 4)} моль${m.fill ? `, C = ${fmt(m.C, 4)} моль/л` : ', колба ещё не долита'}. Цели: ${TARG3.map((x, i) => `${x.txt} — ${S.f3[i] ? 'готово' : 'ещё нет'}`).join('; ')}. Не называй нужную массу — подводи к цепочке n = C · V (V в литрах), m = n · M.`;
+  if (id === 'hydrate') now = `На столе карточка «состав кристалла» (1 моль ${m.H.f} = ${m.H.M} г, из них ${m.H.Ms} г соли и ${m.H.M - m.H.Ms} г воды), банки с медным купоросом CuSO4·5H2O и английской солью MgSO4·7H2O (нажатие — 1 г), весы со стаканом и промывалка (10 г воды). Выбран ${m.H.f}; в стакане ${m.mh} г кристаллов и ${m.wt} г воды, масса раствора ${m.m} г, безводной соли ${fmt(m.ms, 2)} г, ω(${m.H.s}) = ${pc(m.w)}. Цели: ${TARG4.map((x, i) => `${x.txt} — ${S.f4[i] ? 'готово' : 'ещё нет'}`).join('; ')}. Не называй массы — спрашивай, какая часть кристаллогидрата приходится на безводную соль и куда девается кристаллизационная вода.`;
+  return [
+    `Предмет: химия, 8–9 класс. Тема «Растворы». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Во вкладке «Расчёты» есть задачи как на ЕНТ: ${ENT[id].map((P, i) => `${i + 1}) ${P.q} — ${S.ent[id + '-' + i] ? 'решена' : 'не решена'}`).join(' ')}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Для тьютора: не называй ответ, веди ученика наводящими вопросами.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = { mass: 'Почему делят на массу раствора, а не воды?', dilute: 'Что не меняется при разбавлении и упаривании?', molar: 'Чем молярная концентрация отличается от массовой доли?', hydrate: 'Куда девается вода из кристаллов медного купороса?' }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

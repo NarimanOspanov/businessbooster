@@ -1,0 +1,1187 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по информатике, 8–9 класс: позиционные системы счисления и перевод 2/8/16 ↔ 10, двоичная арифметика, информационный объём и скорость передачи данных, алгоритм Евклида, НОД и НОК.">
+<title>Системы счисления</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag],.scene [data-hit]{cursor:pointer}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+.scene .sans{font-family:var(--font-body)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.big{font:600 15px/1 var(--font-mono);color:var(--fg);min-width:34px}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:22%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chips button:disabled{opacity:.35;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.mtab{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:8px}
+.mtab span{background:var(--surface-2);border-radius:7px;padding:6px 7px;font:500 12.5px/1.2 var(--font-mono);display:flex;justify-content:space-between;gap:4px;min-width:0}
+.mtab span b{font-weight:600;color:var(--fg)}
+.mtab span i{font-style:normal;color:var(--force);letter-spacing:.06em}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:470px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mtab{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(100vw + 180px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ENT practice problems in the «Расчёты» tab */
+.ent{display:grid;gap:10px}
+.prob{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px}
+.prob.ok{border-color:var(--ok)}
+.prob p{margin:0 0 8px;font-size:14px;line-height:1.45}
+.prob .ans{display:flex;gap:8px;align-items:center}
+.prob input{flex:1;min-width:0;height:42px;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:0 11px;color:var(--fg);font:500 15px var(--font-mono)}
+.prob input:focus{border-color:var(--arm);outline:none}
+.prob .ghostbtn{height:42px;flex:none}
+.prob .fb{margin:8px 0 0;font-size:13px;color:var(--muted)}
+.prob .fb.ok{color:var(--ok)}
+.prob .fb.bad{color:var(--warn)}
+.chips button{min-height:36px}
+.row .ghostbtn{min-height:40px}
+</style>
+</head>
+<body>
+<script src="/luch/splash.js"></script>
+<div class="app">
+  <header>
+    <div class="brand" role="link" tabindex="0" title="Карта предметов" style="cursor:pointer" onclick="location.href='/#cs'" onkeydown="if(event.key==='Enter')location.href='/#cs'">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9.6 14.6 9.2 6.2 15 10.6Q20 9.4 25 10.6L30.8 6.2 30.4 14.6Q34.6 22 31.6 29Q27.6 36 20 36Q12.4 36 8.4 29Q5.4 22 9.6 14.6Z" fill="#ffb547"/><path d="M20 14Q15.2 10.8 10.9 13.4Q7.6 17.2 9.4 21.8Q11.6 25.8 15.9 25.4Q18.5 25.1 20 27.1Q21.5 25.1 24.1 25.4Q28.4 25.8 30.6 21.8Q32.4 17.2 29.1 13.4Q24.8 10.8 20 14Z" fill="#ffd896"/><circle cx="15" cy="18.8" r="5" fill="#fffaf0"/><circle cx="25" cy="18.8" r="5" fill="#fffaf0"/><circle cx="15.6" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="24.4" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="16.6" cy="18.1" r="1" fill="#fff"/><circle cx="25.4" cy="18.1" r="1" fill="#fff"/><path d="M18.6 23.4h2.8L20 26.6z" fill="#ff8a73"/><path d="M10.5 29.6Q15.3 27.4 20 29.7Q24.7 27.4 29.5 29.6V34.6Q24.7 32.6 20 34.8Q15.3 32.6 10.5 34.6Z" fill="#72d4e8"/><path d="M20 29.7V34.8" stroke="#0b1019" stroke-width="1.1"/><path d="M8.2 23.5Q5.6 28.6 9.4 32.6Q11.6 33.2 12.4 31Q10.4 28.4 8.2 23.5Z" fill="#e8962a"/><path d="M31.8 23.5Q34.4 28.6 30.6 32.6Q28.4 33.2 27.6 31Q29.6 28.4 31.8 23.5Z" fill="#e8962a"/><path d="M35 3.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="#86e0a8"/></svg>
+      <div><h1>OPEN SCHOOL AI</h1><small>Доступное образование для всех</small></div>
+    </div>
+    <div class="headr">
+      
+      <div class="prog" aria-label="Прогресс"><b>Системы счисления</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочий стол лаборатории">
+    <svg class="scene" id="scene" role="img" aria-label="Интерактивная сцена: разряды, столбики, канал связи и прямоугольник Евклида — нажимайте на кнопки и клетки."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const big = n => Math.round(n).toLocaleString('ru-RU');
+const fmt = (x, n = 1) => (Math.round(x * 10 ** n) / 10 ** n).toFixed(n).replace('.', ',');
+const num = x => Number.isInteger(x) ? big(x) : (Math.round(x * 1000) / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 3 });
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+const sub = n => String(n).replace(/\d/g, d => '₀₁₂₃₄₅₆₇₈₉'[d]);
+const sup = n => String(n).replace(/\d/g, d => '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]);
+const DIG = '0123456789ABCDEF';
+const gcd = (a, b) => { while (b) [a, b] = [b, a % b]; return a; };
+const INK = '#04070d';
+
+const LESSONS = [
+  { id: 'conv', title: 'Позиционные системы и перевод',
+    text: ['Система счисления — способ записывать числа цифрами. В позиционной системе значение цифры зависит от её места — разряда: в числе 333 первая тройка означает 300, а последняя — просто 3. Основание системы — сколько в ней цифр: в десятичной 10 (0…9), в двоичной 2 (0 и 1), в восьмеричной 8 (0…7), в шестнадцатеричной 16 (0…9 и буквы A = 10, B = 11, C = 12, D = 13, E = 14, F = 15).',
+           'Перевод в десятичную: каждую цифру умножаем на вес разряда — степень основания — и складываем. Разряды нумеруют справа, начиная с нуля: 345₈ = 3·8² + 4·8¹ + 5·8⁰ = 192 + 32 + 5 = 229. 1011011₂ = 64 + 16 + 8 + 2 + 1 = 91.',
+           'Из десятичной: делим число на основание, выписываем остатки и читаем их снизу вверх. 157 : 16 = 9, остаток 13, то есть D, — получаем 9D₁₆. Или раскладываем на веса: 91 = 64 + 16 + 8 + 2 + 1, значит, 91 = 1011011₂.',
+           'Двоичная ↔ восьмеричная и шестнадцатеричная — без десятичной. 8 = 2³, поэтому двоичные цифры делят на группы по 3 справа: 101 011₂ = 53₈. 16 = 2⁴ — группы по 4: 0010 1010₂ = 2A₁₆. И обратно: каждую восьмеричную цифру заменяют тремя битами, шестнадцатеричную — четырьмя.',
+           'Приметы, которые выручают на ЕНТ: приписать к двоичной записи справа 0 — умножить число на 2; запись оканчивается на 00 — число делится на 4; 2ⁿ в двоичной — единица и n нулей (64 = 1000000₂), 2ⁿ − 1 — n единиц (255 = 11111111₂). Если число 25 в системе с основанием x записано как 31, то 3·x + 1 = 25 и x = 8.'],
+    why: 'Программисты видят шестнадцатеричные числа каждый день: цвет на сайте #FF8800 — это три байта красного, зелёного и синего, адреса в памяти и MAC-адрес сетевой карты тоже пишут в hex. Права доступа к файлам в Linux задают восьмеричным числом (chmod 755). Инженер-электронщик читает двоичные регистры микроконтроллера, а сетевой инженер переводит маску 255.255.255.192 в двоичную, чтобы посчитать адреса в подсети.',
+    task: 'Наберите на разрядах три числа: 91 в двоичной, 229 в восьмеричной и 157 в шестнадцатеричной системе.',
+    hint: 'Начните со старшего разряда: найдите самый большой вес, который помещается в число, и сколько раз он помещается. Остаток раскладывайте по следующим разрядам. Систему меняют кнопки «осн. 2 / 8 / 16» или нажатие на карточку цели.',
+    stage: 'Кнопки ▲ и ▼ меняют цифру разряда. Ниже — сумма «цифра × вес».',
+    check: m => m.got.every(Boolean) },
+  { id: 'arith', title: 'Двоичная арифметика',
+    text: ['Столбиком в любой системе считают так же, как в десятичной, только перенос случается не при 10, а при основании. В двоичной: 0 + 0 = 0, 0 + 1 = 1, 1 + 1 = 10 (пишем 0, 1 переносим), 1 + 1 + 1 = 11 (пишем 1, 1 переносим).',
+           'Вычитание: 1 − 1 = 0, 1 − 0 = 1, а для 0 − 1 занимаем единицу старшего разряда — она равна основанию: 2 в двоичной, 8 в восьмеричной, 16 в шестнадцатеричной. Пример: 1100₂ − 11₂ = 1001₂ (12 − 3 = 9).',
+           'Умножение в двоичной — это сдвиги и сложение, ведь таблица умножения всего из 0·0 = 0, 0·1 = 0, 1·1 = 1. 1101₂ · 11₂ = 1101 + 11010 = 100111₂ (13 · 3 = 39). Умножить на 10₂ — приписать справа ноль.',
+           'Восьмеричная: 17₈ + 25₈. Справа 7 + 5 = 12 = 8 + 4 — пишем 4, 1 переносим; дальше 1 + 2 + 1 = 4. Ответ 44₈. Шестнадцатеричная: B + 7 = 11 + 7 = 18 = 16 + 2 — пишем 2, 1 переносим.',
+           'Проверка: переведите числа в десятичную, посчитайте и переведите ответ обратно. 1101010₂ + 101011₂ + 111110₂ = 106 + 43 + 62 = 211 = 11010011₂.'],
+    why: 'Сложение столбиком в двоичной — ровно то, что делает сумматор процессора миллиарды раз в секунду: бит суммы и бит переноса. Разработчики игр и встроенных систем умножают на 2 сдвигом битов — это быстрее обычного умножения. Специалист по информационной безопасности складывает байты по модулю 2, когда считает контрольные суммы и хеши, а сетевой инженер вычитает адреса в двоичной, чтобы найти размер подсети.',
+    task: 'Решите столбиком все 5 примеров: наберите цифры ответа и нажмите «Проверить».',
+    hint: 'Идите справа налево. Если сумма в столбце не меньше основания, вычтите основание и перенесите 1 в следующий разряд — отметьте перенос нажатием на клетку над столбцом. В умножении сложите частичные произведения.',
+    stage: 'Нажмите на клетку ответа или ▲ ▼ под ней. Клетка над столбцом — отметка переноса.',
+    check: m => m.solvedN === EX.length },
+  { id: 'volume', title: 'Объём и скорость передачи',
+    text: ['Единицы: 1 байт = 8 бит, 1 Кбайт = 1024 байта, 1 Мбайт = 1024 Кбайта, 1 Гбайт = 1024 Мбайта. В степенях двойки: 1 Кбайт = 2¹⁰ байт = 2¹³ бит, 1 Мбайт = 2²³ бит. Скорость канала меряют в бит/с; 1 Кбит/с = 1024 бит/с. Если в условии написано 128 000 бит/с — это просто число бит.',
+           'Объём текста: I = K · i, где K — число символов, i — бит на символ. Для алфавита из N символов i — наименьшее целое с 2ⁱ ≥ N: для 32 символов i = 5, для 50 — уже 6 (2⁵ = 32 мало, 2⁶ = 64 хватает). В Unicode (UTF-16) символ занимает 16 бит = 2 байта, в ASCII — 8 бит.',
+           'Передача: I = v · t, значит, t = I / v и v = I / t. Главное — привести объём и скорость к одним единицам. Файл 2 Мбайт по каналу 256 Кбит/с: 2 Мбайт = 2 · 1024 · 8 = 16 384 Кбит, t = 16 384 / 256 = 64 с.',
+           'Степенями двойки ещё быстрее: 2 Мбайт = 2¹ · 2²³ = 2²⁴ бит, 256 Кбит/с = 2⁸ · 2¹⁰ = 2¹⁸ бит/с, t = 2²⁴ / 2¹⁸ = 2⁶ = 64 с.',
+           'Картинка: I = ширина · высота · глубина цвета. 200 × 480 пикселей по 32 бита = 3 072 000 бит = 384 000 байт = 375 Кбайт. Число цветов N = 2ⁱ: при 4 битах на пиксель — 16 цветов.'],
+    why: 'Провайдер обещает «100 Мбит/с», а браузер качает около 12 Мбайт/с — это одно и то же, просто поделили на 8. Сетевой инженер считает, выдержит ли канал видеозвонки всего офиса, а разработчик мобильного приложения — сколько секунд картинка будет грузиться на медленном 3G. Видеоинженеры стриминговых сервисов подбирают битрейт, чтобы фильм не тормозил, а облачные архитекторы прикидывают, сколько дней займёт перенос петабайта в другой дата-центр, — иногда быстрее отвезти диски грузовиком.',
+    task: 'Передайте все три сообщения за минимальное время T: без недолёта и без лишних секунд.',
+    hint: 'Нажмите на объём файла и на скорость канала — единицы переключаются. Приведите их к одним единицам и разделите объём на скорость. Для текста сначала найдите i — наименьшее число бит, при котором 2ⁱ не меньше мощности алфавита.',
+    stage: 'Нажмите на объём или скорость, чтобы сменить единицы. Время T задают кнопки −10, −1, +1, +10.',
+    check: m => m.got.every(Boolean) },
+  { id: 'euclid', title: 'Алгоритм Евклида: НОД и НОК',
+    text: ['НОД — наибольший общий делитель: самое большое число, на которое делятся оба числа. НОК — наименьшее общее кратное: самое маленькое число, которое делится на оба.',
+           'Алгоритм Евклида: НОД(a, b) = НОД(b, a mod b), пока остаток не станет 0; последний ненулевой остаток и есть НОД. НОД(48, 18): 48 = 2·18 + 12; 18 = 1·12 + 6; 12 = 2·6 + 0 — значит, НОД = 6. Вариант с вычитанием: из большего числа вычитаем меньшее, пока числа не сравняются.',
+           'Геометрически: от прямоугольника a × b отрезаем самые большие квадраты, сколько поместится. Сторона квадратов, которыми остаток замостится без щели, — НОД.',
+           'НОК через НОД: НОК(a, b) = a · b / НОД(a, b). НОК(12, 18) = 12 · 18 / 6 = 36. Если два автобуса уходят вместе и ходят каждые 12 и 18 минут, снова вместе они уйдут через 36 минут.',
+           'В программе на Python: while b: a, b = b, a % b — в конце в a лежит НОД. Шагов мало даже для огромных чисел: за каждые два шага остаток уменьшается хотя бы вдвое.'],
+    why: 'Алгоритму Евклида больше 2300 лет, и он работает в каждом смартфоне: шифрование RSA, которым защищены банковские приложения и сайты с замком https, вычисляет ключи расширенным алгоритмом Евклида. Программисты сокращают дроби и находят соотношение сторон экрана: 1920 × 1080 делим на НОД 120 и получаем 16 : 9. Логисты и диспетчеры через НОК ищут, когда совпадут расписания рейсов, а звукорежиссёры — когда сойдутся ритмы двух партий.',
+    task: 'Найдите НОД(48, 18), отрезая квадраты от прямоугольника, и НОК(12, 18) на линии времени.',
+    hint: 'Отрезайте от длинной стороны столько квадратов, сколько поместится целиком: остаток должен быть меньше стороны квадрата. Для НОК нажимайте на минуты и смотрите, какой автобус туда приходит.',
+    stage: 'НОД: выберите число квадратов и нажмите «Отрезать». НОК: нажимайте на минуты.',
+    check: m => m.gcdOk && m.lcmOk },
+];
+
+const KEY = 'luch-cs-numsys';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, solved: saved.solved || {}, draft: {}, fb: {}, tab: 'overview', hl: null,
+            base: 2, dig: [], got: [false, false, false],
+            ai: 0, res: [], car: [], aok: {}, bad: null,
+            sc: 0, su: [], vu: [], T: 10, bi: 3, send: null, vgot: [false, false, false],
+            mode: 'gcd', gp: 0, g: null, k: 1, gcdOk: false, lp: 0, lx: 0, taps: {}, lcmOk: false };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done, solved: S.solved })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- lesson 1: positional systems ----------
+const POS = { 2: 8, 8: 4, 16: 3 };
+const TARGETS = [{ b: 2, v: 91 }, { b: 8, v: 229 }, { b: 16, v: 157 }];
+const BNAME = { 2: 'двоичная', 8: 'восьмеричная', 16: 'шестнадцатеричная' };
+const digVal = () => S.dig.reduce((s, d) => s * S.base + d, 0);
+const digStr = () => { const s = S.dig.map(d => DIG[d]).join('').replace(/^0+(?=.)/, ''); return s; };
+function setBase(b) { S.base = b; S.dig = Array(POS[b]).fill(0); update(); renderTools(); }
+function bump(i, d) {
+  S.dig[i] = (S.dig[i] + d + S.base) % S.base;
+  const v = digVal(), ti = TARGETS.findIndex(t => t.b === S.base);
+  if (ti >= 0 && !S.got[ti] && v === TARGETS[ti].v) { S.got[ti] = true; toast(`Верно: ${v}₁₀ = ${digStr()}${sub(S.base)}.`); }
+  update();
+}
+
+// ---------- lesson 2: column arithmetic ----------
+const EX = [
+  { op: '+', b: 2, a: '101101', c: '11011', name: 'сложение' },
+  { op: '−', b: 2, a: '1100', c: '11', name: 'вычитание' },
+  { op: '×', b: 2, a: '1101', c: '11', name: 'умножение' },
+  { op: '+', b: 8, a: '17', c: '25', name: 'сложение' },
+  { op: '+', b: 16, a: '2B', c: '1F', name: 'сложение' },
+];
+EX.forEach(e => {
+  const A = parseInt(e.a, e.b), C = parseInt(e.c, e.b);
+  e.A = A; e.C = C; e.R = e.op === '+' ? A + C : e.op === '−' ? A - C : A * C;
+  e.ans = e.R.toString(e.b).toUpperCase();
+  e.parts = e.op === '×' ? [...e.c].reverse().map((d, j) => d === '1' ? e.a + '0'.repeat(j) : null).filter(Boolean) : [];
+  e.W = Math.max(e.ans.length, e.a.length, e.c.length, ...e.parts.map(p => p.length)) + (e.op === '−' ? 0 : e.ans.length > Math.max(e.a.length, e.c.length, ...e.parts.map(p => p.length)) ? 0 : 1); // room for a carry, so the cell count does not give the answer away
+});
+const EXX = () => EX[S.ai];
+function resetEx() { const e = EXX(); S.res = Array(e.W).fill(null); S.car = Array(e.W).fill(false); S.bad = null; }
+function resDigit(j, d) { // j: 0 = rightmost
+  const e = EXX(); if (S.aok[S.ai]) { toast('Этот пример уже решён. Нажмите «›», чтобы перейти к следующему.'); return; }
+  const cur = S.res[j];
+  S.res[j] = cur === null ? (d > 0 ? 1 % e.b : 0) : (cur + d + e.b) % e.b;
+  S.bad = null; update();
+}
+function checkEx() {
+  const e = EXX();
+  if (S.aok[S.ai]) { toast('Этот пример уже решён.'); return; }
+  let s = ''; let gap = false, started = false;
+  for (let j = e.W - 1; j >= 0; j--) { const d = S.res[j]; if (d === null) { if (started) gap = true; continue; } if (d !== 0 || started || j === 0) started = true; if (started) s += DIG[d]; }
+  if (!s || gap) { toast('Заполните разряды ответа подряд, начиная с правого.'); return; }
+  if (s === e.ans) { S.aok[S.ai] = true; toast(`Верно: ${e.a}${sub(e.b)} ${e.op} ${e.c}${sub(e.b)} = ${e.ans}${sub(e.b)}.`); update(); return; }
+  // first wrong column from the right — named, not solved
+  const want = e.ans.padStart(e.W, ' ');
+  let bj = -1;
+  for (let j = 0; j < e.W; j++) { const w = want[e.W - 1 - j], d = S.res[j]; const g = d === null ? ' ' : DIG[d]; if ((w === ' ' ? (d === null || d === 0) : g === w) === false) { bj = j; break; } }
+  S.bad = { j: bj, t: performance.now() };
+  const base = e.b;
+  const msg = e.op === '−'
+    ? `Ошибка в разряде ${bj + 1} справа. Если цифра сверху меньше нижней, займите единицу у соседа слева: она равна ${base}.`
+    : e.op === '×'
+      ? `Ошибка в разряде ${bj + 1} справа. Сложите в этом столбце цифры частичных произведений и перенос: 1 + 1 = 10₂.`
+      : `Ошибка в разряде ${bj + 1} справа. Сложите цифры столбца и перенос; если вышло ${base} или больше — вычтите ${base}, а 1 перенесите.`;
+  toast(msg); update();
+}
+
+// ---------- lesson 3: volume and transfer ----------
+const SU = [{ n: 'бит', f: 1 }, { n: 'байт', f: 8 }, { n: 'Кбайт', f: 8192 }, { n: 'Мбайт', f: 8388608 }];
+const VU = [{ n: 'бит/с', f: 1 }, { n: 'Кбит/с', f: 1024 }, { n: 'байт/с', f: 8 }, { n: 'Кбайт/с', f: 8192 }];
+const SC = [
+  { name: 'Файл 2 Мбайт', short: 'Файл 1', bits: 2 * 8388608, su: 3, v: 256 * 1024, vu: 1 },
+  { name: 'Файл 500 Кбайт', short: 'Файл 2', bits: 500 * 8192, su: 2, v: 128000, vu: 0 },
+  { name: 'Текст: 256 символов, алфавит из 50 символов', short: 'Текст', K: 256, N: 50, v: 96, vu: 0 },
+];
+const minI = N => Math.ceil(Math.log2(N) - 1e-9);
+const scBits = (k, i) => { const c = SC[k]; return c.K ? c.K * (i === undefined ? S.bi : i) : c.bits; };
+const scNeed = k => Math.ceil(scBits(k, SC[k].K ? minI(SC[k].N) : undefined) / SC[k].v);
+let sendTimer = 0;
+function setSc(k) { S.sc = k; S.T = 10; S.send = null; clearTimeout(sendTimer); update(); }
+function doSend() {
+  const c = SC[S.sc];
+  if (S.send && S.send.run) return;
+  if (c.K && 2 ** S.bi < c.N) { toast(`При i = ${S.bi} бит кодов всего 2^${S.bi} = ${2 ** S.bi}, а символов ${c.N} — алфавит не помещается. Увеличьте i.`); return; }
+  const I = scBits(S.sc), frac = S.T * c.v / I;
+  S.send = { t0: performance.now(), T: S.T, frac, run: true };
+  clearTimeout(sendTimer);
+  sendTimer = setTimeout(() => {
+    S.send.run = false;
+    const need = Math.ceil(I / c.v);
+    if (S.T < need) { S.send.res = 'short'; toast('Не успели: за это время прошла только часть сообщения. Сколько бит проходит за секунду и сколько их всего?'); }
+    else if (S.T > need) { S.send.res = 'long'; toast('Дошло, но с запасом — канал простаивал. Найдите точное время.'); }
+    else if (c.K && S.bi > minI(c.N)) { S.send.res = 'long'; toast(`Дошло, но каждый символ занимает лишние биты. Какое наименьшее i подходит для алфавита из ${c.N} символов?`); }
+    else { S.send.res = 'ok'; if (!S.vgot[S.sc]) { S.vgot[S.sc] = true; toast(`Точно! ${c.short}: T = ${S.T} с.`); } }
+    update();
+  }, reduce ? 50 : 1600);
+  update();
+}
+
+// ---------- lesson 4: Euclid ----------
+const GP = [[48, 18], [91, 35], [65, 26]];
+const LP = [[12, 18], [8, 12], [10, 25]];
+function newG() { const [a, b] = GP[S.gp]; S.g = { a, b, rx: 0, ry: 0, rw: a, rh: b, sq: [], steps: [], done: false, last: 0 }; S.k = 1; }
+function cut() {
+  const g = S.g; if (g.done) { toast('Прямоугольник уже разрезан. Выберите другую пару или нажмите «Заново».'); return; }
+  const s = Math.min(g.rw, g.rh), Lg = Math.max(g.rw, g.rh), k = S.k;
+  if (k * s > Lg) { toast(`${k} ${plural(k, 'квадрат', 'квадрата', 'квадратов')} ${s}×${s} не помещаются в сторону ${Lg}.`); return; }
+  const r = Lg - k * s;
+  if (r >= s) { toast(`Останется полоса ${r}, а это не меньше ${s} — влезет ещё квадрат. Остаток всегда меньше делителя.`); return; }
+  for (let j = 0; j < k; j++) g.sq.push(g.rw >= g.rh ? { x: g.rx + j * s, y: g.ry, s, st: g.steps.length } : { x: g.rx, y: g.ry + j * s, s, st: g.steps.length });
+  g.steps.push({ big: Lg, s, k, r });
+  if (g.rw >= g.rh) { g.rx += k * s; g.rw -= k * s; } else { g.ry += k * s; g.rh -= k * s; }
+  g.last = s; S.k = 1;
+  if (r === 0) {
+    g.done = true;
+    if (S.gp === 0) S.gcdOk = true;
+    toast(`Без остатка! НОД(${g.a}, ${g.b}) = ${s}.`);
+  } else toast(`${Lg} = ${k}·${s} + ${r}. Дальше работаем с прямоугольником ${Math.max(g.rw, g.rh)} × ${Math.min(g.rw, g.rh)}.`);
+  update();
+}
+const lpStep = () => gcd(...LP[S.lp]);
+function tapMin(v) {
+  const [a, b] = LP[S.lp], l = a * b / gcd(a, b), inA = v % a === 0, inB = v % b === 0;
+  S.lx = Math.max(S.lx, v); S.taps[v] = true;
+  if (inA && inB) {
+    if (v === l) { toast(`На ${v}-й минуте оба автобуса снова вместе. НОК(${a}, ${b}) = ${v}.`); if (S.lp === 0) S.lcmOk = true; }
+    else toast(`В ${v} мин оба автобуса здесь, но это не первая встреча. Проверьте минуты раньше.`);
+  } else if (inA) toast(`В ${v} мин приходит только первый автобус (каждые ${a} мин).`);
+  else if (inB) toast(`В ${v} мин приходит только второй автобус (каждые ${b} мин).`);
+  else toast(`В ${v} мин нет ни одного автобуса: ${v} не делится ни на ${a}, ни на ${b}.`);
+  update();
+}
+
+function model() {
+  const id = LID();
+  if (id === 'conv') {
+    const ti = TARGETS.findIndex(t => t.b === S.base);
+    return { kind: 'conv', base: S.base, v: digVal(), s: digStr(), target: TARGETS[ti].v, got: S.got.slice() };
+  }
+  if (id === 'arith') {
+    const e = EXX(), solvedN = Object.keys(S.aok).length;
+    return { kind: 'arith', e, solvedN, ok: !!S.aok[S.ai] };
+  }
+  if (id === 'volume') {
+    const c = SC[S.sc], I = scBits(S.sc);
+    return { kind: 'vol', c, I, got: S.vgot.slice(), T: S.T, need: scNeed(S.sc) };
+  }
+  const [a, b] = LP[S.lp];
+  return { kind: 'euc', g: S.g, gcdOk: S.gcdOk, lcmOk: S.lcmOk, la: a, lb: b, l: a * b / gcd(a, b) };
+}
+
+// ---------- drawing ----------
+const btn = (hit, x, y, w, h, label, opt = {}) =>
+  `<g data-hit="${hit}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${opt.rx || 9}" fill="${opt.fill || '#1a2438'}" stroke="${opt.stroke || '#3a4762'}" stroke-width="1.3"/>` +
+  `<text x="${x + w / 2}" y="${y + h / 2 + (opt.fs || 13) * 0.36}" font-size="${opt.fs || 13}" fill="${opt.col || '#e8ecf4'}" text-anchor="middle" class="${opt.mono ? '' : 'sans'}" font-weight="600">${label}</text></g>`;
+const fitText = (x, y, s, fs, maxW, attrs) => {
+  const est = s.length * fs * 0.6;
+  return `<text x="${x}" y="${y}" font-size="${fs}" ${attrs || ''} ${est > maxW ? `textLength="${maxW}" lengthAdjust="spacingAndGlyphs"` : ''}>${s}</text>`;
+};
+
+function drawConv(t) {
+  const m = model(), n = POS[S.base], cw = Math.min(60, 352 / n), x0 = 180 - n * cw / 2;
+  let h = fitText(180, 88, `${BNAME[S.base]} система · основание ${S.base} · цифры ${S.base === 16 ? '0–9, A–F' : S.base === 8 ? '0–7' : '0 и 1'}`, 9, 340, 'fill="#8b96ad" text-anchor="middle"');
+  for (let i = 0; i < n; i++) {
+    const k = n - 1 - i, x = x0 + i * cw, cx = x + cw / 2, w = S.base ** k, d = S.dig[i];
+    h += `<text x="${cx}" y="106" font-size="10" fill="#ffb547" text-anchor="middle">${S.base}${sup(k)}</text>`;
+    h += `<text x="${cx}" y="120" font-size="${w >= 1000 ? 9 : 10.5}" fill="#8b96ad" text-anchor="middle">${big(w)}</text>`;
+    h += `<g data-hit="up:${i}"><rect x="${x + 2}" y="126" width="${cw - 4}" height="38" rx="8" fill="#141d2e" stroke="#26324a"/><path d="M${cx - 8} 151L${cx} 139L${cx + 8} 151Z" fill="#72d4e8"/></g>`;
+    h += `<g data-hit="up:${i}"><rect x="${x + 2}" y="168" width="${cw - 4}" height="50" rx="9" fill="${d ? '#22324f' : '#1a2438'}" stroke="${d ? '#72d4e8' : '#3a4762'}" stroke-width="1.6"/>`;
+    h += `<text x="${cx}" y="202" font-size="26" fill="${d ? '#e8ecf4' : '#56627d'}" text-anchor="middle" font-weight="500">${DIG[d]}</text></g>`;
+    h += `<g data-hit="dn:${i}"><rect x="${x + 2}" y="222" width="${cw - 4}" height="38" rx="8" fill="#141d2e" stroke="#26324a"/><path d="M${cx - 8} 235L${cx} 247L${cx + 8} 235Z" fill="#72d4e8"/></g>`;
+  }
+  // expansion
+  const terms = S.dig.map((d, i) => ({ d, w: S.base ** (n - 1 - i) })).filter(o => o.d);
+  const ex = terms.length ? terms.map(o => `${DIG[o.d]}·${o.w}`).join(' + ') : '0';
+  h += fitText(180, 282, ex, 11, 344, 'fill="#e8ecf4" text-anchor="middle"');
+  const eq = terms.some(o => o.d >= 10) ? `  (${terms.filter(o => o.d >= 10).map(o => `${DIG[o.d]} = ${o.d}`).join(', ')})` : '';
+  h += `<text x="180" y="310" font-size="20" fill="${m.v === m.target ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle" font-weight="500">${m.s}${sub(S.base)} = ${m.v}${sub(10)}</text>`;
+  if (eq) h += `<text x="180" y="326" font-size="9" fill="#8b96ad" text-anchor="middle">${eq}</text>`;
+  // groupings
+  let gl = '';
+  if (S.base === 2) {
+    const bits = S.dig.join('').replace(/^0+(?=.)/, '');
+    const grp = (k) => { const p = bits.padStart(Math.ceil(bits.length / k) * k, '0'); return p.match(new RegExp(`.{${k}}`, 'g')); };
+    const g3 = grp(3), g4 = grp(4);
+    gl = `по 3: ${g3.join(' ')} → ${g3.map(x => parseInt(x, 2)).join('')}₈ · по 4: ${g4.join(' ')} → ${g4.map(x => DIG[parseInt(x, 2)]).join('')}₁₆`;
+  } else {
+    const k = S.base === 8 ? 3 : 4, s = m.s;
+    gl = `каждая цифра → ${k} бита: ${[...s].map(ch => DIG.indexOf(ch).toString(2).padStart(k, '0')).join(' ')} → ${m.v.toString(2)}₂`;
+  }
+  if (!eq) h += fitText(180, 330, gl, 9.5, 344, 'fill="#8b96ad" text-anchor="middle"');
+  else h += fitText(180, 342, gl, 9, 344, 'fill="#8b96ad" text-anchor="middle"');
+  // target cards
+  TARGETS.forEach((tg, i) => {
+    const x = 4 + i * 120, y = 352, cur = tg.b === S.base, ok = S.got[i];
+    h += `<g data-hit="tg:${i}"><rect x="${x}" y="${y}" width="112" height="44" rx="10" fill="${ok ? '#1f3a2f' : cur ? '#2a3a56' : '#141d2e'}" stroke="${ok ? '#86e0a8' : cur ? '#ffb547' : '#26324a'}" stroke-width="1.5"/>`;
+    h += `<text x="${x + 56}" y="${y + 18}" font-size="9" fill="#8b96ad" text-anchor="middle" class="sans">цель ${i + 1}${ok ? ' · ✓' : ''}</text>`;
+    h += `<text x="${x + 56}" y="${y + 35}" font-size="13" fill="${ok ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle">${tg.v}${sub(10)} → ${ok ? tg.v.toString(tg.b).toUpperCase() : '?'}${sub(tg.b)}</text></g>`;
+  });
+  return h;
+}
+
+function drawArith(t) {
+  const e = EXX(), ok = !!S.aok[S.ai], W = e.W, cw = Math.min(40, 290 / W), gx = 180 - W * cw / 2 + 12;
+  const colX = j => gx + (W - 1 - j) * cw;
+  let h = `<text x="180" y="88" font-size="9.5" fill="#8b96ad" text-anchor="middle" class="sans">Пример ${S.ai + 1} из ${EX.length} · ${e.name}, основание ${e.b}${ok ? ' · ✓ решён' : ''}</text>`;
+  let y = 96;
+  const rowDigits = (s, yy, col, op, muteTail) => {
+    let r = op ? `<text x="${gx - 22}" y="${yy + 19}" font-size="17" fill="#ffb547" text-anchor="middle">${op}</text>` : '';
+    [...s].reverse().forEach((ch, j) => {
+      const mute = muteTail && j < muteTail;
+      r += `<text x="${colX(j) + cw / 2}" y="${yy + 19}" font-size="${cw < 34 ? 16 : 18}" fill="${mute ? '#3a4762' : col}" text-anchor="middle">${ch}</text>`;
+    });
+    return r;
+  };
+  const carryRow = yy => {
+    let r = `<text x="${gx - 22}" y="${yy + 15}" font-size="7.5" fill="#8b96ad" text-anchor="middle" class="sans">${e.op === '−' ? 'заём' : 'перен.'}</text>`;
+    for (let j = 0; j < W; j++) {
+      const on = S.car[j];
+      r += `<g data-hit="car:${j}"><rect x="${colX(j) + 3}" y="${yy}" width="${cw - 6}" height="24" rx="6" fill="${on ? 'rgba(255,181,71,.16)' : 'transparent'}" stroke="${on ? '#ffb547' : '#26324a'}" stroke-dasharray="${on ? '' : '3 3'}"/>`;
+      if (on) r += `<text x="${colX(j) + cw / 2}" y="${yy + 16}" font-size="11" fill="#ffb547" text-anchor="middle">${e.op === '−' ? '•' : '1'}</text>`;
+      r += `</g>`;
+    }
+    return r;
+  };
+  const line = yy => `<path d="M${gx - 30} ${yy}H${gx + W * cw}" stroke="#56627d" stroke-width="1.6"/>`;
+  if (e.op !== '×') { h += carryRow(y); y += 28; }
+  h += rowDigits(e.a, y, '#e8ecf4'); y += 28;
+  h += rowDigits(e.c, y, '#e8ecf4', e.op); y += 30;
+  h += line(y); y += 6;
+  if (e.op === '×') {
+    h += carryRow(y); y += 28;
+    e.parts.forEach((p, i) => { h += rowDigits(p, y, '#72d4e8', i ? '+' : '', p.length - e.a.length); y += 28; });
+    h += line(y + 2); y += 8;
+  }
+  // answer row
+  const ry = Math.max(y, 214), bad = S.bad && performance.now() - S.bad.t < 2600 ? S.bad.j : -1;
+  for (let j = 0; j < W; j++) {
+    const x = colX(j), d = S.res[j], isBad = j === bad;
+    h += `<g data-hit="rup:${j}"><rect x="${x + 2}" y="${ry}" width="${cw - 4}" height="46" rx="8" fill="${ok ? '#1f3a2f' : isBad ? 'rgba(255,138,115,.16)' : '#1a2438'}" stroke="${ok ? '#86e0a8' : isBad ? '#ff8a73' : d === null ? '#3a4762' : '#72d4e8'}" stroke-width="1.6" ${d === null ? 'stroke-dasharray="4 3"' : ''}/>`;
+    h += `<text x="${x + cw / 2}" y="${ry + 31}" font-size="${cw < 34 ? 19 : 22}" fill="${ok ? '#86e0a8' : d === null ? '#3a4762' : '#e8ecf4'}" text-anchor="middle" font-weight="500">${d === null ? '·' : DIG[d]}</text></g>`;
+    h += `<g data-hit="rup:${j}"><rect x="${x + 2}" y="${ry + 50}" width="${cw - 4}" height="36" rx="7" fill="#141d2e" stroke="#26324a"/><path d="M${x + cw / 2 - 7} ${ry + 73}L${x + cw / 2} ${ry + 62}L${x + cw / 2 + 7} ${ry + 73}Z" fill="#72d4e8"/></g>`;
+    h += `<g data-hit="rdn:${j}"><rect x="${x + 2}" y="${ry + 90}" width="${cw - 4}" height="36" rx="7" fill="#141d2e" stroke="#26324a"/><path d="M${x + cw / 2 - 7} ${ry + 102}L${x + cw / 2} ${ry + 113}L${x + cw / 2 + 7} ${ry + 102}Z" fill="#72d4e8"/></g>`;
+  }
+  h += `<text x="${gx - 22}" y="${ry + 30}" font-size="15" fill="#8b96ad" text-anchor="middle">=</text>`;
+  // progress dots
+  const dy = Math.min(ry + 142, 396);
+  EX.forEach((x, i) => {
+    const cx = 180 + (i - (EX.length - 1) / 2) * 30;
+    h += `<g data-hit="ex:${i}"><rect x="${cx - 14}" y="${dy - 14}" width="28" height="28" fill="transparent"/><circle cx="${cx}" cy="${dy}" r="${i === S.ai ? 8 : 6}" fill="${S.aok[i] ? '#86e0a8' : i === S.ai ? '#ffb547' : '#26324a'}"/></g>`;
+  });
+  return h;
+}
+
+function drawVolume(t) {
+  const m = model(), c = m.c;
+  let h = '';
+  SC.forEach((s, i) => {
+    const x = 4 + i * 120, cur = i === S.sc, ok = S.vgot[i];
+    h += btn(`sc:${i}`, x, 86, 112, 38, s.short + (ok ? ' ✓' : ''), { fill: ok ? '#1f3a2f' : cur ? '#2a3a56' : '#141d2e', stroke: ok ? '#86e0a8' : cur ? '#ffb547' : '#26324a', col: ok ? '#86e0a8' : '#e8ecf4' });
+  });
+  // file card
+  h += `<g data-hit="su"><rect x="6" y="132" width="118" height="96" rx="11" fill="#141d2e" stroke="#3a4762" stroke-width="1.4"/>`;
+  h += `<path d="M18 142h16l7 7v20H18z" fill="#efe9da" stroke="${INK}" stroke-width="1.2"/><path d="M34 142v7h7" fill="none" stroke="${INK}" stroke-width="1.2"/>`;
+  if (c.K) {
+    h += `<text x="48" y="153" font-size="9" fill="#8b96ad" class="sans">текст</text><text x="48" y="166" font-size="11" fill="#e8ecf4">${c.K} симв.</text>`;
+    h += `<text x="14" y="190" font-size="10" fill="#8b96ad" class="sans">алфавит: ${c.N}</text>`;
+    h += fitText(14, 212, `${c.K}·${S.bi} = ${big(c.K * S.bi)} бит`, 11.5, 104, 'fill="#e8ecf4"');
+  } else {
+    const u = SU[S.su[S.sc]];
+    h += `<text x="48" y="156" font-size="9" fill="#8b96ad" class="sans">файл</text>`;
+    h += fitText(65, 196, num(c.bits / u.f), 16, 108, 'fill="#e8ecf4" text-anchor="middle" font-weight="500"');
+    h += `<text x="65" y="216" font-size="11" fill="#ffb547" text-anchor="middle">${u.n} ⟳</text>`;
+  }
+  h += `</g>`;
+  // channel
+  const vu = VU[S.vu[S.sc]];
+  h += `<g data-hit="vu"><rect x="128" y="132" width="104" height="44" rx="10" fill="#141d2e" stroke="#3a4762" stroke-width="1.4"/>`;
+  h += fitText(180, 152, num(c.v / vu.f), 13, 96, 'fill="#e8ecf4" text-anchor="middle" font-weight="500"');
+  h += `<text x="180" y="168" font-size="10" fill="#72d4e8" text-anchor="middle">${vu.n} ⟳</text></g>`;
+  h += `<path d="M124 196H236" stroke="#56627d" stroke-width="4" stroke-linecap="round"/><path d="M124 196H236" stroke="#0b1019" stroke-width="1.5" stroke-dasharray="2 5"/>`;
+  const sd = S.send;
+  let p = 0;
+  if (sd) { const k = sd.run ? clamp((t - sd.t0) / 1600, 0, 1) : 1; p = Math.min(1, sd.frac) * k; if (sd.run) for (let j = 0; j < 5; j++) { const xx = 128 + ((t / 8 + j * 22) % 104); h += `<text x="${xx.toFixed(1)}" y="192" font-size="8" fill="#ffd27a">${(j + Math.floor(t / 200)) % 2}</text>`; } }
+  h += `<text x="180" y="218" font-size="9" fill="#8b96ad" text-anchor="middle" class="sans">канал связи</text>`;
+  // receiver
+  h += `<rect x="238" y="134" width="116" height="74" rx="8" fill="#0e1520" stroke="#3a4762" stroke-width="1.4"/><rect x="290" y="208" width="12" height="10" fill="#3a4762"/><rect x="274" y="218" width="44" height="5" rx="2" fill="#3a4762"/>`;
+  h += `<rect x="248" y="164" width="96" height="10" rx="4" fill="#1a2438"/><rect x="248" y="164" width="${(96 * p).toFixed(1)}" height="10" rx="4" fill="${sd && !sd.run ? (sd.res === 'ok' ? '#86e0a8' : sd.res === 'short' ? '#ff8a73' : '#ffb547') : '#72d4e8'}"/>`;
+  const rmsg = !sd ? 'ждёт данные' : sd.run ? 'приём…' : sd.res === 'ok' ? '✓ ровно вовремя' : sd.res === 'short' ? 'принято не всё' : 'дошло с запасом';
+  h += `<text x="296" y="154" font-size="9.5" fill="${sd && !sd.run && sd.res === 'ok' ? '#86e0a8' : '#8b96ad'}" text-anchor="middle" class="sans">${rmsg}</text>`;
+  if (sd && !sd.run && sd.res === 'long') h += `<text x="296" y="196" font-size="9" fill="#ffb547" text-anchor="middle" class="sans">канал простаивал</text>`;
+  // row A: i stepper or unit ladder
+  if (c.K) {
+    const okI = 2 ** S.bi >= c.N;
+    h += btn('bi:-1', 6, 234, 56, 38, '− i', { fs: 14 });
+    h += `<text x="180" y="250" font-size="12" fill="#e8ecf4" text-anchor="middle">i = ${S.bi} бит на символ</text>`;
+    h += `<text x="180" y="266" font-size="10" fill="${okI ? '#86e0a8' : '#ff8a73'}" text-anchor="middle">2${sup(S.bi)} = ${2 ** S.bi} ${okI ? '≥' : '&lt;'} ${c.N}</text>`;
+    h += btn('bi:1', 298, 234, 56, 38, '+ i', { fs: 14 });
+  } else {
+    const LAD = ['бит', 'байт', 'Кбайт', 'Мбайт'], AR = ['×8', '×1024', '×1024'];
+    LAD.forEach((u, i) => {
+      const x = 6 + i * 90, cur = SU[S.su[S.sc]].n === u;
+      h += `<rect x="${x}" y="238" width="66" height="26" rx="7" fill="${cur ? '#2a3a56' : '#141d2e'}" stroke="${cur ? '#ffb547' : '#26324a'}"/><text x="${x + 33}" y="255" font-size="10.5" fill="#e8ecf4" text-anchor="middle">${u}</text>`;
+      if (i < 3) h += `<text x="${x + 78}" y="248" font-size="8" fill="#8b96ad" text-anchor="middle">${AR[i]}</text><text x="${x + 78}" y="259" font-size="9" fill="#8b96ad" text-anchor="middle">←</text>`;
+    });
+  }
+  h += `<text x="180" y="288" font-size="9.5" fill="#8b96ad" text-anchor="middle" class="sans">время передачи T = I / v · попыток можно сколько угодно</text>`;
+  // T row
+  h += btn('t:-10', 6, 296, 56, 44, '−10', { fs: 13 }) + btn('t:-1', 66, 296, 50, 44, '−1', { fs: 13 });
+  h += `<rect x="120" y="296" width="120" height="44" rx="10" fill="#0e1520" stroke="#ffb547" stroke-width="1.4"/><text x="180" y="324" font-size="18" fill="#e8ecf4" text-anchor="middle" font-weight="500">T = ${S.T} с</text>`;
+  h += btn('t:1', 244, 296, 50, 44, '+1', { fs: 13 }) + btn('t:10', 298, 296, 56, 44, '+10', { fs: 13 });
+  h += btn('send', 6, 348, 348, 46, sd && sd.run ? 'Идёт передача…' : `Передать за ${S.T} с`, { fill: '#e8ecf4', stroke: '#e8ecf4', col: '#0b1019', fs: 14 });
+  return h;
+}
+
+const SQC = ['#2f4466', '#3b5a3f', '#5a4630', '#4a3560', '#2f5560', '#5a3040'];
+function drawEuclid(t) {
+  let h = '';
+  const gm = S.mode === 'gcd', P = gm ? GP : LP, cur = gm ? S.gp : S.lp;
+  P.forEach((p, i) => {
+    const x = 4 + i * 120, on = i === cur, ok = i === 0 && (gm ? S.gcdOk : S.lcmOk);
+    h += btn(`pair:${i}`, x, 86, 112, 38, `${gm ? 'НОД' : 'НОК'}(${p[0]}, ${p[1]})${ok ? ' ✓' : ''}`, { fill: ok ? '#1f3a2f' : on ? '#2a3a56' : '#141d2e', stroke: ok ? '#86e0a8' : on ? '#ffb547' : '#26324a', col: ok ? '#86e0a8' : '#e8ecf4', fs: 12 });
+  });
+  if (gm) {
+    const g = S.g, sc = Math.min(344 / g.a, 150 / g.b), ox = 180 - g.a * sc / 2, oy = 134 + (150 - g.b * sc) / 2;
+    h += `<rect x="${ox}" y="${oy}" width="${g.a * sc}" height="${g.b * sc}" fill="#0e1520" stroke="#56627d" stroke-width="1.4"/>`;
+    g.sq.forEach(q => {
+      h += `<rect x="${(ox + q.x * sc).toFixed(1)}" y="${(oy + q.y * sc).toFixed(1)}" width="${(q.s * sc).toFixed(1)}" height="${(q.s * sc).toFixed(1)}" fill="${SQC[q.st % SQC.length]}" stroke="${INK}" stroke-width="1.2"/>`;
+      if (q.s * sc >= 20) h += `<text x="${(ox + (q.x + q.s / 2) * sc).toFixed(1)}" y="${(oy + (q.y + q.s / 2) * sc + 4).toFixed(1)}" font-size="${q.s * sc >= 40 ? 11 : 8}" fill="#e8ecf4" text-anchor="middle">${q.s}</text>`;
+    });
+    if (!g.done) {
+      const s = Math.min(g.rw, g.rh), horiz = g.rw >= g.rh;
+      for (let j = 0; j < S.k; j++) { // preview of the squares about to be cut
+        const qx = horiz ? g.rx + j * s : g.rx, qy = horiz ? g.ry : g.ry + j * s;
+        const fitIn = horiz ? qx + s <= g.rx + g.rw : qy + s <= g.ry + g.rh;
+        h += `<rect x="${(ox + qx * sc).toFixed(1)}" y="${(oy + qy * sc).toFixed(1)}" width="${(s * sc).toFixed(1)}" height="${(s * sc).toFixed(1)}" fill="${fitIn ? 'rgba(255,181,71,.12)' : 'rgba(255,138,115,.15)'}" stroke="${fitIn ? '#ffb547' : '#ff8a73'}" stroke-width="1.4" stroke-dasharray="5 4"/>`;
+      }
+      h += `<rect x="${(ox + g.rx * sc).toFixed(1)}" y="${(oy + g.ry * sc).toFixed(1)}" width="${(g.rw * sc).toFixed(1)}" height="${(g.rh * sc).toFixed(1)}" fill="none" stroke="#72d4e8" stroke-width="1.6"/>`;
+      h += `<text x="${(ox + (g.rx + g.rw / 2) * sc).toFixed(1)}" y="${(oy + g.ry * sc - 4).toFixed(1)}" font-size="9" fill="#72d4e8" text-anchor="middle">${g.rw}</text>`;
+      h += `<text x="${(ox + (g.rx + g.rw) * sc + 3).toFixed(1)}" y="${(oy + (g.ry + g.rh / 2) * sc + 3).toFixed(1)}" font-size="9" fill="#72d4e8">${g.rh}</text>`;
+    }
+    const st = g.steps[g.steps.length - 1];
+    const line = g.done ? `НОД(${g.a}, ${g.b}) = ${g.last} — сторона последних квадратов` : st ? `${st.big} = ${st.k}·${st.s} + ${st.r}  →  дальше ${Math.max(g.rw, g.rh)} и ${Math.min(g.rw, g.rh)}` : `прямоугольник ${g.a} × ${g.b}: режем квадраты ${g.b} × ${g.b}`;
+    h += fitText(180, 300, line, 11, 344, `fill="${g.done ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle"`);
+    const s = Math.min(g.rw, g.rh) || g.last;
+    h += btn('k:-1', 6, 308, 56, 42, '−', { fs: 18 });
+    h += `<text x="180" y="326" font-size="12" fill="#e8ecf4" text-anchor="middle">${g.done ? 'готово' : `${S.k} ${plural(S.k, 'квадрат', 'квадрата', 'квадратов')} ${s}×${s}`}</text><text x="180" y="342" font-size="9" fill="#8b96ad" text-anchor="middle" class="sans">${g.done ? '' : `от стороны ${Math.max(g.rw, g.rh)}`}</text>`;
+    h += btn('k:1', 298, 308, 56, 42, '+', { fs: 18 });
+    h += btn('cut', 6, 354, 348, 44, g.done ? 'Заново' : 'Отрезать', { fill: '#e8ecf4', stroke: '#e8ecf4', col: '#0b1019', fs: 14 });
+  } else {
+    const [a, b] = LP[S.lp], stp = lpStep(), mx = stp * 12, sx = v => 14 + v * 332 / mx;
+    h += `<text x="14" y="140" font-size="9.5" fill="#ffb547" class="sans">● автобус 1: каждые ${a} мин</text><text x="346" y="140" font-size="9.5" fill="#72d4e8" text-anchor="end" class="sans">● автобус 2: каждые ${b} мин</text>`;
+    h += `<path d="M14 196H346" stroke="#56627d" stroke-width="1.6"/>`;
+    for (let v = 0; v <= mx; v += stp) h += `<path d="M${sx(v)} 191V201" stroke="#56627d"/><text x="${sx(v)}" y="214" font-size="8" fill="#8b96ad" text-anchor="middle">${v}</text>`;
+    const lim = S.lx;
+    for (let v = 0; v + a <= lim; v += a) h += `<path d="M${sx(v)} 192Q${(sx(v) + sx(v + a)) / 2} ${192 - 34} ${sx(v + a)} 192" fill="none" stroke="#ffb547" stroke-width="1.8"/><circle cx="${sx(v + a)}" cy="190" r="3" fill="#ffb547"/>`;
+    for (let v = 0; v + b <= lim; v += b) h += `<path d="M${sx(v)} 200Q${(sx(v) + sx(v + b)) / 2} ${200 + 40} ${sx(v + b)} 200" fill="none" stroke="#72d4e8" stroke-width="1.8"/><circle cx="${sx(v + b)}" cy="202" r="3" fill="#72d4e8"/>`;
+    if (!lim) h += `<text x="180" y="170" font-size="9.5" fill="#8b96ad" text-anchor="middle" class="sans">оба уходят в 0 мин — когда снова вместе?</text>`;
+    h += `<text x="180" y="256" font-size="9.5" fill="#8b96ad" text-anchor="middle" class="sans">нажмите на минуту — увидите, кто туда приходит</text>`;
+    for (let i = 0; i < 12; i++) {
+      const v = stp * (i + 1), x = 6 + (i % 4) * 87, y = 264 + Math.floor(i / 4) * 45, tp = S.taps[v];
+      const inA = v % a === 0, inB = v % b === 0, both = inA && inB;
+      const fill = !tp ? '#141d2e' : both ? '#1f3a2f' : inA ? 'rgba(255,181,71,.16)' : inB ? 'rgba(114,212,232,.14)' : '#10151f';
+      const stroke = !tp ? '#3a4762' : both ? '#86e0a8' : inA ? '#ffb547' : inB ? '#72d4e8' : '#26324a';
+      h += btn(`min:${v}`, x, y, 82, 40, `${v} мин`, { fill, stroke, col: tp && !inA && !inB ? '#56627d' : '#e8ecf4', fs: 13 });
+    }
+  }
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'conv') return { weights: [2, 96, 356, 28], digits: [2, 124, 356, 140], sum: [2, 266, 356, 80], targets: [2, 348, 356, 52] }[id];
+  if (lid === 'arith') return { operands: [2, 92, 356, 120], carry: [2, 92, 356, 32], answer: [2, 210, 356, 140], dots: [60, 340, 240, 60] }[id];
+  if (lid === 'volume') return { file: [4, 130, 122, 100], channel: [126, 130, 108, 100], recv: [236, 130, 120, 100], ladder: [2, 230, 356, 44], timer: [2, 292, 356, 106] }[id];
+  if (lid === 'euclid') return S.mode === 'gcd' ? { rect: [2, 130, 356, 158], cutter: [2, 304, 356, 96], pairs: [2, 82, 356, 46] }[id] : { line: [2, 128, 356, 122], grid: [2, 258, 356, 142], pairs: [2, 82, 356, 46] }[id];
+  return null;
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4360" height="4405" fill="url(#tile)"/>`;
+  if (id === 'conv') h += drawConv(t);
+  else if (id === 'arith') h += drawArith(t);
+  else if (id === 'volume') h += drawVolume(t);
+  else h += drawEuclid(t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 360 × 405 units, centred, content at the bottom
+let VB = { x: 0, y: 0, w: 360, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 372, hh / 412, 1.8);
+  VB = { w: w / s, h: hh / s }; VB.x = 180 - VB.w / 2; VB.y = 404 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- interaction ----------
+let dirty = true, press = null;
+scene.addEventListener('pointerdown', e => {
+  const hit = e.target.closest('[data-hit]');
+  if (!hit) return;
+  e.preventDefault();
+  press = { h: hit.dataset.hit, x: e.clientX, y: e.clientY };
+});
+scene.addEventListener('pointerup', e => {
+  if (!press) return;
+  const p = press; press = null;
+  if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 24) return;
+  onHit(p.h);
+});
+scene.addEventListener('pointercancel', () => { press = null; });
+
+function onHit(h) {
+  const [k, v] = h.split(':');
+  if (k === 'up') bump(+v, 1);
+  if (k === 'dn') bump(+v, -1);
+  if (k === 'tg') setBase(TARGETS[+v].b);
+  if (k === 'car') { S.car[+v] = !S.car[+v]; update(); }
+  if (k === 'rup') resDigit(+v, 1);
+  if (k === 'rdn') resDigit(+v, -1);
+  if (k === 'ex') { S.ai = +v; resetEx(); update(); }
+  if (k === 'sc') setSc(+v);
+  if (k === 'su') { if (SC[S.sc].K) { toast('Объём текста: I = K · i. Число бит на символ меняют кнопки «− i» и «+ i».'); return; } S.su[S.sc] = (S.su[S.sc] + 1) % SU.length; update(); }
+  if (k === 'vu') { S.vu[S.sc] = (S.vu[S.sc] + 1) % VU.length; update(); }
+  if (k === 'bi') { S.bi = clamp(S.bi + +v, 1, 10); S.send = null; update(); }
+  if (k === 't') act('t' + v);
+  if (k === 'send') doSend();
+  if (k === 'pair') { if (S.mode === 'gcd') { S.gp = +v; newG(); } else { S.lp = +v; S.lx = 0; S.taps = {}; } update(); }
+  if (k === 'k') { const g = S.g; if (g.done) return; S.k = clamp(S.k + +v, 1, 12); update(); }
+  if (k === 'cut') { if (S.g.done) { newG(); update(); } else cut(); }
+  if (k === 'min') tapMin(+v);
+}
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  last = t;
+  let anim = false;
+  if (S.hl || (S.send && S.send.run) || (S.bad && t - S.bad.t < 2700)) anim = true;
+  if (dirty || anim) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3200); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    conv: B('b2', 'осн. 2', S.base === 2) + B('b8', 'осн. 8', S.base === 8) + B('b16', 'осн. 16', S.base === 16) + sep + B('zero', 'Обнулить'),
+    arith: B('aprev', '‹ пример', undefined) + B('anext', 'пример ›') + B('aclr', 'Стереть') + sep + B('acheck', 'Проверить'),
+    volume: B('treset', 'Сбросить T') + sep + B('send', 'Передать'),
+    euclid: B('mgcd', 'НОД', S.mode === 'gcd') + B('mlcm', 'НОК', S.mode === 'lcm') + sep + B('erst', 'Заново'),
+  }[id];
+}
+function act(a) {
+  if (a === 'b2') return setBase(2);
+  if (a === 'b8') return setBase(8);
+  if (a === 'b16') return setBase(16);
+  if (a === 'zero') { S.dig = S.dig.map(() => 0); update(); return; }
+  if (a === 'aprev' || a === 'anext') { S.ai = (S.ai + (a === 'anext' ? 1 : -1) + EX.length) % EX.length; resetEx(); update(); return; }
+  if (a === 'aclr') { if (S.aok[S.ai]) return; resetEx(); update(); return; }
+  if (a === 'acheck') return checkEx();
+  if (a === 'treset') { S.T = 10; S.send = null; update(); return; }
+  if (a === 'send') return doSend();
+  if (a[0] === 't' && /^t-?\d+$/.test(a)) { if (S.send && S.send.run) return; S.T = clamp(S.T + +a.slice(1), 1, 999); S.send = null; update(); return; }
+  if (a === 'mgcd' || a === 'mlcm') { S.mode = a === 'mgcd' ? 'gcd' : 'lcm'; renderTools(); buildScheme(); update(); return; }
+  if (a === 'erst') { if (S.mode === 'gcd') newG(); else { S.lx = 0; S.taps = {}; } update(); return; }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const T = (x, y, s, fs, col) => `<text x="${x}" y="${y}" font-size="${fs}" fill="${col || 'var(--fg)'}" text-anchor="middle" font-family="monospace">${s}</text>`;
+const ICON = {
+  weights: IC(T(9, 14, '2²', 8, 'var(--force)') + T(25, 14, '2⁰', 8, 'var(--force)') + T(9, 26, '4', 8, 'var(--muted)') + T(25, 26, '1', 8, 'var(--muted)')),
+  digits: IC('<rect x="3" y="9" width="12" height="16" rx="3" fill="none" stroke="var(--arm)" stroke-width="1.5"/><rect x="19" y="9" width="12" height="16" rx="3" fill="none" stroke="var(--arm)" stroke-width="1.5"/>' + T(9, 21, '1', 10) + T(25, 21, 'F', 10)),
+  sum: IC(T(17, 15, '1·4+1', 7.5) + T(17, 27, '= 5', 9, 'var(--ok)')),
+  targets: IC('<rect x="3" y="8" width="28" height="18" rx="4" fill="none" stroke="var(--force)" stroke-width="1.5"/>' + T(17, 21, '91→?', 8)),
+  operands: IC(T(20, 14, '1011', 8) + T(20, 25, '+ 110', 8) + '<path d="M5 28h26" stroke="var(--muted)"/>'),
+  carry: IC('<rect x="11" y="6" width="12" height="12" rx="3" fill="none" stroke="var(--force)" stroke-dasharray="2 2"/>' + T(17, 15.5, '1', 9, 'var(--force)') + T(17, 29, '1+1', 8)),
+  answer: IC('<rect x="4" y="9" width="12" height="16" rx="3" fill="none" stroke="var(--ok)" stroke-width="1.5"/><rect x="18" y="9" width="12" height="16" rx="3" fill="none" stroke="var(--ok)" stroke-width="1.5"/>' + T(10, 21, '1', 10, 'var(--ok)') + T(24, 21, '0', 10, 'var(--ok)')),
+  dots: IC('<circle cx="7" cy="17" r="3" fill="var(--ok)"/><circle cx="17" cy="17" r="4" fill="var(--force)"/><circle cx="27" cy="17" r="3" fill="var(--line)"/>'),
+  file: IC('<path d="M8 4h13l6 6v20H8z" fill="#efe9da"/><path d="M21 4v6h6" fill="none" stroke="#0b1019"/>' + T(17, 24, 'Мб', 7, '#0b1019')),
+  channel: IC('<path d="M2 17h30" stroke="var(--muted)" stroke-width="3"/>' + T(17, 12, '101', 7, '#ffd27a') + T(17, 29, 'бит/с', 6.5, 'var(--arm)')),
+  recv: IC('<rect x="4" y="5" width="26" height="18" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.5"/><rect x="8" y="13" width="14" height="4" rx="2" fill="var(--ok)"/><path d="M14 27h6" stroke="var(--fg)" stroke-width="2"/>'),
+  ladder: IC(T(17, 12, 'Мб→Кб', 7) + T(17, 24, '×1024', 7, 'var(--muted)')),
+  timer: IC('<circle cx="17" cy="19" r="11" fill="none" stroke="var(--force)" stroke-width="1.6"/><path d="M17 19V12M14 5h6" stroke="var(--force)" stroke-width="1.6"/>'),
+  rect: IC('<rect x="2" y="9" width="12" height="12" fill="#2f4466"/><rect x="14" y="9" width="12" height="12" fill="#2f4466" stroke="#0b1019"/><rect x="26" y="9" width="6" height="6" fill="#3b5a3f"/><rect x="26" y="15" width="6" height="6" fill="#3b5a3f" stroke="#0b1019"/>'),
+  cutter: IC('<path d="M6 8l22 18M6 26L28 8" stroke="var(--fg)" stroke-width="1.6"/><circle cx="6" cy="8" r="3" fill="none" stroke="var(--force)"/><circle cx="6" cy="26" r="3" fill="none" stroke="var(--force)"/>'),
+  pairs: IC('<rect x="3" y="10" width="28" height="14" rx="4" fill="none" stroke="var(--force)" stroke-width="1.4"/>' + T(17, 20, '48,18', 7)),
+  line: IC('<path d="M3 22h28" stroke="var(--muted)"/><path d="M3 22Q9 8 15 22" fill="none" stroke="var(--force)" stroke-width="1.5"/><path d="M3 22Q12 34 21 22" fill="none" stroke="var(--arm)" stroke-width="1.5"/>'),
+  grid: IC('<rect x="3" y="6" width="12" height="9" rx="2" fill="none" stroke="var(--muted)"/><rect x="19" y="6" width="12" height="9" rx="2" fill="none" stroke="var(--ok)"/><rect x="3" y="19" width="12" height="9" rx="2" fill="none" stroke="var(--force)"/><rect x="19" y="19" width="12" height="9" rx="2" fill="none" stroke="var(--arm)"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  if (id === 'conv') return TARGETS.map((tg, i) => `${tg.v}→${sub(tg.b)} ${m.got[i] ? '✓' : '—'}`).join(' · ');
+  if (id === 'arith') return `Решено ${m.solvedN} из ${EX.length}`;
+  if (id === 'volume') return SC.map((c, i) => `${c.short} ${m.got[i] ? '✓' : '—'}`).join(' · ');
+  return `НОД(48, 18) ${m.gcdOk ? '✓' : '—'} · НОК(12, 18) ${m.lcmOk ? '✓' : '—'}`;
+}
+
+// Scheme tab
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'conv') h = `<h2>Разряды</h2>
+      <dl class="reads"><div><dt>Основание</dt><dd id="r1"></dd></div><div><dt>Запись</dt><dd id="r2"></dd></div><div><dt>Десятичное</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Система счисления</div><div class="chips" id="baseChips"></div></div>
+      <div class="ctl"><div class="lbl">Цифры разрядов (нажатие — +1)</div><div class="chips" id="digChips"></div></div>
+      <div class="row"><button class="ghostbtn" data-a="zero">Обнулить</button></div>`;
+  if (id === 'arith') h = `<h2>Столбик</h2>
+      <dl class="reads"><div><dt>Пример</dt><dd id="r1"></dd></div><div><dt>Основание</dt><dd id="r2"></dd></div><div><dt>Решено</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Выбрать пример</div><div class="chips" id="exChips"></div></div>
+      <div class="ctl"><div class="lbl">Цифры ответа (слева направо, нажатие — +1)</div><div class="chips" id="resChips"></div></div>
+      <div class="row"><button class="ghostbtn" data-a="aclr">Стереть</button><button class="ghostbtn" data-a="acheck">Проверить</button></div>`;
+  if (id === 'volume') h = `<h2>Канал связи</h2>
+      <dl class="reads"><div><dt>Сообщение</dt><dd id="r1"></dd></div><div><dt>Скорость</dt><dd id="r2"></dd></div><div><dt>T</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Сообщение</div><div class="chips" id="scChips"></div></div>
+      <div class="ctl"><div class="lbl">Единицы объёма</div><div class="chips" id="suChips"></div></div>
+      <div class="ctl"><div class="lbl">Единицы скорости</div><div class="chips" id="vuChips"></div></div>
+      <div class="ctl" id="biBox"><div class="lbl">Бит на символ i</div><div class="chips" id="biChips"></div></div>
+      <div class="ctl"><label for="inT">Время T, с <output id="inTO"></output></label><input type="range" id="inT" min="1" max="200" step="1" value="${S.T}"></div>
+      <div class="row"><button class="ghostbtn" data-a="t-1">−1 с</button><button class="ghostbtn" data-a="t1">+1 с</button><button class="ghostbtn" data-a="send">Передать</button></div>`;
+  if (id === 'euclid') h = `<h2>${S.mode === 'gcd' ? 'Прямоугольник Евклида' : 'Расписание автобусов'}</h2>
+      <dl class="reads"><div><dt>Пара</dt><dd id="r1"></dd></div><div><dt>${S.mode === 'gcd' ? 'Шагов' : 'Проверено'}</dt><dd id="r2"></dd></div><div><dt>Ответ</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Режим</div><div class="chips"><button data-m="gcd" aria-pressed="${S.mode === 'gcd'}">НОД</button><button data-m="lcm" aria-pressed="${S.mode === 'lcm'}">НОК</button></div></div>
+      <div class="ctl"><div class="lbl">Числа</div><div class="chips" id="pairChips"></div></div>` +
+      (S.mode === 'gcd' ? `<div class="ctl"><div class="lbl">Сколько квадратов отрезать</div><div class="chips" id="kChips"></div></div><div class="row"><button class="ghostbtn" data-x="cut">Отрезать</button><button class="ghostbtn" data-a="erst">Заново</button></div>`
+        : `<div class="ctl"><div class="lbl">Минуты</div><div class="chips" id="minChips"></div></div><div class="row"><button class="ghostbtn" data-a="erst">Заново</button></div>`);
+  el.innerHTML = h;
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  el.querySelectorAll('[data-x="cut"]').forEach(b => b.onclick = () => cut());
+  el.querySelectorAll('[data-m]').forEach(b => b.onclick = () => act(b.dataset.m === 'gcd' ? 'mgcd' : 'mlcm'));
+  const inT = el.querySelector('#inT');
+  if (inT) inT.addEventListener('input', e => { if (S.send && S.send.run) return; S.T = +e.target.value; S.send = null; update(); });
+}
+function chips(el, sel, items, onClick) {
+  const c = el.querySelector(sel); if (!c) return;
+  c.innerHTML = items.map((it, i) => `<button data-i="${i}" aria-pressed="${!!it.on}"${it.dis ? ' disabled' : ''}>${it.t}</button>`).join('');
+  c.querySelectorAll('button').forEach(b => b.onclick = () => onClick(+b.dataset.i));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  if (id === 'conv') {
+    set('#r1', String(S.base)); set('#r2', m.s + sub(S.base)); set('#r3', String(m.v));
+    chips(el, '#baseChips', [2, 8, 16].map(b => ({ t: `${b} — ${BNAME[b]}`, on: b === S.base })), i => setBase([2, 8, 16][i]));
+    chips(el, '#digChips', S.dig.map((d, i) => ({ t: `${S.base}${sup(S.dig.length - 1 - i)}: ${DIG[d]}` })), i => bump(i, 1));
+  } else if (id === 'arith') {
+    const e = m.e;
+    set('#r1', `${S.ai + 1} из ${EX.length}`); set('#r2', String(e.b)); set('#r3', `${m.solvedN} из ${EX.length}`);
+    chips(el, '#exChips', EX.map((x, i) => ({ t: `${x.a} ${x.op} ${x.c} (${x.b})${S.aok[i] ? ' ✓' : ''}`, on: i === S.ai })), i => { S.ai = i; resetEx(); update(); });
+    chips(el, '#resChips', Array.from({ length: e.W }, (_, k) => { const j = e.W - 1 - k, d = S.res[j]; return { t: d === null ? '·' : DIG[d], dis: m.ok }; }), k => resDigit(e.W - 1 - k, 1));
+  } else if (id === 'volume') {
+    const c = m.c;
+    set('#r1', c.K ? `${c.K}·${S.bi} бит` : `${num(c.bits / SU[S.su[S.sc]].f)} ${SU[S.su[S.sc]].n}`); set('#r2', `${num(c.v / VU[S.vu[S.sc]].f)} ${VU[S.vu[S.sc]].n}`); set('#r3', `${S.T} с`);
+    set('#inTO', `${S.T} с`); const it = el.querySelector('#inT'); if (it && document.activeElement !== it) it.value = Math.min(S.T, 200);
+    chips(el, '#scChips', SC.map((x, i) => ({ t: x.short + (S.vgot[i] ? ' ✓' : ''), on: i === S.sc })), setSc);
+    const bb = el.querySelector('#biBox'); if (bb) bb.hidden = !c.K;
+    el.querySelector('#suChips').parentElement.hidden = !!c.K;
+    chips(el, '#suChips', SU.map((u, i) => ({ t: u.n, on: S.su[S.sc] === i })), i => { S.su[S.sc] = i; update(); });
+    chips(el, '#vuChips', VU.map((u, i) => ({ t: u.n, on: S.vu[S.sc] === i })), i => { S.vu[S.sc] = i; update(); });
+    chips(el, '#biChips', Array.from({ length: 8 }, (_, i) => ({ t: String(i + 1), on: S.bi === i + 1 })), i => { S.bi = i + 1; S.send = null; update(); });
+  } else {
+    if (S.mode === 'gcd') {
+      const g = S.g;
+      set('#r1', `${g.a}, ${g.b}`); set('#r2', String(g.steps.length)); set('#r3', g.done ? `НОД = ${g.last}` : '—');
+      chips(el, '#pairChips', GP.map((p, i) => ({ t: `${p[0]}, ${p[1]}`, on: i === S.gp })), i => { S.gp = i; newG(); update(); });
+      chips(el, '#kChips', Array.from({ length: 6 }, (_, i) => ({ t: String(i + 1), on: S.k === i + 1, dis: g.done })), i => { S.k = i + 1; update(); });
+    } else {
+      const [a, b] = LP[S.lp], stp = lpStep();
+      set('#r1', `${a}, ${b}`); set('#r2', String(Object.keys(S.taps).length)); set('#r3', S.taps[a * b / gcd(a, b)] ? `НОК = ${a * b / gcd(a, b)}` : '—');
+      chips(el, '#pairChips', LP.map((p, i) => ({ t: `${p[0]}, ${p[1]}`, on: i === S.lp })), i => { S.lp = i; S.lx = 0; S.taps = {}; update(); });
+      chips(el, '#minChips', Array.from({ length: 12 }, (_, i) => ({ t: String(stp * (i + 1)), on: !!S.taps[stp * (i + 1)] })), i => tapMin(stp * (i + 1)));
+    }
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'conv') return [
+    { id: 'weights', icon: ICON.weights, name: 'Веса разрядов', spec: 'Над каждой клеткой — степень основания и её значение. Разряды нумеруют справа налево с нуля: вес младшего разряда всегда 1.' },
+    { id: 'digits', icon: ICON.digits, name: 'Цифры', spec: 'В каждой клетке одна цифра от 0 до основания − 1. ▲ и ▼ меняют её; после самой большой цифры снова идёт 0.' },
+    { id: 'sum', icon: ICON.sum, name: 'Развёрнутая запись', spec: 'Сумма «цифра × вес» — это и есть перевод в десятичную систему. Ниже — группы по 3 и по 4 бита для перевода в 8-ю и 16-ю системы.' },
+    { id: 'targets', icon: ICON.targets, name: 'Цели', spec: 'Три десятичных числа, которые нужно записать в двоичной, восьмеричной и шестнадцатеричной системах. Нажатие на карточку переключает основание.' }];
+  if (id === 'arith') return [
+    { id: 'operands', icon: ICON.operands, name: 'Числа в столбик', spec: 'Разряды выровнены по правому краю, как в десятичном столбике. В умножении ниже черты — частичные произведения, сдвинутые влево; серые нули показывают сдвиг.' },
+    { id: 'carry', icon: ICON.carry, name: 'Отметки переноса', spec: 'Клетки над столбцами — черновик: отметьте, куда переходит единица переноса или откуда занята единица. Они не проверяются.' },
+    { id: 'answer', icon: ICON.answer, name: 'Ответ', spec: 'Цифры ответа. Нажатие на клетку или ▲ увеличивает цифру, ▼ уменьшает. Пустые клетки слева не считаются.' },
+    { id: 'dots', icon: ICON.dots, name: 'Примеры', spec: 'Пять примеров: сложение, вычитание и умножение в двоичной, сложение в восьмеричной и шестнадцатеричной. Зелёный — решён.' }];
+  if (id === 'volume') return [
+    { id: 'file', icon: ICON.file, name: 'Сообщение', spec: 'Объём файла или текста. Нажатие меняет единицы: бит, байт, Кбайт, Мбайт — число пересчитывается, объём тот же.' },
+    { id: 'channel', icon: ICON.channel, name: 'Канал связи', spec: 'Скорость передачи v. Нажатие меняет единицы: бит/с, Кбит/с, байт/с, Кбайт/с.' },
+    { id: 'recv', icon: ICON.recv, name: 'Получатель', spec: 'Полоса показывает, какая часть сообщения дошла за время T. Зелёная — ровно вовремя, красная — не всё, жёлтая — с запасом.' },
+    { id: 'ladder', icon: ICON.ladder, name: 'Лестница единиц', spec: 'Каждый шаг вверх — ×8 или ×1024. Для текста здесь выбирают i — бит на символ.' },
+    { id: 'timer', icon: ICON.timer, name: 'Время передачи', spec: 'T в секундах. Нужно наименьшее целое T, за которое сообщение дойдёт целиком.' }];
+  return S.mode === 'gcd' ? [
+    { id: 'rect', icon: ICON.rect, name: 'Прямоугольник a × b', spec: 'От него отрезают самые большие квадраты. Каждый цвет — один шаг алгоритма Евклида; голубая рамка — что осталось.' },
+    { id: 'cutter', icon: ICON.cutter, name: 'Ножницы', spec: 'Сколько квадратов отрезать за шаг — это неполное частное q в записи a = q·b + r. Остаток r должен быть меньше b.' },
+    { id: 'pairs', icon: ICON.pairs, name: 'Пары чисел', spec: 'Задание — пара 48 и 18. Остальные — для тренировки.' }]
+    : [
+    { id: 'line', icon: ICON.line, name: 'Линия времени', spec: 'Дуги — рейсы автобусов: сверху первый, снизу второй. Видны до самой поздней минуты, которую вы проверили.' },
+    { id: 'grid', icon: ICON.grid, name: 'Минуты', spec: 'Нажмите на минуту: зелёная — там оба автобуса, жёлтая — только первый, голубая — только второй.' },
+    { id: 'pairs', icon: ICON.pairs, name: 'Пары чисел', spec: 'Задание — 12 и 18 минут. Остальные — для тренировки.' }];
+}
+
+// ENT-style problems for the «Расчёты» tab
+const PROBS = {
+  conv: [
+    { q: 'Переведите число 345₈ в десятичную систему счисления.', a: ['229'], h: 'Умножьте каждую цифру на 8 в степени номера разряда (справа, с нуля) и сложите.' },
+    { q: 'Сколько нулей в двоичной записи десятичного числа 64?', a: ['6'], h: '64 — степень двойки. Как выглядит 2ⁿ в двоичной записи?' },
+    { q: 'В системе счисления с некоторым основанием десятичное число 25 записывается как 31. Найдите основание.', a: ['8'], h: '31 в системе с основанием x — это 3·x + 1. Решите уравнение.' },
+  ],
+  arith: [
+    { q: 'Вычислите 1101₂ · 11₂. Ответ запишите в двоичной системе.', a: ['100111'], h: '11₂ = 10₂ + 1₂: сложите 1101 и 1101, сдвинутое на разряд влево.' },
+    { q: 'Вычислите 17₈ + 25₈. Ответ запишите в восьмеричной системе.', a: ['44'], h: '7 + 5 = 12 — это больше 8. Сколько пишем в разряд и сколько переносим?' },
+    { q: 'Найдите сумму 1101010₂ + 101011₂ + 111110₂. Ответ — в двоичной системе.', a: ['11010011'], h: 'Переведите слагаемые в десятичную, сложите и переведите сумму обратно.' },
+  ],
+  volume: [
+    { q: 'Скорость передачи данных 128 000 бит/с. За сколько секунд будет передан файл объёмом 625 Кбайт?', a: ['40'], h: 'Переведите Кбайты в биты: × 1024 × 8. Потом разделите на скорость.' },
+    { q: 'Сообщение из 512 символов записано алфавитом мощностью 32 символа. Каков его информационный объём в байтах?', a: ['320'], h: 'Сначала i: 2ⁱ = 32. Затем I = K · i бит и разделите на 8.' },
+    { q: 'Изображение 200 × 480 пикселей, каждый пиксель кодируется 32 битами. Каков объём изображения в Кбайтах?', a: ['375'], h: 'Перемножьте пиксели и биты, переведите в байты (: 8) и в Кбайты (: 1024).' },
+  ],
+  euclid: [
+    { q: 'Найдите НОД(84; 36) с помощью алгоритма Евклида.', a: ['12'], h: '84 = 2·36 + ?. Дальше делите 36 на остаток.' },
+    { q: 'Найдите наименьшее общее кратное чисел 15 и 20.', a: ['60'], h: 'НОК = a · b / НОД(a, b). Чему равен НОД(15, 20)?' },
+    { q: 'Сколько делений с остатком выполнит алгоритм Евклида для чисел 1071 и 462, считая последнее деление с остатком 0?', a: ['3'], h: 'Выписывайте a = q·b + r, пока остаток не станет 0, и посчитайте строчки.' },
+  ],
+};
+const norm = s => String(s).toUpperCase().replace(/[\s₀-₉]/g, '').replace(/^0+(?=.)/, '');
+function probsHTML() {
+  const id = LID();
+  return `<h3>Задачи как на ЕНТ</h3><div class="ent">` + PROBS[id].map((p, i) => {
+    const k = `${id}:${i}`, ok = !!S.solved[k], fb = S.fb[k];
+    return `<div class="prob ${ok ? 'ok' : ''}"><p>${i + 1}. ${p.q}</p><div class="ans"><input data-k="${k}" inputmode="text" autocomplete="off" aria-label="Ответ к задаче ${i + 1}" placeholder="ответ" value="${ok ? p.a[0] : (S.draft[k] || '').replace(/"/g, '&quot;')}" ${ok ? 'readonly' : ''}><button class="ghostbtn" data-chk="${k}" ${ok ? 'disabled' : ''}>Проверить</button></div>` +
+      `<p class="fb ${ok ? 'ok' : fb ? 'bad' : ''}">${ok ? '✓ Верно' : fb || ''}</p></div>`;
+  }).join('') + `</div>`;
+}
+function wireProbs(el) {
+  el.querySelectorAll('.prob input').forEach(inp => {
+    inp.oninput = () => { S.draft[inp.dataset.k] = inp.value; };
+    inp.onkeydown = e => { if (e.key === 'Enter') checkProb(inp.dataset.k); };
+  });
+  el.querySelectorAll('[data-chk]').forEach(b => b.onclick = () => checkProb(b.dataset.chk));
+}
+function checkProb(k) {
+  const [id, i] = k.split(':'), p = PROBS[id][+i], v = norm(S.draft[k] || '');
+  if (!v) { S.fb[k] = 'Введите ответ.'; renderPanes(model()); return; }
+  if (p.a.some(a => norm(a) === v)) { S.solved[k] = true; S.fb[k] = ''; save(); toast('Верно!'); }
+  else S.fb[k] = `Пока не так. Подсказка: ${p.h}`;
+  renderPanes(model());
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Из чего состоит опыт</h2><p class="note">Нажмите на деталь, чтобы найти её на сцене.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') {
+    const el = $('#pane-calc');
+    const ae = document.activeElement, focusK = ae && ae.dataset && ae.dataset.k;
+    el.innerHTML = calcHTML(m) + probsHTML();
+    wireProbs(el);
+    if (focusK) { const f = el.querySelector(`input[data-k="${focusK}"]`); if (f && !f.readOnly) f.focus(); }
+  }
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'conv') {
+    const b = S.base, n = S.dig.length;
+    let h = `<h2>Перевод чисел</h2><div class="formula">aₙ…a₁a₀ = Σ aₖ · ${b}ᵏ</div><h3>Ваше число: ${m.s}${sub(b)}</h3><div class="steps">`;
+    S.dig.forEach((d, i) => { const k = n - 1 - i; if (d || k === 0) h += step(`разряд ${k}: ${DIG[d]}`, `${d} · ${b}${sup(k)} = ${big(d * b ** k)}`); });
+    h += step('сумма', `${m.v}${sub(10)}`, 'sum') + `</div>`;
+    h += `<h3>Обратно: делим на ${b}</h3>`;
+    if (m.v === 0) h += `<p class="note">Наберите число, и здесь появится деление с остатком.</p>`;
+    else {
+      let x = m.v; const rows = [];
+      while (x > 0) { rows.push(step(`${x} : ${b}`, `= ${Math.floor(x / b)}, остаток ${x % b}${x % b >= 10 ? ` (${DIG[x % b]})` : ''}`)); x = Math.floor(x / b); }
+      h += `<div class="steps">${rows.join('')}${step('остатки снизу вверх', `${m.s}${sub(b)}`, 'sum')}</div>`;
+    }
+    h += `<h3>Степени двойки</h3><div class="steps">${step('2⁰ … 2⁵', '1 · 2 · 4 · 8 · 16 · 32')}${step('2⁶ … 2¹⁰', '64 · 128 · 256 · 512 · 1024')}${step('8 = 2³, 16 = 2⁴', 'группы по 3 и по 4 бита')}</div>`;
+    return h;
+  }
+  if (id === 'arith') {
+    const e = m.e;
+    let h = `<h2>Столбиком в системе с основанием ${e.b}</h2><div class="formula">${e.b === 2 ? '1 + 1 = 10₂ · 1 + 1 + 1 = 11₂' : e.b === 8 ? '7 + 1 = 10₈' : 'F + 1 = 10₁₆'}</div>`;
+    h += `<h3>Таблица ${e.b === 2 ? 'двоичного сложения' : 'цифр'}</h3><div class="steps">`;
+    if (e.b === 2) h += step('0 + 0', '0') + step('0 + 1', '1') + step('1 + 1', '10 → пишем 0, перенос 1') + step('1 + 1 + 1', '11 → пишем 1, перенос 1') + step('0 − 1', 'занимаем 1 = 2 → 2 − 1 = 1');
+    else if (e.b === 8) h += step('цифры', '0 … 7') + step('сумма ≥ 8', 'пишем сумму − 8, перенос 1');
+    else h += step('A B C D E F', '10 11 12 13 14 15') + step('сумма ≥ 16', 'пишем сумму − 16, перенос 1');
+    h += `</div><h3>Проверка через десятичную</h3><div class="steps">` + step(`${e.a}${sub(e.b)}`, `${e.A}${sub(10)}`) + step(`${e.c}${sub(e.b)}`, `${e.C}${sub(10)}`) +
+      step(`${e.A} ${e.op} ${e.C}`, m.ok ? `${e.R}${sub(10)} = ${e.ans}${sub(e.b)}` : 'посчитайте и переведите обратно', 'sum') + `</div>`;
+    if (e.op === '×') h += `<p class="note" style="margin-top:10px">Каждая единица множителя даёт копию множимого, сдвинутую на номер её разряда. Нули множителя дают пустые строки.</p>`;
+    return h;
+  }
+  if (id === 'volume') {
+    const c = m.c;
+    let h = `<h2>Объём и скорость</h2><div class="formula">I = K · i &nbsp;·&nbsp; I = v · t</div><h3>Лестница единиц</h3><div class="steps">` +
+      step('1 байт', '8 бит = 2³') + step('1 Кбайт', '1024 байта = 2¹³ бит') + step('1 Мбайт', '1024 Кбайта = 2²³ бит') + step('1 Кбит/с', '1024 бит/с') + `</div>`;
+    h += `<h3>${c.name}</h3><div class="steps">`;
+    if (c.K) h += step('мощность алфавита', `N = ${c.N} → i: 2ⁱ ≥ ${c.N}`) + step('ваше i', `${S.bi} бит → 2${sup(S.bi)} = ${2 ** S.bi}`) + step('объём', `I = ${c.K} · ${S.bi} = ${big(c.K * S.bi)} бит`);
+    else h += step('объём', `${num(c.bits / SU[c.su].f)} ${SU[c.su].n}`);
+    h += step('скорость', `${num(c.v / VU[c.vu].f)} ${VU[c.vu].n}`);
+    h += S.vgot[S.sc]
+      ? step('t = I / v', `${big(scBits(S.sc, c.K ? minI(c.N) : undefined))} бит : ${big(c.v)} бит/с = ${scNeed(S.sc)} с`, 'sum')
+      : step('t = I / v', 'приведите к битам и разделите', 'sum');
+    h += `</div><p class="note" style="margin-top:10px">${S.vgot[S.sc] ? 'Сообщение доставлено — разбор открыт.' : 'Полный разбор появится, когда сообщение дойдёт ровно вовремя.'}</p>`;
+    return h;
+  }
+  if (S.mode === 'gcd') {
+    const g = m.g;
+    let h = `<h2>Алгоритм Евклида</h2><div class="formula">НОД(a, b) = НОД(b, a mod b)</div><h3>Ваши шаги: ${g.a} и ${g.b}</h3>`;
+    h += g.steps.length ? `<div class="steps">` + g.steps.map(s => step(`${s.big} = ${s.k}·${s.s} + ${s.r}`, s.r ? `дальше ${s.s} и ${s.r}` : 'остаток 0')).join('') + (g.done ? step('НОД', String(g.last), 'sum') : '') + `</div>` : `<p class="note">Пока нет. Отрежьте первые квадраты.</p>`;
+    h += `<h3>Python</h3><div class="steps">${step('while b:', 'a, b = b, a % b')}${step('print(a)', 'НОД')}</div>`;
+    return h;
+  }
+  const done = !!S.taps[m.l];
+  let h = `<h2>Наименьшее общее кратное</h2><div class="formula">НОК(a, b) = a · b / НОД(a, b)</div><h3>Автобусы ${m.la} и ${m.lb} мин</h3><div class="steps">` +
+    step(`кратные ${m.la}`, Array.from({ length: 6 }, (_, i) => m.la * (i + 1)).join(', ') + '…') + step(`кратные ${m.lb}`, Array.from({ length: 6 }, (_, i) => m.lb * (i + 1)).join(', ') + '…');
+  h += done ? step('НОК', `${m.la} · ${m.lb} / ${gcd(m.la, m.lb)} = ${m.l}`, 'sum') : step('первое общее', 'найдите на линии времени', 'sum');
+  return h + `</div>`;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), id = LID(), ok = !!S.done[id];
+  if (m.kind === 'conv') el.innerHTML = `<div class="k">Значение</div><div class="v ${ok || m.v === m.target ? 'ok' : ''}">${m.v}${sub(10)}</div><div class="gauge"><b style="width:${clamp(m.v / m.target * 100, 0, 100).toFixed(1)}%;background:${m.v === m.target ? 'var(--ok)' : m.v > m.target ? 'var(--warn)' : 'var(--arm)'}"></b></div><div class="lr"><span>цель</span><span>${m.target}</span></div>`;
+  else if (m.kind === 'arith') el.innerHTML = `<div class="k">Решено</div><div class="v ${ok ? 'ok' : ''}">${m.solvedN} из ${EX.length}</div><div class="gauge"><b style="width:${(m.solvedN / EX.length * 100).toFixed(1)}%"></b></div><div class="lr"><span>пример</span><span>${S.ai + 1}</span></div>`;
+  else if (m.kind === 'vol') { const n = m.got.filter(Boolean).length; el.innerHTML = `<div class="k">Доставлено</div><div class="v ${ok ? 'ok' : ''}">${n} из ${SC.length}</div><div class="gauge"><b style="width:${(n / SC.length * 100).toFixed(1)}%"></b></div><div class="lr"><span>T</span><span>${S.T} с</span></div>`; }
+  else el.innerHTML = `<div class="k">НОД · НОК</div><div class="v ${ok ? 'ok' : ''}">${m.gcdOk ? 6 : '?'} · ${m.lcmOk ? 36 : '?'}</div><div class="lr"><span>48 и 18</span><span>12 и 18</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Отличная работа!'), 1500);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  conv: '<text x="33" y="13" font-size="9" fill="#e8ecf4" text-anchor="middle" font-family="monospace">1011011₂</text><text x="33" y="25" font-size="9" fill="#ffb547" text-anchor="middle" font-family="monospace">= 91₁₀</text>',
+  arith: '<text x="40" y="11" font-size="8" fill="#e8ecf4" text-anchor="end" font-family="monospace">1101</text><text x="40" y="19" font-size="8" fill="#e8ecf4" text-anchor="end" font-family="monospace">+ 11</text><path d="M14 21h28" stroke="#56627d"/><text x="40" y="29" font-size="8" fill="#86e0a8" text-anchor="end" font-family="monospace">10000</text><text x="54" y="18" font-size="8" fill="#ffb547" text-anchor="middle" font-family="monospace">₂</text>',
+  volume: '<path d="M6 6h10l4 4v14H6z" fill="#efe9da"/><path d="M22 16H46" stroke="#56627d" stroke-width="3"/><text x="34" y="12" font-size="7" fill="#ffd27a" text-anchor="middle" font-family="monospace">101</text><rect x="48" y="8" width="14" height="12" rx="2" fill="none" stroke="#e8ecf4"/><rect x="50" y="15" width="8" height="2.5" fill="#86e0a8"/>',
+  euclid: '<rect x="4" y="5" width="20" height="20" fill="#2f4466" stroke="#0b1019"/><rect x="24" y="5" width="20" height="20" fill="#2f4466" stroke="#0b1019"/><rect x="44" y="5" width="10" height="10" fill="#3b5a3f" stroke="#0b1019"/><rect x="44" y="15" width="10" height="10" fill="#3b5a3f" stroke="#0b1019"/><rect x="54" y="5" width="8" height="20" fill="none" stroke="#72d4e8"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Ls, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Ls.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Ls.title}</span></span>
+      ${S.done[Ls.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  clearTimeout(sendTimer);
+  S.lesson = i; S.hl = null; S.fb = {};
+  S.base = 2; S.dig = Array(POS[2]).fill(0); S.got = [false, false, false];
+  S.ai = 0; S.aok = {}; resetEx();
+  S.sc = 0; S.su = SC.map(c => c.su || 0); S.vu = SC.map(c => c.vu); S.T = 10; S.bi = 3; S.send = null; S.vgot = [false, false, false];
+  S.mode = 'gcd'; S.gp = 0; newG(); S.gcdOk = false; S.lp = 0; S.lx = 0; S.taps = {}; S.lcmOk = false;
+  press = null;
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '', guide = '';
+  if (id === 'conv') {
+    now = `Разрядная линейка: ${BNAME[S.base]} система (основание ${S.base}), ${S.dig.length} разрядов с весами ${S.dig.map((_, i) => S.base ** (S.dig.length - 1 - i)).join(', ')}. Ученик кнопками ▲/▼ набрал цифры ${S.dig.map(d => DIG[d]).join(' ')}, это ${m.s}${sub(S.base)} = ${m.v} в десятичной (под линейкой видна развёрнутая сумма «цифра × вес» и группы по 3/4 бита). Цели: 91 → двоичная (${S.got[0] ? 'набрано' : 'не набрано'}), 229 → восьмеричная (${S.got[1] ? 'набрано' : 'не набрано'}), 157 → шестнадцатеричная (${S.got[2] ? 'набрано' : 'не набрано'}). Цель для текущего основания — ${m.target}.`;
+    guide = 'Не называй цифры ответа для целей 91, 229 и 157: предложи найти самый большой вес разряда, который помещается в число, или делить на основание с остатком.';
+  }
+  if (id === 'arith') {
+    const e = m.e, typed = Array.from({ length: e.W }, (_, k) => { const d = S.res[e.W - 1 - k]; return d === null ? '·' : DIG[d]; }).join('');
+    now = `Столбик, пример ${S.ai + 1} из ${EX.length}: ${e.a}${sub(e.b)} ${e.op} ${e.c}${sub(e.b)} (${e.name} в системе с основанием ${e.b})${e.op === '×' ? `, частичные произведения: ${e.parts.join(' и ')}` : ''}. Ученик набрал в строке ответа: ${typed} (точка — пустая клетка). Отметки переноса над столбцами: ${S.car.map((c, j) => c ? `разряд ${j + 1}` : '').filter(Boolean).join(', ') || 'нет'}. Пример ${m.ok ? 'решён' : 'не решён'}. Решено ${m.solvedN} из ${EX.length}: ${EX.map((x, i) => `${x.a} ${x.op} ${x.c} (${x.b}) — ${S.aok[i] ? 'да' : 'нет'}`).join('; ')}.`;
+    guide = 'Не называй цифры ответа: попроси сложить (вычесть) один столбец справа вслух, напомни, что перенос возникает при сумме ≥ основания, и предложи проверку через десятичную систему.';
+  }
+  if (id === 'volume') {
+    const c = m.c;
+    now = `Канал связи. Сообщение «${c.name}»${c.K ? `: ${c.K} символов, алфавит ${c.N} символов, ученик выбрал i = ${S.bi} бит на символ (2^${S.bi} = ${2 ** S.bi})` : `, объём показан как ${num(c.bits / SU[S.su[S.sc]].f)} ${SU[S.su[S.sc]].n}`}; скорость канала показана как ${num(c.v / VU[S.vu[S.sc]].f)} ${VU[S.vu[S.sc]].n} (нажатием единицы переключаются). Выбрано время T = ${S.T} с. ${S.send && !S.send.run ? `Последняя передача: ${S.send.res === 'ok' ? 'ровно вовремя' : S.send.res === 'short' ? 'не успели передать всё' : 'дошло с запасом или с лишними битами на символ'}.` : 'Передачи ещё не было.'} Доставлено точно: ${SC.map((x, i) => `${x.short} — ${S.vgot[i] ? 'да' : 'нет'}`).join(', ')}.`;
+    guide = 'Не называй время T: помоги привести объём и скорость к одним единицам (бит и бит/с или Кбит и Кбит/с), а для текста — найти наименьшее i с 2^i ≥ N.';
+  }
+  if (id === 'euclid') {
+    if (S.mode === 'gcd') {
+      const g = S.g;
+      now = `Режим НОД. Прямоугольник ${g.a} × ${g.b}; ученик отрезает самые большие квадраты (сколько штук за шаг — выбирает сам, остаток должен быть меньше стороны квадрата). Шаги: ${g.steps.map(s => `${s.big} = ${s.k}·${s.s} + ${s.r}`).join('; ') || 'пока нет'}. ${g.done ? `Прямоугольник разрезан без остатка, НОД = ${g.last}.` : `Остался прямоугольник ${g.rw} × ${g.rh}, выбрано ${S.k} квадрат(а).`}`;
+    } else {
+      const [a, b] = LP[S.lp];
+      now = `Режим НОК. Два автобуса уходят вместе в 0 минут, первый ходит каждые ${a} мин, второй — каждые ${b} мин. Ученик нажимает на минуты (шаг ${lpStep()}), чтобы найти первую общую. Проверены минуты: ${Object.keys(S.taps).sort((x, y) => x - y).join(', ') || 'пока нет'}.`;
+    }
+    now += ` Задание: НОД(48, 18) — ${S.gcdOk ? 'найден' : 'не найден'}, НОК(12, 18) — ${S.lcmOk ? 'найден' : 'не найден'}.`;
+    guide = 'Не называй НОД и НОК для 48, 18 и 12, 18: спроси, сколько квадратов помещается и какой остаток получится, или попроси выписать кратные каждого числа.';
+  }
+  return [
+    `Раздел: информатика, 8 класс, тема «Системы счисления» (подготовка к ЕНТ). Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Во вкладке «Расчёты» — задачи как на ЕНТ: ${PROBS[id].map((p, i) => `${i + 1}) ${p.q} — ${S.solved[`${id}:${i}`] ? 'решена' : 'не решена'}`).join(' ')}`,
+    S.done[id] ? 'Задание уже выполнено — можно обсуждать свободно, но ответы нерешённых задач ЕНТ не называй.' : guide,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = {
+    conv: 'Почему для перевода из двоичной в шестнадцатеричную берут группы по 4 бита?',
+    arith: 'Почему 1 + 1 в двоичной равно 10?',
+    volume: 'Чем Кбит отличается от Кбайта?',
+    euclid: 'Почему алгоритм Евклида всегда заканчивается?',
+  }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

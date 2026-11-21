@@ -1,0 +1,960 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по математике, 5–6 класс: скорость, время и расстояние, движение навстречу и вдогонку, движение по реке, средняя скорость на участках пути.">
+<title>Задачи на движение</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 130px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.probs{display:grid;gap:10px}
+.prob{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:11px 13px}
+.prob.ok{border-color:var(--ok)}
+.prob .lv{font:600 10.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--force);margin-bottom:7px}
+.prob.ok .lv{color:var(--ok)}
+.prob p{margin:0 0 9px;font-size:14px;line-height:1.5}
+.ansrow{display:flex;gap:6px;align-items:center}
+.ansrow input{flex:1;min-width:0;min-height:42px;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;color:var(--fg);font:500 16px var(--font-mono)}
+.ansrow .u{font-size:13px;color:var(--muted);white-space:nowrap}
+.ansrow button{min-height:42px}
+.prob .fb{margin-top:8px;font-size:13.5px;line-height:1.45}
+.prob .fb.bad{color:var(--warn)}
+.prob .fb.good{color:var(--ok)}
+</style>
+</head>
+<body>
+<script src="/luch/splash.js"></script>
+<div class="app">
+  <header>
+    <div class="brand" role="link" tabindex="0" title="Карта предметов" style="cursor:pointer" onclick="location.href='/#math'" onkeydown="if(event.key==='Enter')location.href='/#math'">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9.6 14.6 9.2 6.2 15 10.6Q20 9.4 25 10.6L30.8 6.2 30.4 14.6Q34.6 22 31.6 29Q27.6 36 20 36Q12.4 36 8.4 29Q5.4 22 9.6 14.6Z" fill="#ffb547"/><path d="M20 14Q15.2 10.8 10.9 13.4Q7.6 17.2 9.4 21.8Q11.6 25.8 15.9 25.4Q18.5 25.1 20 27.1Q21.5 25.1 24.1 25.4Q28.4 25.8 30.6 21.8Q32.4 17.2 29.1 13.4Q24.8 10.8 20 14Z" fill="#ffd896"/><circle cx="15" cy="18.8" r="5" fill="#fffaf0"/><circle cx="25" cy="18.8" r="5" fill="#fffaf0"/><circle cx="15.6" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="24.4" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="16.6" cy="18.1" r="1" fill="#fff"/><circle cx="25.4" cy="18.1" r="1" fill="#fff"/><path d="M18.6 23.4h2.8L20 26.6z" fill="#ff8a73"/><path d="M10.5 29.6Q15.3 27.4 20 29.7Q24.7 27.4 29.5 29.6V34.6Q24.7 32.6 20 34.8Q15.3 32.6 10.5 34.6Z" fill="#72d4e8"/><path d="M20 29.7V34.8" stroke="#0b1019" stroke-width="1.1"/><path d="M8.2 23.5Q5.6 28.6 9.4 32.6Q11.6 33.2 12.4 31Q10.4 28.4 8.2 23.5Z" fill="#e8962a"/><path d="M31.8 23.5Q34.4 28.6 30.6 32.6Q28.4 33.2 27.6 31Q29.6 28.4 31.8 23.5Z" fill="#e8962a"/><path d="M35 3.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="#86e0a8"/></svg>
+      <div><h1>OPEN SCHOOL AI</h1><small>Доступное образование для всех</small></div>
+    </div>
+    <div class="headr">
+      
+      <div class="prog" aria-label="Прогресс"><b>Движение</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочее поле">
+    <svg class="scene" id="scene" role="img" aria-label="Рабочее поле: дорога, река и машины. Ползунки скорости и времени можно тянуть."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const trim = (x, n = 3) => fmt(x, n).replace(/(,\d*?)0+$/, '$1').replace(/,$/, '') || '0';
+const num = v => trim(v, 2);
+const eq = (a, b) => Math.abs(a - b) < 1e-9;
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const BLUE = '#5fb4d9', ORANGE = '#ffb547', RED = '#ff8a73', GREEN = '#86e0a8', MUTED = '#8b96ad', FG = '#e8ecf4', DIM = '#5d6880';
+// hours → «4 ч 30 мин»; minutes of the day → «11:00»
+const fmtH = h => { const mm = Math.round(h * 60), H = Math.floor(mm / 60), M = mm % 60; return H && M ? `${H} ч ${M} мин` : H ? `${H} ч` : `${M} мин`; };
+const clock = min => { const m = ((Math.round(min) % 1440) + 1440) % 1440; return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`; };
+
+// ---------- lesson data ----------
+// 1: Aktobe → city 240 km (80 km/h · 3 h); task: 60 km/h → 4 h
+const CITY = 240, KM1 = 320, DEP1 = 8 * 60;
+// 2: three scenarios, the first is the task
+const SCN = [
+  { id: 'chase', name: 'Вдогонку', title: 'Из Астаны в одну сторону', sub: 'автобус в 8:00, 60 км/ч · автомобиль в 9:00, 90 км/ч',
+    km: [0, 300], tick: 60, start: 8 * 60, tmMax: 300, step: 10, ans: 180, what: 'сближения', origin: 'Астана',
+    A: { name: 'автобус', v: 60, x0: 0, dir: 1, t0: 0, kind: 'bus', col: ORANGE }, B: { name: 'автомобиль', v: 90, x0: 0, dir: 1, t0: 60, kind: 'car', col: BLUE },
+    chips: [150, 30, 90], good: 1,
+    why: ['150 = 60 + 90 — так сближаются, только когда едут навстречу. А тут оба едут в одну сторону.', '', '90 км/ч — скорость самого автомобиля. Но автобус тоже не стоит: за час он уезжает на 60 км.'] },
+  { id: 'meet', name: 'Навстречу', title: 'Навстречу друг другу', sub: 'между сёлами 24 км · велосипедист 15 км/ч, пешеход 5 км/ч',
+    km: [0, 24], tick: 4, start: null, tmMax: 120, step: 6, ans: 72, what: 'сближения',
+    A: { name: 'велосипедист', v: 15, x0: 0, dir: 1, t0: 0, kind: 'bike', col: BLUE }, B: { name: 'пешеход', v: 5, x0: 24, dir: -1, t0: 0, kind: 'walk', col: ORANGE },
+    chips: [10, 20, 75], good: 1,
+    why: ['10 = 15 − 5 — так сближаются, когда один догоняет другого. Здесь они идут навстречу.', '', '75 = 15 · 5 — скорости не перемножают: за час расстояние уменьшается на 15 и ещё на 5 км.'] },
+  { id: 'apart', name: 'В разные стороны', title: 'В противоположные стороны', sub: 'оба из пункта A · скорости 12 км/ч и 16 км/ч',
+    km: [-50, 50], tick: 10, start: null, tmMax: 180, step: 15, ans: 150, what: 'удаления', origin: 'A',
+    A: { name: '1-й велосипедист', v: 12, x0: 0, dir: -1, t0: 0, kind: 'bike', col: BLUE }, B: { name: '2-й велосипедист', v: 16, x0: 0, dir: 1, t0: 0, kind: 'bike', col: ORANGE },
+    chips: [4, 28, 192], good: 1,
+    why: ['4 = 16 − 12 — так было бы, если бы они ехали в одну сторону.', '', '192 = 12 · 16 — скорости не перемножают: за час каждый отъезжает на свои километры.'] },
+];
+const posOf = (P, tm) => tm <= P.t0 ? P.x0 : P.x0 + P.dir * P.v * (tm - P.t0) / 60;
+// 4: Kostanay → city 120 km, 60 there / 40 back
+const D4 = 120;
+
+const LESSONS = [
+  { id: 'svt', title: 'Скорость, время, расстояние',
+    text: ['Движение описывают три величины: расстояние s — сколько проехали, время t — сколько ехали, и скорость v — какое расстояние проходят за единицу времени (за час, за секунду). Они связаны одной формулой: s = v · t. Из неё v = s : t и t = s : v.',
+           'Единицы должны быть согласованы: км/ч — с километрами и часами, м/с — с метрами и секундами. 30 мин = 0,5 ч, 4 ч 30 мин = 4,5 ч, а 1 м/с = 3,6 км/ч. Пример: поезд прошёл 360 км за 4 ч 30 мин — его скорость 360 : 4,5 = 80 км/ч. Бегун пробежал 400 м за 50 с: 400 : 50 = 8 м/с = 8 · 3,6 = 28,8 км/ч.',
+           'Если путь один и тот же, скорость и время обратно пропорциональны: во сколько раз увеличили скорость, во столько раз уменьшилось время. При 80 км/ч дорога занимает 3 ч — значит, путь 80 · 3 = 240 км; при 120 км/ч на него уйдёт 240 : 120 = 2 ч. Чтобы узнать время прибытия, прибавьте время в пути к времени отправления.'],
+    why: 'Навигатор в телефоне делит оставшийся путь на скорость и показывает время прибытия. Диспетчер вокзала по той же формуле строит расписание поездов, логист считает, успеет ли фура к открытию склада, а пилот — сколько топлива нужно на рейс. Водители такси и курьеры прикидывают это в уме по несколько раз за смену.',
+    task: 'Машина едет из Актобе в соседний город. Со скоростью 80 км/ч дорога занимает 3 ч. Поставьте скорость 60 км/ч, подберите время в пути и нажмите «Поехали»: машина должна остановиться ровно у города.',
+    hint: 'Сначала узнайте, сколько километров до города: 80 км/ч в течение 3 ч. Потом подумайте, сколько часов нужно ехать по 60 км/ч, чтобы проехать столько же.',
+    stage: 'Ползунки — скорость и время. «Поехали» запускает машину.',
+    check: m => !!m.ran && m.ran.v === 60 && eq(m.ran.t, 4) },
+  { id: 'meet', title: 'Навстречу и вдогонку',
+    text: ['Когда двое движутся навстречу друг другу, расстояние между ними каждый час уменьшается на v₁ + v₂ — это скорость сближения. Время до встречи t = s : (v₁ + v₂). Пример: между сёлами 30 км, скорости 4 и 6 км/ч — встретятся через 30 : (4 + 6) = 3 ч.',
+           'Если двое разъезжаются в противоположные стороны, расстояние каждый час растёт на v₁ + v₂ (скорость удаления): через t часов между ними (v₁ + v₂) · t. Если едут в одну сторону, догоняющий приближается только на разность скоростей v₂ − v₁ и догонит через t = d : (v₂ − v₁), где d — расстояние между ними в момент начала погони.',
+           'Если один выехал раньше, сначала найдите, сколько он успел проехать до выезда второго, — это и есть d. Время встречи по часам = время выезда второго + время погони. Пример: грузовик 50 км/ч, через 1 ч за ним легковая 70 км/ч: d = 50 км, сближение 20 км/ч, погоня 50 : 20 = 2,5 ч.'],
+    why: 'Диспетчеры железной дороги рассчитывают, где разъедутся два поезда на однопутке. Спасатели прикидывают, когда катер догонит дрейфующую лодку, а логисты — где встретить фуру по пути. В спорте тренер считает, догонит ли бегун лидера на последнем круге.',
+    task: 'Автобус выехал из Астаны в 8:00 со скоростью 60 км/ч. В 9:00 за ним по той же дороге выехал автомобиль со скоростью 90 км/ч. Выберите скорость сближения и поставьте часы на момент, когда автомобиль догонит автобус.',
+    hint: 'Сколько километров автобус проехал до 9:00? Насколько автомобиль приближается к автобусу за каждый час? Разделите одно на другое — получится время погони.',
+    stage: 'Выберите скорость сближения, затем тяните часы.',
+    check: m => m.sc === 0 && m.close === SCN[0].good && m.tm === SCN[0].ans },
+  { id: 'river', title: 'Движение по реке',
+    text: ['Река сама несёт всё, что в ней плавает, со скоростью течения u. Собственная скорость лодки v — её скорость в стоячей воде, например в озере. По течению скорости складываются: v + u. Против течения река мешает: v − u.',
+           'У плота своей скорости нет — он плывёт со скоростью течения u. Разность скоростей по течению и против течения равна двум скоростям течения: (v + u) − (v − u) = 2u. Отсюда u = (vпо − vпр) : 2, а собственная скорость v = (vпо + vпр) : 2 — среднее арифметическое двух скоростей.',
+           'Пример: собственная скорость лодки 10 км/ч, течение 2 км/ч. По течению лодка идёт 12 км/ч и проходит 24 км за 24 : 12 = 2 ч, а против течения идёт 8 км/ч и тратит на те же 24 км 24 : 8 = 3 ч.'],
+    why: 'Капитаны речных судов закладывают в расписание, что вверх по реке рейс идёт дольше, чем вниз. Та же арифметика у пилотов: с попутным ветром самолёт летит быстрее, со встречным — медленнее. Сплавщики, пловцы на открытой воде и спасатели на воде учитывают течение, чтобы не промахнуться мимо цели.',
+    task: 'Собственная скорость катера 18 км/ч. По течению он идёт на 8 км/ч быстрее, чем против течения. Настройте скорость течения и поставьте часы на 1 ч: катер по течению должен уйти от пристани на 8 км дальше, чем катер против течения.',
+    hint: 'На сколько скорость по течению больше скорости против течения, если течение u? Сравните (18 + u) и (18 − u).',
+    stage: 'Ползунки — течение, катер и часы. Кнопка «1 час» пускает катера.',
+    check: m => m.v === 18 && eq(m.u, 4) && eq(m.t, 1) },
+  { id: 'avg', title: 'Средняя скорость на участках',
+    text: ['Средняя скорость — это весь путь, делённый на всё время в пути: vср = (s₁ + s₂) : (t₁ + t₂). Это не среднее арифметическое скоростей! Средняя скорость — такая постоянная скорость, с которой можно было бы проехать тот же путь за то же время.',
+           'Пример: машина ехала 2 ч со скоростью 60 км/ч и 3 ч со скоростью 80 км/ч. Путь 120 + 240 = 360 км, время 2 + 3 = 5 ч, средняя скорость 360 : 5 = 72 км/ч, а не 70: быстрее ехали дольше, поэтому средняя ближе к 80.',
+           'Если две равные половины пути пройдены со скоростями v₁ и v₂, медленную половину едут дольше, и средняя скорость меньше среднего арифметического: vср = 2 · v₁ · v₂ : (v₁ + v₂). Можно и без формулы: возьмите путь, найдите время каждой половины, сложите и разделите весь путь на всё время.'],
+    why: 'Навигатор показывает среднюю скорость поездки, а не среднее показаний спидометра. Тренер бегуна делит дистанцию на итоговое время, чтобы оценить темп. Логисты по средней скорости с учётом пробок и стоянок обещают клиенту время доставки, а инженеры по ней проектируют расписание общественного транспорта.',
+    task: 'Из Костаная в соседний город (120 км) машина ехала со скоростью 60 км/ч, а обратно той же дорогой — 40 км/ч. Подберите скорость «ровной» машины, которая едет туда и обратно с одной скоростью, и нажмите «Поехали»: она должна вернуться одновременно с первой.',
+    hint: 'Сколько часов машина ехала туда, а сколько обратно? Весь путь туда и обратно разделите на всё время. Проверьте, вернётся ли ровная машина одновременно с первой при 50 км/ч.',
+    stage: 'Ползунок — скорость ровной машины. «Поехали» запускает обе.',
+    check: m => !!m.ran && m.ran.w === 48 && m.ran.v1 === 60 && m.ran.v2 === 40 },
+];
+
+// ЕНТ-style problems for «Расчёты»
+const PROBS = {
+  svt: [
+    { q: 'Поезд проехал 360 км за 4 ч 30 мин. С какой средней скоростью он ехал?', ans: 80, u: 'км/ч', hint: 'Переведите время в часы: 30 мин — это половина часа. Потом v = s : t.', fact: '4 ч 30 мин = 4,5 ч; 360 : 4,5 = 80 км/ч.' },
+    { q: 'Поезд Алматы — Шымкент вышел в 21:30 и прошёл 690 км со скоростью 69 км/ч. Во сколько он прибыл? Ответ запишите как чч:мм.', clock: 7 * 60 + 30, u: '', hint: 'Найдите время в пути t = s : v и прибавьте его к 21:30. Не забудьте, что после 24:00 начинаются новые сутки.', fact: '690 : 69 = 10 ч; 21:30 + 10 ч = 07:30 следующего дня.' },
+    { q: 'Бегун пробежал 400 м за 50 секунд. Найдите его скорость в км/ч.', ans: 28.8, u: 'км/ч', hint: 'Сначала скорость в м/с, потом умножьте на 3,6 (в часе 3600 с, в километре 1000 м).', fact: '400 : 50 = 8 м/с; 8 · 3,6 = 28,8 км/ч.' },
+  ],
+  meet: [
+    { q: 'Велосипедист и пешеход одновременно вышли навстречу друг другу из двух сёл, между которыми 24 км. Скорость велосипедиста 15 км/ч, пешехода 5 км/ч. Через сколько минут они встретятся?', ans: 72, u: 'мин', hint: 'Скорость сближения навстречу — сумма скоростей. Время получится в часах — переведите в минуты.', fact: '24 : (15 + 5) = 1,2 ч = 72 мин = 1 ч 12 мин.' },
+    { q: 'Из пункта A одновременно в противоположные стороны выехали два велосипедиста со скоростями 12 км/ч и 16 км/ч. Какое расстояние будет между ними через 2,5 ч?', ans: 70, u: 'км', hint: 'В разные стороны расстояние растёт на сумму скоростей каждый час.', fact: '(12 + 16) · 2,5 = 28 · 2,5 = 70 км.' },
+    { q: 'Грузовик выехал из города со скоростью 50 км/ч. Через 2 ч вслед за ним выехал легковой автомобиль со скоростью 75 км/ч. Через сколько часов после своего выезда легковой догонит грузовик?', ans: 4, u: 'ч', hint: 'Сколько грузовик проехал за 2 ч? Вдогонку сближаются на разность скоростей.', fact: 'Отрыв 50 · 2 = 100 км, сближение 75 − 50 = 25 км/ч, погоня 100 : 25 = 4 ч.' },
+  ],
+  river: [
+    { q: 'Собственная скорость лодки 12 км/ч, скорость течения 3 км/ч. За сколько часов лодка пройдёт 45 км против течения?', ans: 5, u: 'ч', hint: 'Против течения скорость лодки v − u.', fact: '12 − 3 = 9 км/ч; 45 : 9 = 5 ч.' },
+    { q: 'Скорость катера по течению 22 км/ч, а против течения 16 км/ч. Найдите собственную скорость катера.', ans: 19, u: 'км/ч', hint: 'Собственная скорость ровно посередине между скоростью по течению и против течения.', fact: 'v = (22 + 16) : 2 = 19 км/ч, течение (22 − 16) : 2 = 3 км/ч.' },
+    { q: 'Собственная скорость катера 20 км/ч. Скорость по течению на 10 км/ч больше, чем против течения. Какова скорость течения реки?', ans: 5, u: 'км/ч', hint: 'Разность скоростей по течению и против течения — это удвоенная скорость течения.', fact: '(20 + u) − (20 − u) = 2u = 10, u = 5 км/ч.' },
+  ],
+  avg: [
+    { q: 'Автомобиль ехал 2 ч со скоростью 60 км/ч и 3 ч со скоростью 80 км/ч. Найдите среднюю скорость на всём пути.', ans: 72, u: 'км/ч', hint: 'Найдите весь путь и всё время, потом разделите.', fact: '60 · 2 + 80 · 3 = 360 км за 5 ч; 360 : 5 = 72 км/ч.' },
+    { q: 'Поезд прошёл первую половину пути со скоростью 90 км/ч, а вторую — со скоростью 45 км/ч. Определите среднюю скорость на всём пути.', ans: 60, u: 'км/ч', hint: 'Возьмите удобную длину половины, например 90 км, и найдите время каждой половины.', fact: 'Половина 90 км: 1 ч + 2 ч = 3 ч на 180 км; 180 : 3 = 60 км/ч (по формуле 2 · 90 · 45 : 135 = 60).' },
+    { q: 'Из пункта А в пункт В велосипедист ехал со скоростью 11 км/ч, а назад — со скоростью 9 км/ч. Определите среднюю скорость велосипедиста.', ans: 9.9, u: 'км/ч', hint: 'Пути туда и обратно равны. Подойдёт формула 2 · v₁ · v₂ : (v₁ + v₂) или удобный путь, например 99 км.', fact: '2 · 11 · 9 : 20 = 198 : 20 = 9,9 км/ч.' },
+  ],
+};
+
+const KEY = 'luch-math-motion';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, cs: saved.cs || {}, tab: 'overview', hl: null, anim: null,
+            v1: 80, t1: 3, p1: 0, ran1: null,
+            sc: 0, close: null, tm: 0,
+            u: 1, v3: 18, t3: 0,
+            w: 50, a1: 60, a2: 40, tau: 0, ran4: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done, cs: S.cs })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function model() {
+  const id = LID();
+  if (id === 'svt') {
+    const s = S.v1 * S.t1, now = s * S.p1;
+    return { kind: id, v: S.v1, t: S.t1, s, now, p: S.p1, ran: S.ran1, arr: DEP1 + S.t1 * 60, miss: s - CITY };
+  }
+  if (id === 'meet') {
+    const sc = SCN[S.sc], a = posOf(sc.A, S.tm), b = posOf(sc.B, S.tm);
+    return { kind: id, sc: S.sc, SC: sc, tm: S.tm, a, b, gap: Math.abs(a - b), close: S.close, closeOk: S.close === sc.good, hit: S.tm === sc.ans };
+  }
+  if (id === 'river') {
+    const v = S.v3, u = S.u, t = S.t3, dn = (v + u) * t, up = Math.max(0, v - u) * t;
+    return { kind: id, v, u, t, vd: v + u, vu: v - u, dn, up, raft: u * t, dd: dn - up };
+  }
+  const T1 = D4 / S.a1, T2 = D4 / S.a2, TR = T1 + T2, TG = 2 * D4 / S.w, vavg = 2 * D4 / TR;
+  const tau = S.tau;
+  const real = tau < T1 ? { d: S.a1 * tau, back: false } : tau < TR ? { d: D4 - S.a2 * (tau - T1), back: true } : { d: 0, back: true, home: true };
+  const gd = Math.min(S.w * tau, 2 * D4), ghost = gd < D4 ? { d: gd, back: false } : { d: 2 * D4 - gd, back: true, home: gd >= 2 * D4 };
+  return { kind: 'avg', w: S.w, v1: S.a1, v2: S.a2, T1, T2, TR, TG, vavg, tau, real, ghost, ran: S.ran4 };
+}
+
+// ---------- SVG helpers (520 × 405 units) ----------
+const T = (x, y, s, txt, fill = MUTED, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const L = (x1, y1, x2, y2, col, w = 1, extra = '') => `<path d="M${(+x1).toFixed(1)} ${(+y1).toFixed(1)}L${(+x2).toFixed(1)} ${(+y2).toFixed(1)}" stroke="${col}" stroke-width="${w}" ${extra}/>`;
+const R = (x, y, w, h, fill, extra = '') => `<rect x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" width="${Math.max(0, +w).toFixed(1)}" height="${Math.max(0, +h).toFixed(1)}" fill="${fill}" ${extra}/>`;
+function backdrop() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.05)" stroke-width="1.5"/></pattern>
+    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d4a66"/><stop offset="1" stop-color="#143247"/></linearGradient></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+// vehicles drawn around (0,0) = ground point, facing right; dir −1 mirrors
+function veh(kind, x, y, col, dir = 1, op = 1) {
+  let g = '';
+  if (kind === 'car') g = `<path d="M-17 -5v-6q0-3 3-3h6l5-6h11l6 6h3q3 0 3 3v6z" fill="${col}" stroke="${INK}" stroke-width="1.4"/><path d="M-6 -15l4-4h8l4 4z" fill="#cfe6f2" opacity=".75"/><circle cx="-9" cy="-4" r="4" fill="#1b2232" stroke="${INK}" stroke-width="1.4"/><circle cx="10" cy="-4" r="4" fill="#1b2232" stroke="${INK}" stroke-width="1.4"/>`;
+  else if (kind === 'bus') g = `<rect x="-22" y="-22" width="44" height="18" rx="3" fill="${col}" stroke="${INK}" stroke-width="1.4"/>${[-17, -8, 1, 10].map(a => `<rect x="${a}" y="-19" width="7" height="6" rx="1" fill="#cfe6f2" opacity=".75"/>`).join('')}<circle cx="-13" cy="-4" r="4" fill="#1b2232" stroke="${INK}" stroke-width="1.4"/><circle cx="13" cy="-4" r="4" fill="#1b2232" stroke="${INK}" stroke-width="1.4"/>`;
+  else if (kind === 'bike') g = `<circle cx="-8" cy="-6" r="5.5" fill="none" stroke="${col}" stroke-width="2"/><circle cx="8" cy="-6" r="5.5" fill="none" stroke="${col}" stroke-width="2"/><path d="M-8 -6l5-9h8l3 9M-3 -15l-2-3M5 -15l1-3" fill="none" stroke="${col}" stroke-width="1.8"/><path d="M-1 -16l2-9" stroke="${FG}" stroke-width="2.2" stroke-linecap="round"/><circle cx="2" cy="-28" r="3.5" fill="${FG}"/>`;
+  else if (kind === 'walk') g = `<circle cx="0" cy="-27" r="4" fill="${col}"/><path d="M0 -22v10l-5 12M0 -12l5 12M0 -19l-5 6M0 -19l5 5" fill="none" stroke="${col}" stroke-width="2.4" stroke-linecap="round"/>`;
+  else if (kind === 'boat') g = `<path d="M-20 -9h40l-7 9h-27z" fill="${col}" stroke="${INK}" stroke-width="1.4"/><path d="M-9 -9v-8h11l4 8z" fill="#e8ecf4" stroke="${INK}" stroke-width="1.2"/>`;
+  else if (kind === 'raft') g = `${[-10, -3, 4].map(a => `<rect x="${a}" y="-7" width="7" height="7" rx="2" fill="#b48a5a" stroke="${INK}" stroke-width="1.1"/>`).join('')}<path d="M0 -7v-13l8 5-8 3" fill="${RED}" stroke="${INK}" stroke-width=".8"/>`;
+  return `<g transform="translate(${(+x).toFixed(1)} ${(+y).toFixed(1)}) scale(${dir} 1)" opacity="${op}">${g}</g>`;
+}
+function road(x0, x1, y, h = 26) {
+  return R(x0 - 10, y, x1 - x0 + 20, h, '#252e40', 'rx="4"') + L(x0 - 6, y + h / 2, x1 + 6, y + h / 2, '#6b7690', 1.4, 'stroke-dasharray="10 8"');
+}
+function town(x, y, label, col = MUTED) {
+  return `<path d="M${x - 14} ${y}v-16h8v-8h8v12h7v12z" fill="#33405c" stroke="${INK}" stroke-width="1.2"/>` + T(x, y - 30, 12.5, label, col, 'middle', 'font-weight="500"');
+}
+// SVG slider; registry SL is rebuilt on every draw
+let SL = {};
+function slider(key, x0, x1, y, min, max, step, val, label, vtxt, col = ORANGE) {
+  SL[key] = { x0, x1, y, min, max, step };
+  const X = v => x0 + (clamp(v, min, max) - min) / (max - min) * (x1 - x0);
+  let h = T(x0, y - 13, 12.5, label, FG, 'start') + T(x1, y - 13, 13, vtxt, col, 'end', 'font-weight="500"');
+  h += L(x0, y, x1, y, '#33405c', 5, 'stroke-linecap="round"') + L(x0, y, X(val), y, col, 5, 'stroke-linecap="round"');
+  h += `<rect data-sl="${key}" x="${x0 - 14}" y="${y - 20}" width="${x1 - x0 + 28}" height="40" fill="transparent"/>`;
+  h += `<g data-sl="${key}"><circle cx="${X(val).toFixed(1)}" cy="${y}" r="18" fill="transparent"/><circle cx="${X(val).toFixed(1)}" cy="${y}" r="10" fill="#2a3348" stroke="${col}" stroke-width="2.6"/></g>`;
+  return h;
+}
+function chip(x, y, w, label, on, data, state) {
+  const bg = on ? (state === 'bad' ? RED : FG) : '#1a2438', bd = on ? bg : '#33405c';
+  return `<g data-pick="${data}" style="cursor:pointer">${R(x, y - 17, w, 34, bg, `rx="9" stroke="${bd}" stroke-width="1.3"`)}${T(x + w / 2, y + 5, 13.5, label, on ? '#0b1019' : FG, 'middle', 'font-weight="500"')}</g>`;
+}
+
+// ---------- lesson 1 ----------
+const X1 = km => 50 + km * 420 / KM1;
+function svtSVG(m) {
+  let h = T(260, 84, 14, 'Актобе → соседний город', FG, 'middle', 'font-weight="500"') + T(260, 104, 12.5, 'со скоростью 80 км/ч дорога занимает 3 ч', MUTED);
+  h += road(X1(0), X1(KM1), 168);
+  for (let k = 0; k <= KM1; k += 40) h += L(X1(k), 198, X1(k), 205, '#6b7690', 1.2) + T(X1(k), 220, 12, k, k === 0 ? FG : MUTED);
+  h += T(X1(KM1) + 6, 234, 10.5, 'км', MUTED, 'end');
+  h += town(X1(0), 166, 'Актобе', FG) + town(X1(CITY), 166, 'город', ORANGE);
+  // planned stop
+  const sx = X1(Math.min(m.s, KM1));
+  h += L(sx, 150, sx, 200, m.miss === 0 ? GREEN : FG, 1.3, 'stroke-dasharray="4 3"');
+  if (m.s > KM1) h += `<path d="M${X1(KM1) + 14} 175l9 6-9 6" fill="none" stroke="${RED}" stroke-width="2"/>`;
+  // car
+  h += veh('car', X1(Math.min(m.now, KM1)) - 4, 184, BLUE);
+  let res, col = MUTED;
+  if (m.ran) {
+    const d = m.ran.v * m.ran.t - CITY;
+    if (d === 0) { res = `Остановились ровно у города: ${m.ran.v} · ${num(m.ran.t)} = ${CITY} км`; col = GREEN; }
+    else if (d < 0) { res = `Не доехали до города ${num(-d)} км`; col = RED; }
+    else { res = `Проехали город на ${num(d)} км`; col = RED; }
+  } else res = S.anim ? 'едем…' : 'нажмите «Поехали»';
+  h += T(260, 250, 13, res, col, 'middle', 'font-weight="500"');
+  h += slider('v1', 60, 460, 293, 10, 120, 10, m.v, 'скорость v', `${m.v} км/ч`, BLUE);
+  h += slider('t1', 60, 460, 343, 0.5, 8, 0.5, m.t, 'время в пути t', fmtH(m.t), ORANGE);
+  h += T(260, 380, 13.5, `s = v · t = ${m.v} · ${num(m.t)} = ${num(m.s)} км`, FG, 'middle', 'font-weight="500"');
+  h += T(260, 399, 11.5, `выезд ${clock(DEP1)} → прибытие ${clock(m.arr)}`, MUTED);
+  return h;
+}
+
+// ---------- lesson 2 ----------
+function meetX(sc, km) { return 50 + (km - sc.km[0]) / (sc.km[1] - sc.km[0]) * 420; }
+function meetSVG(m) {
+  const sc = m.SC, X = km => meetX(sc, km);
+  let h = T(260, 82, 13.5, sc.title, FG, 'middle', 'font-weight="500"') + T(260, 101, 11.5, sc.sub, MUTED);
+  h += road(X(sc.km[0]), X(sc.km[1]), 140, 50);
+  for (let k = sc.km[0]; k <= sc.km[1] + 1e-9; k += sc.tick) h += L(X(k), 190, X(k), 197, '#6b7690', 1.2) + T(X(k), 211, 12, num(k), MUTED);
+  h += T(X(sc.km[1]) + 6, 224, 10.5, 'км', MUTED, 'end');
+  if (sc.id === 'meet') h += town(X(0), 138, 'село 1', FG) + town(X(24), 138, 'село 2', FG);
+  else h += town(X(0), 138, sc.origin, FG);
+  const xa = X(m.a), xb = X(m.b);
+  // gap bracket
+  if (m.gap > 1e-9) {
+    const l = Math.min(xa, xb), r = Math.max(xa, xb);
+    h += `<path d="M${l.toFixed(1)} 118v-6H${r.toFixed(1)}v6" fill="none" stroke="${FG}" stroke-width="1.2"/>`;
+  }
+  const met = m.hit && sc.id !== 'apart';
+  h += veh(sc.A.kind, xa, 163, sc.A.col, sc.A.dir) + veh(sc.B.kind, xb, 186, sc.B.col, sc.B.dir);
+  // status line
+  const st = met ? (sc.id === 'chase' ? `${sc.B.name} догнал ${sc.A.name}!` : 'встретились!') : `между ними ${num(m.gap)} км`;
+  h += T(260, 246, 14, st, met ? GREEN : m.hit && sc.id === 'apart' ? ORANGE : FG, 'middle', 'font-weight="500"');
+  // closing-speed chips
+  h += T(40, 284, 12.5, `скорость ${sc.what}:`, FG, 'start');
+  sc.chips.forEach((v, i) => { h += chip(200 + i * 98, 280, 88, `${v} км/ч`, m.close === i, 'c-' + i, i === sc.good ? 'good' : 'bad'); });
+  if (m.close !== null && m.close !== sc.good) h += T(260, 312, 11, 'не подходит: подумайте, как меняется расстояние за 1 час', RED);
+  else if (m.close === sc.good) h += T(260, 312, 11, `${sc.chips[sc.good]} км/ч — верно: за час расстояние меняется на столько`, GREEN);
+  const tl = sc.start !== null ? `${clock(sc.start + m.tm)}` : `${m.tm ? fmtH(m.tm / 60) : '0 мин'}`;
+  h += slider('tm', 60, 460, 352, 0, sc.tmMax, sc.step, m.tm, sc.start !== null ? 'часы' : 'прошло времени', tl, ORANGE);
+  h += T(260, 393, 11.5, `${sc.A.name}: ${num(Math.abs(m.a))} км от старта · ${sc.B.name}: ${num(Math.abs(m.b - sc.B.x0))} км`, MUTED);
+  return h;
+}
+
+// ---------- lesson 3 ----------
+const X3 = km => clamp(260 + km * 2.6, 14, 506);
+function riverSVG(m, t) {
+  let h = T(260, 82, 13.5, `по течению: v + u = ${m.v} + ${num(m.u)} = ${num(m.vd)} км/ч`, GREEN, 'middle', 'font-weight="500"');
+  h += T(260, 101, 13.5, `против течения: v − u = ${m.v} − ${num(m.u)} = ${num(m.vu)} км/ч`, ORANGE, 'middle', 'font-weight="500"');
+  h += R(-600, 118, 1720, 14, '#2c3a26') + R(-600, 132, 1720, 118, 'url(#water)') + R(-600, 250, 1720, 14, '#2c3a26');
+  // flowing current marks
+  const sh = reduce ? 0 : ((t || 0) / 1000 * (6 + m.u * 10)) % 52;
+  if (m.u > 0) for (let row = 0; row < 3; row++) for (let k = -14; k < 14; k++) {
+    const x = k * 52 + sh + row * 17, y = 147 + row * 42;
+    h += `<path d="M${x.toFixed(1)} ${y}h${(8 + m.u * 3).toFixed(1)}m-4 -3l4 3-4 3" fill="none" stroke="rgba(160,210,240,.35)" stroke-width="1.4"/>`;
+  }
+  h += T(500, 245, 10.5, `течение u = ${num(m.u)} км/ч →`, '#a8d4ec', 'end');
+  // pier
+  h += R(252, 112, 16, 152, '#6b5a44', `stroke="${INK}" stroke-width="1.2"`) + T(260, 278, 11, 'пристань', MUTED);
+  // boats
+  const xd = X3(m.dn), xu = X3(-m.up), xr = X3(m.raft);
+  h += veh('boat', xd, 168, GREEN, 1) + veh('raft', xr, 206, '#b48a5a', 1) + veh('boat', xu, 242, ORANGE, -1);
+  if (m.t > 0) {
+    h += L(260, 176, X3(m.dn), 176, GREEN, 1.2, 'stroke-dasharray="3 3"') + T(clamp(xd + 26, 40, 500), 165, 12, `${num(m.dn)} км`, GREEN, 'start');
+    h += L(260, 222, X3(-m.up), 222, ORANGE, 1.2, 'stroke-dasharray="3 3"') + T(clamp(xu - 26, 20, 480), 239, 12, `${num(m.up)} км`, ORANGE, 'end');
+    h += T(clamp(xr + 14, 40, 500), 203, 10.5, `плот ${num(m.raft)} км`, '#d9b98d', 'start');
+  }
+  const done = eq(m.dd, 8) && eq(m.t, 1);
+  h += T(260, 297, 13, m.t > 0 ? `за ${fmtH(m.t)}: по течению дальше на ${num(m.dn)} − ${num(m.up)} = ${num(m.dd)} км` : 'поставьте часы, чтобы катера поплыли', done ? GREEN : m.t > 0 ? FG : DIM, 'middle', 'font-weight="500"');
+  h += slider('u', 60, 460, 330, 0, 6, 0.5, m.u, 'скорость течения u', `${num(m.u)} км/ч`, BLUE);
+  h += slider('v3', 60, 460, 365, 10, 24, 1, m.v, 'собственная скорость катера v', `${m.v} км/ч`, GREEN);
+  h += slider('t3', 60, 460, 400, 0, 3, 0.25, m.t, 'часы', m.t ? fmtH(m.t) : '0 мин', ORANGE);
+  return h;
+}
+
+// ---------- lesson 4 ----------
+const X4 = km => 60 + km / D4 * 380;
+function avgSVG(m) {
+  let h = T(260, 82, 13.5, `Костанай → город (${D4} км) и обратно`, FG, 'middle', 'font-weight="500"') + T(260, 101, 12, `туда ${m.v1} км/ч, обратно ${m.v2} км/ч · ровная машина ${m.w} км/ч`, MUTED);
+  h += road(X4(0), X4(D4), 126, 26) + road(X4(0), X4(D4), 176, 26);
+  h += T(X4(0) - 14, 143, 10, 'A', FG, 'end') + T(X4(D4) + 14, 143, 10, 'B', FG, 'start') + T(X4(0) - 14, 193, 10, 'A', FG, 'end') + T(X4(D4) + 14, 193, 10, 'B', FG, 'start');
+  h += T(X4(D4 / 2), 122, 10.5, `машина: туда ${m.v1}, обратно ${m.v2} км/ч`, ORANGE) + T(X4(D4 / 2), 172, 10.5, `ровная: всё время ${m.w} км/ч`, BLUE);
+  h += veh('car', X4(m.real.d), 147, ORANGE, m.real.back ? -1 : 1) + veh('car', X4(m.ghost.d), 197, BLUE, m.ghost.back ? -1 : 1);
+  // time bars
+  const H = Math.max(Math.ceil(Math.max(m.TR, m.TG)) + 1, 6), XT = hh => 60 + hh / H * 400;
+  const by1 = 222, by2 = 254;
+  h += R(XT(0), by1, XT(m.T1) - XT(0), 20, ORANGE, `stroke="${INK}" stroke-width="1.2"`) + R(XT(m.T1), by1, XT(m.TR) - XT(m.T1), 20, '#c98a2a', `stroke="${INK}" stroke-width="1.2"`);
+  if (XT(m.T1) - XT(0) > 40) h += T((XT(0) + XT(m.T1)) / 2, by1 + 14, 10.5, `туда ${fmtH(m.T1)}`, INK, 'middle', 'font-weight="500"');
+  if (XT(m.TR) - XT(m.T1) > 40) h += T((XT(m.T1) + XT(m.TR)) / 2, by1 + 14, 10.5, `обратно ${fmtH(m.T2)}`, INK, 'middle', 'font-weight="500"');
+  h += R(XT(0), by2, XT(m.TG) - XT(0), 20, BLUE, `stroke="${INK}" stroke-width="1.2"`) + T((XT(0) + XT(m.TG)) / 2, by2 + 14, 10.5, `${2 * D4} : ${m.w} = ${fmtH(m.TG)}`, INK, 'middle', 'font-weight="500"');
+  for (let k = 0; k <= H; k++) h += L(XT(k), by2 + 24, XT(k), by2 + 29, '#6b7690', 1) + T(XT(k), by2 + 41, 10, k, MUTED);
+  h += T(XT(H) + 8, by2 + 41, 10, 'ч', MUTED, 'start');
+  h += L(XT(m.tau), by1 - 6, XT(m.tau), by2 + 26, FG, 1.4);
+  let res = 'нажмите «Поехали»', col = MUTED;
+  if (S.anim) res = 'едут…';
+  else if (m.ran) {
+    if (eq(m.TG, m.TR)) { res = `вернулись одновременно: через ${fmtH(m.TR)}`; col = GREEN; }
+    else if (m.TG < m.TR) { res = `ровная вернулась раньше на ${fmtH(m.TR - m.TG)}`; col = RED; }
+    else { res = `ровная опоздала на ${fmtH(m.TG - m.TR)}`; col = RED; }
+  }
+  h += T(260, 322, 13, res, col, 'middle', 'font-weight="500"');
+  h += slider('w', 60, 460, 362, 30, 70, 1, m.w, 'скорость ровной машины', `${m.w} км/ч`, BLUE);
+  h += T(260, 397, 11.5, `путь ${2 * D4} км · время машины ${num(m.TR)} ч · ровной ${num(m.TG)} ч`, MUTED);
+  return h;
+}
+
+function hlBox(id) {
+  return {
+    road1: [36, 140, 450, 100], city: [X1(CITY) - 28, 118, 56, 54], car1: [30, 150, 470, 46], sv: [44, 270, 432, 40], st: [44, 320, 432, 40], formula: [80, 362, 360, 44],
+    road2: [36, 130, 450, 100], veh2: [30, 128, 470, 66], gap2: [60, 228, 400, 28], chips2: [30, 258, 470, 62], clock2: [44, 330, 432, 40],
+    speeds3: [70, 66, 380, 42], river3: [10, 128, 500, 126], pier3: [244, 106, 32, 164], raft3: [200, 188, 140, 26], sl3: [44, 312, 432, 96],
+    roads4: [36, 110, 450, 98], bars4: [50, 214, 430, 76], res4: [80, 304, 360, 28], w4: [44, 340, 432, 40],
+  }[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  SL = {};
+  let h = backdrop();
+  if (id === 'svt') h += svtSVG(m);
+  else if (id === 'meet') h += meetSVG(m);
+  else if (id === 'river') h += riverSVG(m, t);
+  else h += avgSVG(m);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b && b[2] > 0) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 410, 1.45);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 410 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- actions ----------
+const stopAnim = () => { S.anim = null; };
+const SET = {
+  v1: v => { if (v !== S.v1) { S.v1 = v; S.p1 = 0; S.ran1 = null; stopAnim(); } },
+  t1: v => { if (!eq(v, S.t1)) { S.t1 = v; S.p1 = 0; S.ran1 = null; stopAnim(); } },
+  tm: v => { if (v !== S.tm) { S.tm = v; stopAnim(); } },
+  u: v => { if (!eq(v, S.u)) { S.u = v; stopAnim(); } },
+  v3: v => { if (v !== S.v3) { S.v3 = v; stopAnim(); } },
+  t3: v => { if (!eq(v, S.t3)) { S.t3 = v; stopAnim(); } },
+  w: v => { if (v !== S.w) { S.w = v; S.tau = 0; S.ran4 = null; stopAnim(); } },
+  a1: v => { if (v !== S.a1) { S.a1 = v; S.tau = 0; S.ran4 = null; stopAnim(); } },
+  a2: v => { if (v !== S.a2) { S.a2 = v; S.tau = 0; S.ran4 = null; stopAnim(); } },
+};
+const LIM = { v1: [10, 120, 10], t1: [0.5, 8, 0.5], u: [0, 6, 0.5], v3: [10, 24, 1], t3: [0, 3, 0.25], w: [30, 70, 1], a1: [20, 90, 10], a2: [20, 90, 10] };
+function setVal(k, v) {
+  let lim = LIM[k];
+  if (k === 'tm') { const sc = SCN[S.sc]; lim = [0, sc.tmMax, sc.step]; }
+  const [a, b, st] = lim;
+  v = clamp(Math.round((v - a) / st) * st + a, a, b); v = Math.round(v * 1000) / 1000;
+  SET[k](v); update();
+}
+function bump(k, d) { const cur = { v1: S.v1, t1: S.t1, tm: S.tm, u: S.u, v3: S.v3, t3: S.t3, w: S.w }[k]; const st = k === 'tm' ? SCN[S.sc].step : LIM[k][2]; setVal(k, cur + d * st); }
+function play() {
+  const id = LID(), now = performance.now();
+  if (id === 'svt') { S.ran1 = null; S.p1 = 0; S.anim = { key: 'p1', from: 0, to: 1, t0: now, dur: reduce ? 1 : 900 + S.t1 * 260, done: () => { S.ran1 = { v: S.v1, t: S.t1 }; } }; }
+  else if (id === 'meet') { const sc = SCN[S.sc], from = S.tm >= sc.tmMax ? 0 : S.tm; S.anim = { key: 'tm', from, to: sc.tmMax, t0: now, dur: reduce ? 1 : (sc.tmMax - from) / sc.tmMax * 3200, done: () => {} }; }
+  else if (id === 'river') { S.anim = { key: 't3', from: 0, to: 1, t0: now, dur: reduce ? 1 : 1800, done: () => {} }; }
+  else { const m = model(), to = Math.max(m.TR, m.TG); S.ran4 = null; S.anim = { key: 'tau', from: 0, to, t0: now, dur: reduce ? 1 : 900 + to * 420, done: () => { S.ran4 = { w: S.w, v1: S.a1, v2: S.a2 }; } }; }
+  update();
+}
+function stepAnim(now) {
+  const a = S.anim; if (!a) return false;
+  const k = clamp((now - a.t0) / a.dur, 0, 1), e = reduce ? 1 : k;
+  S[a.key] = a.from + (a.to - a.from) * e;
+  if (a.key === 'tm') S.tm = Math.round(S.tm); // keep whole minutes
+  if (k >= 1) { S[a.key] = a.to; S.anim = null; a.done(); update(); }
+  else light();
+  return true;
+}
+function pick(p) {
+  if (p.startsWith('c-')) {
+    const i = +p.slice(2), sc = SCN[S.sc]; S.close = i;
+    if (i !== sc.good) toast(sc.why[i]);
+    update();
+  }
+}
+function setScn(i) { if (i === S.sc) return; S.sc = i; S.close = null; S.tm = 0; stopAnim(); renderTools(); buildScheme(); update(); }
+let trainMsg = '';
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const p = scene.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; const c = scene.getScreenCTM(); return c ? p.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+function slAt(key, x) { const s = SL[key]; if (!s) return; setVal(key, s.min + (x - s.x0) / (s.x1 - s.x0) * (s.max - s.min)); }
+scene.addEventListener('pointerdown', e => {
+  const p = toSvg(e);
+  const pk = e.target.closest('[data-pick]'); if (pk) { e.preventDefault(); pick(pk.dataset.pick); return; }
+  let key = null; const el = e.target.closest('[data-sl]');
+  if (el) key = el.dataset.sl;
+  else for (const k in SL) { const s = SL[k]; if (Math.abs(p.y - s.y) < 22 && p.x > s.x0 - 18 && p.x < s.x1 + 18) { key = k; break; } }
+  if (!key) return;
+  e.preventDefault(); try { scene.setPointerCapture(e.pointerId); } catch (er) {} scene.classList.add('grabbing');
+  drag = { key }; slAt(key, p.x);
+});
+scene.addEventListener('pointermove', e => { if (!drag) return; slAt(drag.key, toSvg(e).x); });
+const endDrag = () => { if (!drag) return; drag = null; scene.classList.remove('grabbing'); dirty = true; };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  const an = stepAnim(t);
+  if (dirty || S.hl || an || (LID() === 'river' && !reduce && S.u > 0)) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3200); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pr) => `<button data-a="${k}"${pr === undefined ? '' : ` aria-pressed="${pr}"`}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    svt: B('v1-', 'v −10') + B('v1+', 'v +10') + B('t1-', 't −½ ч') + B('t1+', 't +½ ч') + sep + B('play', '▶ Поехали'),
+    meet: SCN.map((s, i) => B('sc' + i, s.name, S.sc === i)).join('') + sep + B('tm-', '−') + B('tm+', '+') + B('play', '▶'),
+    river: B('u-', 'течение −') + B('u+', 'течение +') + sep + B('play', '▶ 1 час') + B('reset3', 'Сброс'),
+    avg: B('w-', 'v −1') + B('w+', 'v +1') + sep + B('play', '▶ Поехали') + B('reset4', 'Сброс'),
+  }[id];
+}
+function act(a) {
+  if (a === 'play') return play();
+  if (/^sc\d$/.test(a)) return setScn(+a.slice(2));
+  const mm = a.match(/^(v1|t1|tm|u|w)([+-])$/); if (mm) return bump(mm[1], mm[2] === '+' ? 1 : -1);
+  if (a === 'reset3') { stopAnim(); S.u = 1; S.v3 = 18; S.t3 = 0; update(); return; }
+  if (a === 'reset4') { stopAnim(); S.w = 50; S.a1 = 60; S.a2 = 40; S.tau = 0; S.ran4 = null; buildScheme(); update(); }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  road: IC('<rect x="2" y="13" width="30" height="10" rx="2" fill="#252e40"/><path d="M4 18h26" stroke="#6b7690" stroke-dasharray="4 3"/>'),
+  city: IC('<path d="M9 28v-12h6v-6h6v9h5v9z" fill="#33405c" stroke="var(--fg)" stroke-width="1"/>'),
+  car: IC('<path d="M5 22v-4q0-2 2-2h4l3-4h7l4 4h2q2 0 2 2v4z" fill="#5fb4d9"/><circle cx="11" cy="23" r="3" fill="#1b2232" stroke="var(--fg)"/><circle cx="24" cy="23" r="3" fill="#1b2232" stroke="var(--fg)"/>'),
+  sv: IC('<path d="M4 17h26" stroke="var(--muted)" stroke-width="3" stroke-linecap="round"/><path d="M4 17h14" stroke="#5fb4d9" stroke-width="3" stroke-linecap="round"/><circle cx="18" cy="17" r="4" fill="#2a3348" stroke="#5fb4d9" stroke-width="1.6"/>'),
+  st: IC('<circle cx="17" cy="17" r="11" fill="none" stroke="#ffb547" stroke-width="1.6"/><path d="M17 10v7l5 3" stroke="var(--fg)" stroke-width="1.6" fill="none"/>'),
+  formula: IC('<text x="17" y="21" font-size="9" fill="var(--fg)" text-anchor="middle" font-family="monospace">s=vt</text>'),
+  gap: IC('<path d="M6 14v-4h22v4" fill="none" stroke="var(--fg)" stroke-width="1.3"/><circle cx="6" cy="22" r="3" fill="#ffb547"/><circle cx="28" cy="22" r="3" fill="#5fb4d9"/>'),
+  chips: IC('<rect x="2" y="11" width="13" height="11" rx="3" fill="var(--fg)"/><rect x="18" y="11" width="13" height="11" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.2"/>'),
+  river: IC('<rect x="2" y="9" width="30" height="16" fill="#1d4a66"/><path d="M6 14h8m-3-2l3 2-3 2M18 20h8m-3-2l3 2-3 2" fill="none" stroke="#a8d4ec" stroke-width="1.2"/>'),
+  boat: IC('<path d="M4 20h26l-5 6H9z" fill="#86e0a8"/><path d="M12 20v-7h8l3 7z" fill="var(--fg)"/>'),
+  raft: IC('<rect x="6" y="18" width="7" height="7" rx="2" fill="#b48a5a"/><rect x="13" y="18" width="7" height="7" rx="2" fill="#b48a5a"/><rect x="20" y="18" width="7" height="7" rx="2" fill="#b48a5a"/><path d="M16 18V7l7 4-7 3" fill="#ff8a73"/>'),
+  pier: IC('<rect x="14" y="4" width="6" height="26" fill="#6b5a44"/><rect x="2" y="12" width="30" height="10" fill="#1d4a66" opacity=".6"/>'),
+  bars: IC('<rect x="3" y="9" width="11" height="7" fill="#ffb547"/><rect x="14" y="9" width="16" height="7" fill="#c98a2a"/><rect x="3" y="20" width="24" height="7" fill="#5fb4d9"/>'),
+  sum: IC('<text x="17" y="21" font-size="10" fill="var(--ok)" text-anchor="middle" font-family="monospace">=✓</text>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const Ls = LESSONS[S.lesson];
+  if (S.done[Ls.id]) return '✓ Выполнено';
+  if (Ls.id === 'svt') return `v = ${m.v} км/ч · t = ${fmtH(m.t)} · s = ${num(m.s)} км`;
+  if (Ls.id === 'meet') return S.sc !== 0 ? `Тренировка «${m.SC.name}» · задание — «Вдогонку»` : `Сближение: ${m.close === null ? 'не выбрано' : m.SC.chips[m.close] + ' км/ч'} · часы ${clock(m.SC.start + m.tm)} · между ними ${num(m.gap)} км`;
+  if (Ls.id === 'river') return `u = ${num(m.u)} км/ч · v = ${m.v} км/ч · разница за ${fmtH(m.t) || '0'}: ${num(m.dd)} км`;
+  return `ровная ${m.w} км/ч · время ${num(m.TG)} ч против ${num(m.TR)} ч`;
+}
+
+// ---------- Scheme tab ----------
+function rng(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+const reads = (a, b, c) => `<dl class="reads"><div><dt>${a}</dt><dd id="r1"></dd></div><div><dt>${b}</dt><dd id="r2"></dd></div><div><dt>${c}</dt><dd id="r3"></dd></div></dl>`;
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'svt') h = `<h2>Поездка</h2>` + reads('Путь s', 'Скорость v', 'Время t') + rng('inV1', 'Скорость v, км/ч', 10, 120, 10, S.v1) + rng('inT1', 'Время в пути t', 0.5, 8, 0.5, S.t1) +
+    `<div class="row"><button class="ghostbtn" data-a="play">▶ Поехали</button></div><p class="note" style="margin-top:10px">До города 240 км — но на схеме это не подписано: найдите путь сами по условию «80 км/ч, 3 ч».</p><div id="sDiag"></div>`;
+  if (id === 'meet') h = `<h2>Двое на дороге</h2><div class="chips" id="scChips">${SCN.map((s, i) => `<button data-s="${i}" aria-pressed="${S.sc === i}">${s.name}</button>`).join('')}</div>
+    <p class="note" style="margin-top:8px">${SCN[S.sc].title}: ${SCN[S.sc].sub}.${S.sc ? ' Это тренировка, задание — «Вдогонку».' : ''}</p>
+    <h3>Скорость ${SCN[S.sc].what}</h3><div class="chips" id="clChips">${SCN[S.sc].chips.map((v, i) => `<button data-c="${i}" aria-pressed="${S.close === i}">${v} км/ч</button>`).join('')}</div>` +
+    reads('Между ними', 'Время', 'Сближение') + rng('inTm', SCN[S.sc].start !== null ? 'Часы' : 'Прошло времени', 0, SCN[S.sc].tmMax, SCN[S.sc].step, S.tm) +
+    `<div class="row"><button class="ghostbtn" data-a="tm-">−${SCN[S.sc].step} мин</button><button class="ghostbtn" data-a="tm+">+${SCN[S.sc].step} мин</button><button class="ghostbtn" data-a="play">▶ Пустить время</button></div><div id="sDiag"></div>`;
+  if (id === 'river') h = `<h2>Река и катера</h2>` + reads('По течению', 'Против', 'Разница путей') + rng('inU', 'Скорость течения u, км/ч', 0, 6, 0.5, S.u) + rng('inV3', 'Собственная скорость v, км/ч', 10, 24, 1, S.v3) + rng('inT3', 'Часы', 0, 3, 0.25, S.t3) +
+    `<div class="row"><button class="ghostbtn" data-a="play">▶ 1 час</button><button class="ghostbtn" data-a="reset3">Сброс</button></div><p class="note" style="margin-top:10px">Зелёный катер плывёт по течению, оранжевый — против. Плот без мотора показывает, сколько проплыла бы сама вода.</p><div id="sDiag"></div>`;
+  if (id === 'avg') h = `<h2>Туда и обратно</h2>` + reads('Машина', 'Ровная', 'Путь') + rng('inW', 'Скорость ровной машины, км/ч', 30, 70, 1, S.w) +
+    `<h3>Для тренировки</h3>` + rng('inA1', 'Машина туда, км/ч', 20, 90, 10, S.a1) + rng('inA2', 'Машина обратно, км/ч', 20, 90, 10, S.a2) +
+    `<div class="row"><button class="ghostbtn" data-a="play">▶ Поехали</button><button class="ghostbtn" data-a="reset4">Сброс</button></div><p class="note" style="margin-top:10px">Задание — при 60 и 40 км/ч. Другие скорости — чтобы проверить себя: попробуйте 30 и 90.</p><div id="sDiag"></div>`;
+  el.innerHTML = h;
+  const on = (sel, k) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', e => setVal(k, +e.target.value)); };
+  on('#inV1', 'v1'); on('#inT1', 't1'); on('#inTm', 'tm'); on('#inU', 'u'); on('#inV3', 'v3'); on('#inT3', 't3'); on('#inW', 'w'); on('#inA1', 'a1'); on('#inA2', 'a2');
+  el.querySelectorAll('#scChips button').forEach(b => b.onclick = () => setScn(+b.dataset.s));
+  el.querySelectorAll('#clChips button').forEach(b => b.onclick = () => { pick('c-' + b.dataset.c); buildScheme(); updateScheme(model()); });
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (!el.querySelector('#sDiag')) return;
+  if (m.kind === 'svt') { set('#r1', num(m.s) + ' км'); set('#r2', m.v + ' км/ч'); set('#r3', fmtH(m.t)); set('#inV1O', m.v + ' км/ч'); set('#inT1O', fmtH(m.t)); val('#inV1', m.v); val('#inT1', m.t); }
+  else if (m.kind === 'meet') { set('#r1', num(m.gap) + ' км'); set('#r2', m.SC.start !== null ? clock(m.SC.start + m.tm) : fmtH(m.tm / 60)); set('#r3', m.close === null ? '—' : m.SC.chips[m.close] + ' км/ч'); set('#inTmO', m.SC.start !== null ? clock(m.SC.start + m.tm) : fmtH(m.tm / 60)); val('#inTm', m.tm); }
+  else if (m.kind === 'river') { set('#r1', num(m.vd) + ' км/ч'); set('#r2', num(m.vu) + ' км/ч'); set('#r3', num(m.dd) + ' км'); set('#inUO', num(m.u) + ' км/ч'); set('#inV3O', m.v + ' км/ч'); set('#inT3O', fmtH(m.t)); val('#inU', m.u); val('#inV3', m.v); val('#inT3', m.t); }
+  else { set('#r1', num(m.TR) + ' ч'); set('#r2', num(m.TG) + ' ч'); set('#r3', 2 * D4 + ' км'); set('#inWO', m.w + ' км/ч'); set('#inA1O', m.v1 + ' км/ч'); set('#inA2O', m.v2 + ' км/ч'); val('#inW', m.w); val('#inA1', m.v1); val('#inA2', m.v2); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'svt') return [
+    { id: 'road1', icon: ICON.road, name: 'Дорога со шкалой', spec: 'Деления через 40 км. Начало — Актобе, 0 км.' },
+    { id: 'city', icon: ICON.city, name: 'Соседний город', spec: 'Цель поездки. Сколько до него километров — найдите по условию.' },
+    { id: 'car1', icon: ICON.car, name: 'Машина и место остановки', spec: 'Пунктир показывает, где машина остановится: через v · t км от старта.' },
+    { id: 'sv', icon: ICON.sv, name: 'Скорость v', spec: 'От 10 до 120 км/ч с шагом 10.' },
+    { id: 'st', icon: ICON.st, name: 'Время t', spec: 'От получаса до 8 ч с шагом полчаса.' },
+    { id: 'formula', icon: ICON.formula, name: 'Формула и часы', spec: 's = v · t и время прибытия при выезде в 8:00.' }];
+  if (id === 'meet') return [
+    { id: 'road2', icon: ICON.road, name: 'Дорога', spec: 'Шкала в километрах от места старта.' },
+    { id: 'veh2', icon: ICON.car, name: 'Двое участников', spec: 'Положение каждого = старт ± скорость · время в пути.' },
+    { id: 'gap2', icon: ICON.gap, name: 'Расстояние между ними', spec: 'Скобка над дорогой и число под ней.' },
+    { id: 'chips2', icon: ICON.chips, name: 'Скорость сближения', spec: 'На сколько километров в час меняется расстояние между ними.' },
+    { id: 'clock2', icon: ICON.st, name: 'Часы', spec: 'Тяните, чтобы двигать время вперёд и назад.' }];
+  if (id === 'river') return [
+    { id: 'speeds3', icon: ICON.formula, name: 'Скорости', spec: 'По течению v + u, против течения v − u.' },
+    { id: 'river3', icon: ICON.river, name: 'Река', spec: 'Течёт слева направо со скоростью u. Стрелки — течение.' },
+    { id: 'pier3', icon: ICON.pier, name: 'Пристань', spec: 'Оба катера и плот отплывают от неё одновременно.' },
+    { id: 'raft3', icon: ICON.raft, name: 'Плот', spec: 'Без мотора: плывёт со скоростью течения.' },
+    { id: 'sl3', icon: ICON.sv, name: 'Ползунки', spec: 'Течение, собственная скорость катера и часы.' }];
+  return [
+    { id: 'roads4', icon: ICON.car, name: 'Две машины', spec: 'Оранжевая: туда 60, обратно 40 км/ч. Синяя «ровная»: всё время одна скорость.' },
+    { id: 'bars4', icon: ICON.bars, name: 'Полосы времени', spec: 'Сколько часов в пути каждая. Белая черта — текущий момент.' },
+    { id: 'res4', icon: ICON.sum, name: 'Итог', spec: 'Кто вернулся раньше и на сколько.' },
+    { id: 'w4', icon: ICON.sv, name: 'Скорость ровной машины', spec: 'От 30 до 70 км/ч с шагом 1.' }];
+}
+
+function renderPanes(m) {
+  const Ls = LESSONS[S.lesson], done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Модель</h2><p class="note">Из чего состоит рабочее поле. Нажмите на пункт, чтобы найти его.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') {
+    const el = $('#pane-calc');
+    if (el.dataset.l !== Ls.id || !el.querySelector('#calcLive')) buildCalc();
+    el.querySelector('#calcLive').innerHTML = calcLive(m);
+  }
+}
+
+// ---------- «Расчёты»: live computation + ЕНТ-style problems ----------
+function calcLive(m) {
+  const id = LID();
+  if (id === 'svt') return `<h2>Путь, скорость, время</h2><div class="formula">s = v · t</div><div class="steps">` +
+    step('путь до города', '80 · 3 = ? км') + step('сейчас: путь', `${m.v} · ${num(m.t)} = ${num(m.s)} км`) + step('скорость v = s : t', `${num(m.s)} : ${num(m.t)} = ${m.v} км/ч`) +
+    step('время t = s : v', `${num(m.s)} : ${m.v} = ${num(m.t)} ч`) + step('прибытие', `${clock(DEP1)} + ${fmtH(m.t)} = ${clock(m.arr)}`, 'sum') + `</div>`;
+  if (id === 'meet') {
+    const sc = m.SC; let h = `<h2>${sc.name}</h2><div class="formula">${sc.id === 'chase' ? 't = d : (v₂ − v₁)' : sc.id === 'meet' ? 't = s : (v₁ + v₂)' : 's = (v₁ + v₂) · t'}</div><div class="steps">`;
+    if (sc.id === 'chase') h += step('отрыв к 9:00, d', '60 · 1 = ? км') + step('скорость сближения', m.closeOk ? '90 − 60 = 30 км/ч' : 'выберите на схеме') + step('погоня', m.closeOk ? 'd : 30 = ? ч' : '—') + step('сейчас', `${clock(sc.start + m.tm)}, между ними ${num(m.gap)} км`, 'sum');
+    else if (sc.id === 'meet') h += step('расстояние', '24 км') + step('скорость сближения', m.closeOk ? '15 + 5 = 20 км/ч' : 'выберите на схеме') + step('сейчас', `через ${fmtH(m.tm / 60) || '0 мин'} между ними ${num(m.gap)} км`, 'sum');
+    else h += step('скорость удаления', m.closeOk ? '12 + 16 = 28 км/ч' : 'выберите на схеме') + step('сейчас', `через ${fmtH(m.tm / 60) || '0 мин'} между ними ${num(m.gap)} км`, 'sum');
+    return h + `</div>`;
+  }
+  if (id === 'river') return `<h2>Скорости на реке</h2><div class="formula">vпо = v + u · vпр = v − u</div><div class="steps">` +
+    step('по течению', `${m.v} + ${num(m.u)} = ${num(m.vd)} км/ч`) + step('против течения', `${m.v} − ${num(m.u)} = ${num(m.vu)} км/ч`) + step('разность', `${num(m.vd)} − ${num(m.vu)} = ${num(m.vd - m.vu)} = 2 · ${num(m.u)}`) +
+    step('собственная', `(${num(m.vd)} + ${num(m.vu)}) : 2 = ${m.v} км/ч`) + step(`пути за ${fmtH(m.t) || '0 ч'}`, `${num(m.dn)} и ${num(m.up)} км`, 'sum') + `</div>`;
+  return `<h2>Средняя скорость</h2><div class="formula">vср = весь путь : всё время</div><div class="steps">` +
+    step('туда', `${D4} : ${m.v1} = ${num(m.T1)} ч`) + step('обратно', `${D4} : ${m.v2} = ${num(m.T2)} ч`) + step('всё время', `${num(m.T1)} + ${num(m.T2)} = ${num(m.TR)} ч`) +
+    step('весь путь', `${D4} · 2 = ${2 * D4} км`) + step('среднее арифметическое', `(${m.v1} + ${m.v2}) : 2 = ${num((m.v1 + m.v2) / 2)} — не то!`) +
+    step('ровная машина', `${2 * D4} : ${m.w} = ${num(m.TG)} ч`, 'sum') + `</div>`;
+}
+const parseAns = s => { const t = String(s).trim().replace(/\s+/g, '').replace(',', '.').replace(/[^\d.\-−:]/g, '').replace('−', '-'); return t; };
+function buildCalc() {
+  const id = LID(), el = $('#pane-calc'), list = PROBS[id];
+  el.dataset.l = id;
+  el.innerHTML = `<div id="calcLive"></div><h3>Задачи как на ЕНТ</h3><div class="probs">` + list.map((p, i) => {
+    const ok = !!S.cs[id + i];
+    return `<div class="prob${ok ? ' ok' : ''}" data-i="${i}"><div class="lv">Задача ${i + 1}${ok ? ' · решена ✓' : ''}</div><p>${p.q}</p>
+      <div class="ansrow"><input type="text" inputmode="${p.clock ? 'text' : 'decimal'}" autocomplete="off" aria-label="Ответ к задаче ${i + 1}" placeholder="${p.clock ? 'чч:мм' : 'ответ'}"><span class="u">${p.u}</span><button class="ghostbtn" type="button">Проверить</button></div>
+      <div class="fb ${ok ? 'good' : ''}">${ok ? 'Верно. ' + p.fact : ''}</div></div>`;
+  }).join('') + `</div><p class="note" style="margin-top:10px">Дробный ответ пишите через запятую, например 9,5.</p>`;
+  el.querySelectorAll('.prob').forEach(box => {
+    const i = +box.dataset.i, p = list[i], inp = box.querySelector('input'), fb = box.querySelector('.fb');
+    const check = () => {
+      const s = parseAns(inp.value);
+      if (!s) { fb.className = 'fb bad'; fb.textContent = 'Введите ответ.'; return; }
+      let ok = false;
+      if (p.clock !== undefined) { const mm = s.replace('.', ':').match(/^(\d{1,2}):(\d{2})$/); ok = !!mm && (+mm[1] * 60 + +mm[2]) % 1440 === p.clock; if (!mm) { fb.className = 'fb bad'; fb.textContent = 'Запишите время как чч:мм, например 14:05.'; return; } }
+      else { const v = parseFloat(s); if (!isFinite(v)) { fb.className = 'fb bad'; fb.textContent = 'Нужно число.'; return; } ok = Math.abs(v - p.ans) < 1e-6; }
+      if (ok) { S.cs[id + i] = true; save(); box.classList.add('ok'); box.querySelector('.lv').textContent = `Задача ${i + 1} · решена ✓`; fb.className = 'fb good'; fb.textContent = 'Верно. ' + p.fact; }
+      else { fb.className = 'fb bad'; fb.textContent = 'Пока не так. ' + p.hint; }
+    };
+    box.querySelector('button').onclick = check;
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') check(); });
+  });
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter'), ok = !!S.done[id];
+  if (id === 'svt') el.innerHTML = `<div class="k">Путь s = v·t</div><div class="v ${ok ? 'ok' : ''}">${num(m.s)} км</div><div class="lr"><span>v</span><span>${m.v} км/ч</span></div><div class="lr"><span>t</span><span>${num(m.t)} ч</span></div><div class="gauge"><b style="width:${clamp(m.now / KM1 * 100, 0, 100).toFixed(1)}%"></b><i style="left:${(CITY / KM1 * 100).toFixed(1)}%"></i></div>`;
+  else if (id === 'meet') el.innerHTML = `<div class="k">Между ними</div><div class="v ${ok ? 'ok' : ''}">${num(m.gap)} км</div><div class="lr"><span>${m.SC.start !== null ? 'часы' : 'время'}</span><span>${m.SC.start !== null ? clock(m.SC.start + m.tm) : (fmtH(m.tm / 60) || '0')}</span></div><div class="lr"><span>${m.SC.what === 'сближения' ? 'сближ.' : 'удал.'}</span><span>${m.close === null ? '—' : m.SC.chips[m.close]}</span></div>`;
+  else if (id === 'river') el.innerHTML = `<div class="k">Разница путей</div><div class="v ${ok ? 'ok' : ''}">${num(m.dd)} км</div><div class="lr"><span>по теч.</span><span>${num(m.vd)}</span></div><div class="lr"><span>против</span><span>${num(m.vu)}</span></div>`;
+  else el.innerHTML = `<div class="k">Время в пути</div><div class="v ${ok ? 'ok' : ''}">${num(m.TR)} ч</div><div class="lr"><span>ровная</span><span>${num(m.TG)} ч</span></div><div class="lr"><span>v ровной</span><span>${m.w}</span></div>`;
+}
+
+// light refresh during animation (no pane rebuild)
+function light() { const m = model(); renderMeter(m); $('#taskState').textContent = taskState(m); dirty = true; }
+function update() {
+  const m = model(), Ls = LESSONS[S.lesson];
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Задачи на движение вам по плечу!'), 900);
+  }
+  // training scenarios of lesson 2: praise without marking the task
+  if (Ls.id === 'meet' && S.sc !== 0 && m.closeOk && m.tm === m.SC.ans) {
+    const k = 'tr' + S.sc; if (trainMsg !== k) { trainMsg = k; toast(S.sc === 1 ? 'Верно: встретились через 1 ч 12 мин. Это тренировка — задание во «Вдогонку».' : 'Верно: через 2 ч 30 мин между ними 70 км. Это тренировка — задание во «Вдогонку».'); }
+  } else if (Ls.id === 'meet') trainMsg = '';
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  svt: '<rect x="2" y="17" width="62" height="8" fill="#252e40"/><path d="M4 21h58" stroke="#6b7690" stroke-dasharray="4 3"/><path d="M8 17v-4q0-2 2-2h3l2-3h6l3 3h2q1 0 1 2v4z" fill="#5fb4d9"/><path d="M50 17v-9h5v-4h5v13z" fill="#33405c"/>',
+  meet: '<rect x="2" y="17" width="62" height="8" fill="#252e40"/><rect x="10" y="9" width="16" height="8" rx="2" fill="#ffb547"/><path d="M36 17v-4q0-2 2-2h3l2-3h6l3 3h2q1 0 1 2v4z" fill="#5fb4d9"/><path d="M26 5h10" stroke="#e8ecf4" stroke-width="1"/>',
+  river: '<rect x="0" y="6" width="66" height="20" fill="#1d4a66"/><path d="M6 10h10m-3-2l3 2-3 2M40 22h10m-3-2l3 2-3 2" fill="none" stroke="#a8d4ec"/><path d="M22 18h20l-4 5H26z" fill="#86e0a8"/>',
+  avg: '<rect x="4" y="5" width="22" height="7" fill="#ffb547"/><rect x="26" y="5" width="33" height="7" fill="#c98a2a"/><rect x="4" y="17" width="53" height="7" fill="#5fb4d9"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Ls, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Ls.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Ls.title}</span></span>
+      ${S.done[Ls.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null; S.anim = null;
+  S.v1 = 80; S.t1 = 3; S.p1 = 0; S.ran1 = null;
+  S.sc = 0; S.close = null; S.tm = 0; trainMsg = '';
+  S.u = 1; S.v3 = 18; S.t3 = 0;
+  S.w = 50; S.a1 = 60; S.a2 = 40; S.tau = 0; S.ran4 = null;
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = LESSONS[S.lesson], id = Ls.id;
+  let scheme = '', now = '';
+  if (id === 'svt') {
+    scheme = 'Дорога со шкалой от 0 до 320 км (деления через 40 км), слева Актобе, на 240 км — соседний город (число 240 на схеме не подписано, ученик должен найти его сам: 80 км/ч · 3 ч). Синяя машина, пунктиром — место, где она остановится (v · t км от старта). Ползунки: скорость v от 10 до 120 км/ч (шаг 10) и время в пути t от 0,5 до 8 ч (шаг 0,5). Кнопка «Поехали» запускает машину; после поездки видно, доехала ли она ровно до города, не доехала или проехала. Внизу формула s = v · t и время прибытия при выезде в 8:00.';
+    now = `v = ${m.v} км/ч, t = ${num(m.t)} ч, s = ${num(m.s)} км; ${m.ran ? `последняя поездка: ${m.ran.v} км/ч, ${num(m.ran.t)} ч — ${m.ran.v * m.ran.t === CITY ? 'ровно до города' : m.ran.v * m.ran.t < CITY ? 'не доехала' : 'проехала город'}` : 'машина ещё не ездила с этими значениями'}.`;
+  } else if (id === 'meet') {
+    scheme = 'Дорога со шкалой в километрах и два участника движения. Три сценария (кнопки): «Вдогонку» — задание: автобус из Астаны в 8:00, 60 км/ч, автомобиль следом в 9:00, 90 км/ч (до 9:00 автомобиль стоит в Астане); «Навстречу» — тренировка: велосипедист 15 км/ч и пешеход 5 км/ч из сёл в 24 км друг от друга; «В разные стороны» — тренировка: два велосипедиста 12 и 16 км/ч из одного пункта. Над дорогой скобка и число «между ними N км». Три кнопки-варианта «скорость сближения/удаления» (для вдогонку: 150, 30, 90 км/ч). Ползунок «часы» двигает время (для вдогонку от 8:00 до 13:00 с шагом 10 мин).';
+    now = `сценарий «${m.SC.name}»; выбранная скорость ${m.SC.what}: ${m.close === null ? 'не выбрана' : m.SC.chips[m.close] + ' км/ч (' + (m.closeOk ? 'верно' : 'неверно') + ')'}; время: ${m.SC.start !== null ? clock(m.SC.start + m.tm) : fmtH(m.tm / 60) || '0 мин'}; ${m.SC.A.name} в ${num(Math.abs(m.a))} км от старта, ${m.SC.B.name} — ${num(Math.abs(m.b - m.SC.B.x0))} км от своего старта, между ними ${num(m.gap)} км.`;
+  } else if (id === 'river') {
+    scheme = 'Река течёт слева направо (стрелки течения), посередине пристань. От неё одновременно отплывают зелёный катер по течению (вправо), оранжевый катер против течения (влево) и плот без мотора (плывёт со скоростью течения). Сверху записаны скорости: по течению v + u и против течения v − u. Ползунки: скорость течения u от 0 до 6 км/ч (шаг 0,5), собственная скорость катера v от 10 до 24 км/ч и часы от 0 до 3 ч (шаг 15 мин); кнопка «1 час» пускает часы с нуля до 1 ч. Под рекой — на сколько километров катер по течению ушёл дальше, чем катер против течения.';
+    now = `u = ${num(m.u)} км/ч, v = ${m.v} км/ч, по течению ${num(m.vd)} км/ч, против ${num(m.vu)} км/ч; часы ${fmtH(m.t) || '0'}; пути ${num(m.dn)} и ${num(m.up)} км, разница ${num(m.dd)} км.`;
+  } else {
+    scheme = 'Две дороги из Костаная (A) в соседний город (B, 120 км). На верхней — оранжевая машина: туда 60 км/ч, обратно 40 км/ч. На нижней — синяя «ровная» машина, которая и туда, и обратно едет с одной скоростью (ползунок от 30 до 70 км/ч, шаг 1). Ниже полосы времени: у оранжевой — время туда и время обратно, у синей — 240 : v. «Поехали» запускает обе машины, после финиша видно, кто вернулся раньше. Во вкладке «Опыт» можно для тренировки менять скорости оранжевой машины.';
+    now = `оранжевая: туда ${m.v1}, обратно ${m.v2} км/ч, всего ${num(m.TR)} ч; ровная ${m.w} км/ч, ${num(m.TG)} ч; ${m.ran ? 'поездка завершена' : 'поездку ещё не запускали с этими значениями'}.`;
+  }
+  return [
+    `Раздел: математика, 5–6 класс, тема «Задачи на движение» (подготовка к ЕНТ). Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `На схеме: ${scheme}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Во вкладке «Расчёты» — задачи как на ЕНТ: ${PROBS[id].map((p, i) => `${i + 1}) ${p.q}${S.cs[id + i] ? ' (решена)' : ''}`).join(' ')}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+    'Для тьютора: не называй ответ задания и задач (время в пути, момент встречи, скорость течения, среднюю скорость): веди ученика наводящими вопросами — что известно, какая формула связывает величины, в каких единицах — и проверяй его рассуждения.',
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = LESSONS[S.lesson], done = S.done[Ls.id];
+  const q = {
+    svt: 'Как перевести м/с в км/ч?', meet: 'Когда скорости складывать, а когда вычитать?',
+    river: 'Почему плот плывёт со скоростью течения?', avg: 'Почему средняя скорость не равна (60 + 40) : 2?',
+  }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
