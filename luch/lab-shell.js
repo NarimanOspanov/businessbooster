@@ -272,6 +272,14 @@
   .ls-stage .ic{width:44px;height:44px;border-radius:12px;border:1px solid var(--line,#26324a);background:var(--surface-2,#1a2438);color:var(--fg,#e8ecf4);font-size:20px;cursor:pointer;flex:none}
   .ls-stage .ic.rate{width:auto;min-width:52px;padding:0 10px;font:600 14px/1 var(--font-mono,monospace)}
   .ls-stage.done .ic.rate{visibility:hidden}
+  .ls-stage .volw{position:relative;flex:none}
+  .ls-stage .ic.vol{display:inline-grid;place-items:center}
+  .ls-stage .ic.vol svg{width:20px;height:20px}
+  .ls-stage .volp{position:absolute;bottom:52px;left:50%;transform:translateX(-50%);z-index:5;background:var(--surface-2,#1a2438);border:1px solid var(--line,#26324a);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+  .ls-stage .volp[hidden]{display:none}
+  .ls-stage .volp input{width:150px;accent-color:var(--accent,#ffb547)}
+  .ls-stage .volp b{font:600 13px/1 var(--font-mono,monospace);min-width:38px;text-align:right;color:var(--fg,#e8ecf4)}
+  .ls-stage.done .volw{visibility:hidden}
   .ls-stage .pp{height:44px;padding:0 18px;border-radius:12px;border:0;background:var(--accent,#ffb547);color:#0b1019;font:600 15px/1 var(--font-body,sans-serif);cursor:pointer;display:inline-flex;align-items:center;gap:8px;flex:none}
   .ls-stage.done .pp,.ls-stage.done [data-a="next"]{visibility:hidden}
   .ls-stage .ctl .ls-btn{height:44px;padding:0 14px;border-radius:12px}
@@ -346,11 +354,17 @@
     if (e.key === 'Escape') { e.preventDefault(); if (st.el.classList.contains('fs')) setFs(false); else stopStory(); }
     else if ((e.key === 'f' || e.key === 'F' || e.key === 'а' || e.key === 'А') && !/INPUT|TEXTAREA/.test(e.target.tagName)) { e.preventDefault(); toggleFs(); }
     else if (e.key === ' ' && !/INPUT|TEXTAREA/.test(e.target.tagName)) { e.preventDefault(); togglePause(); }
+    else if (/INPUT/.test(e.target.tagName)) return; // стрелки на ползунке громкости — ему
     else if (e.key === 'ArrowRight') stGo(st.i + 1);
     else if (e.key === 'ArrowLeft') stGo(Math.max(0, st.i - 1));
   }
   // скорость лекции — как в плеерах; общая с аудиогидом, запоминается
   const RATES = [1, 1.2, 1.5, 2];
+  // громкость лекции (0…1), по умолчанию полная; запоминаем между уроками
+  let vol = 1; try { const v = parseFloat(localStorage.getItem('ag-vol')); if (v >= 0 && v <= 1) vol = v; } catch (e) {}
+  const VOL_ICON = v => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/>' + (v === 0 ? '<path d="M17 9l5 6M22 9l-5 6"/>' : (v > 0 ? '<path d="M16.5 9.5a3.5 3.5 0 0 1 0 5"/>' : '') + (v > 0.5 ? '<path d="M19 7a7 7 0 0 1 0 10"/>' : '')) + '</svg>';
+  function paintVol() { const b = st && st.el.querySelector('[data-a="vol"]'); if (!b) return; b.innerHTML = VOL_ICON(vol); const p = st.el.querySelector('.volp'); if (p) { p.querySelector('input').value = Math.round(vol * 100); p.querySelector('b').textContent = Math.round(vol * 100) + '%'; } }
+  function setVol(v) { vol = Math.max(0, Math.min(1, v)); try { localStorage.setItem('ag-vol', vol); } catch (e) {} if (st && st.audio) st.audio.volume = vol; paintVol(); }
   let rate = 1.2; try { rate = RATES.includes(+localStorage.getItem('ag-rate')) ? +localStorage.getItem('ag-rate') : 1.2; } catch (e) {} // по умолчанию 1,2×
   function paintRate() { const b = st && st.el.querySelector('[data-a="rate"]'); if (!b) return; const t = String(rate).replace('.', ',') + '×'; b.textContent = t; b.setAttribute('aria-label', 'Скорость ' + t); }
   function stPaint() {
@@ -399,6 +413,7 @@
       '<div class="dots"></div>' +
       '<div class="ctl"><button class="ic" data-a="prev" aria-label="Назад">‹</button><button class="pp" data-a="pp"></button><button class="ic" data-a="next" aria-label="Дальше">›</button>' +
       '<button class="ic rate" data-a="rate" aria-label="Скорость 1,2×" title="Скорость: 1×, 1,2×, 1,5×, 2×">1,2×</button>' +
+      '<span class="volw"><button class="ic vol" data-a="vol" aria-label="Громкость" title="Громкость"></button><span class="volp" hidden><input type="range" min="0" max="100" step="5" aria-label="Громкость"><b></b></span></span>' +
       '<span class="sp"></span><button class="ls-btn ghost" data-a="practice">К практике →</button></div></div>';
     el.addEventListener('click', e => {
       if (e.target === el) return stopStory();
@@ -413,10 +428,13 @@
       else if (a === 'close') stopStory();
       else if (a === 'again') stGo(0);
       else if (a === 'rate') { rate = RATES[(RATES.indexOf(rate) + 1) % RATES.length]; try { localStorage.setItem('ag-rate', rate); } catch (e) {} st.audio.playbackRate = rate; paintRate(); }
+      else if (a === 'vol') { const p = el.querySelector('.volp'); p.hidden = !p.hidden; }
       else if (a === 'practice') toPractice();
       else if (a === 'fs') toggleFs();
       else if (a === 'askq') { stopStory(); if (window.LuchTutor && window.LuchTutor.talk) window.LuchTutor.talk('Какой вопрос по объяснению? Спрашивай голосом — я слушаю. Можно и написать.'); }
     });
+    el.querySelector('.volp input').addEventListener('input', e => setVol(e.target.value / 100));
+    el.querySelector('.volp').addEventListener('click', e => e.stopPropagation());
     el.querySelector('.pv h4').textContent = lessonTitle() || document.title;
     el.querySelector('.pic').addEventListener('dblclick', e => { e.preventDefault(); toggleFs(); });
     return el;
@@ -553,6 +571,7 @@
     // разблокируем звук сразу по нажатию (на телефонах иначе не заиграет)
     audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA='; audio.play().catch(() => {});
     st = { el: stShell(), secs: [], i: 0, paused: false, audio, voice: [], img: [], run: 0 };
+    audio.volume = vol; paintVol();
     document.body.appendChild(st.el); addEventListener('keydown', stKeys, true);
     st.el.querySelector('.ctl [data-a="pp"]').innerHTML = '❚❚ <span>Пауза</span>';
     const me = st;
