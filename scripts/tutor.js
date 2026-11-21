@@ -192,7 +192,9 @@ const STT_MODEL = process.env.TUTOR_STT_MODEL || "gemini-flash-lite-latest";
 // вместо текста звучит посторонняя речь. Gemini — запасной вариант и для казахского.
 const ELEVEN_VOICE = process.env.TUTOR_ELEVEN_VOICE || "1ikyXz7KIkVIgmGOM6QM"; // голос «Иван — учитель»: спокойный, ясный, родной русский (наставник представляется Маратом)
 const ELEVEN_MODEL = process.env.TUTOR_ELEVEN_MODEL || "eleven_turbo_v2_5"; // живые ответы наставника: быстро и естественнее flash
-const ELEVEN_MODEL_HQ = process.env.TUTOR_ELEVEN_MODEL_HQ || "eleven_multilingual_v2"; // лекции и аудиогид: готовятся заранее, звучат живее
+const ELEVEN_MODEL_HQ = process.env.TUTOR_ELEVEN_MODEL_HQ || "eleven_multilingual_v2";
+const ELEVEN_MODEL_KK = process.env.TUTOR_ELEVEN_MODEL_KK || "eleven_v4_turbo"; // казахский: multilingual_v2 и turbo_v2_5 его не знают
+const isKk = (t) => /[әғқңөұүһі]/i.test(t); // лекции и аудиогид: готовятся заранее, звучат живее
 const VOICE = process.env.TUTOR_VOICE || "Sulafat"; // Gemini: тёплый голос
 const VOICE_RULES = [
   "Сейчас разговор голосом: твой ответ сразу озвучивается, а вопрос ученика расшифрован из речи (в нём могут быть ошибки распознавания — угадывай смысл).",
@@ -221,7 +223,7 @@ async function gemini(model, body, ms = 30000) {
 // одинаковые фразы (аудиогид, подсказки наставника) озвучиваем один раз
 const ttsCache = new Map();
 async function speak(text, hq) {
-  const ck = ELEVEN_VOICE + ":" + (hq ? "hq2:" + ELEVEN_MODEL_HQ + ":" : "") + text; // hq2 — ровный голос + выровненная громкость
+  const ck = ELEVEN_VOICE + ":" + (isKk(text) ? "kk:" + ELEVEN_MODEL_KK + ":" : "") + (hq ? "hq2:" + ELEVEN_MODEL_HQ + ":" : "") + text; // hq2 — ровный голос + выровненная громкость
   if (ttsCache.has(ck)) { const v = ttsCache.get(ck); ttsCache.delete(ck); ttsCache.set(ck, v); return v; }
   // лекции и аудиогид озвучиваем один раз навсегда: звук хранится в базе и переживает перезапуски
   const dk = hq ? require("crypto").createHash("sha256").update(ck).digest("hex") : null;
@@ -244,12 +246,12 @@ async function ttsDbPut(k, a) {
 }
 async function speakRaw(text, hq) {
   const key = keyFrom("ELEVENLABS_API_KEY", ".elevenlabs-key");
-  if (key && !/[әғқңөұүһі]/i.test(text)) {
+  if (key) {
     try {
       const r = await fetch("https://api.elevenlabs.io/v1/text-to-speech/" + ELEVEN_VOICE + "?output_format=mp3_44100_64", {
         method: "POST", headers: { "xi-api-key": key, "Content-Type": "application/json" },
         // для лекций и гида — высокая стабильность: один ровный, спокойный тон во всех кусках, без «выкриков»
-        body: JSON.stringify({ text, model_id: hq ? ELEVEN_MODEL_HQ : ELEVEN_MODEL, voice_settings: { stability: hq ? 0.85 : 0.6, similarity_boost: 0.75, style: 0, use_speaker_boost: true, speed: 0.95 } }),
+        body: JSON.stringify({ text, model_id: isKk(text) ? ELEVEN_MODEL_KK : hq ? ELEVEN_MODEL_HQ : ELEVEN_MODEL, voice_settings: { stability: hq ? 0.85 : 0.6, similarity_boost: 0.75, style: 0, use_speaker_boost: true, speed: 0.95 } }),
         signal: AbortSignal.timeout(hq ? 40000 : 20000),
       });
       if (r.ok) { const buf = Buffer.from(await r.arrayBuffer()); return { type: "audio/mpeg", buf: hq ? await evenLoudness(buf) : buf }; }
