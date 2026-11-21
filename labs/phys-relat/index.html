@@ -849,6 +849,36 @@ window.LUCH_SUGGEST = () => {
   return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
 };
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-relat.js): настольные модели тех же опытов
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), M = { module: 'relat' };
+  if (id === 'post') return { ...M, scene: 'relat-post', help: 'Ракета или «Пуск» — замер, пульт — скорость и фонарь',
+    b: S.b1, btxt: fmt(S.b1, 2) + 'c', dir: S.dir, fly: !!S.run, shot: !!S.shot, galT: fmt(m.tGal, 3),
+    has: [m.has0, m.hasF, m.hasB], runs: S.runs.slice(-4).map(r => ({ b: fmt(r.b, 2), d: r.d, tg: fmt(r.tg, 3) })) };
+  if (id === 'dilation') return { ...M, scene: 'relat-clock', help: 'Кнопки пульта — скорость ракеты, часы на Земле — сброс',
+    b: S.b2, btxt: fmt(S.b2, 3) + 'c', gtxt: fmt(m.g, 3), ok: Math.abs(m.g - 2) <= 0.02 };
+  return { ...M, scene: 'relat-emc', help: 'Кубик или «Превратить» — в энергию, пульт — масса',
+    m: S.m, mtxt: mass(S.m), conv: S.conv, frac: m.frac, ftxt: fmt(m.frac * 100, 1) + ' %', ok: Math.abs(m.frac - 1) <= 0.03,
+    Etxt: sci(m.E) + ' Дж', kwh: nice(m.kwh) + ' кВт·ч', coal: nice(m.coal) + ' т угля',
+    kt: m.kt >= 1000 ? fmt(m.kt / 1000, m.kt >= 1e4 ? 0 : 1) + ' Мт тротила' : fmt(m.kt, m.kt >= 10 ? 0 : 2) + ' кт тротила' };
+};
+// live values for smooth motion in 3D (те же формулы, что у схемы)
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (id === 'post') {
+    const r = S.run || S.shot, b = r ? r.b : S.b1, d = b === 0 ? 1 : (r ? r.d : S.dir);
+    const lt = (S.run ? S.run.t : S.shot ? PRE + T1 : 0) - PRE, f = x => (x - GA) / LV;
+    return { lt, T1, b, d, xe: f(GA + d * b * CV1 * lt), px: lt >= 0 ? f(Math.min(GB, GA + CV1 * lt)) : null,
+             gx: lt >= 0 && b > 0 ? f(Math.min(GB + 60, GA + CV1 * (1 + d * b) * lt)) : null, sw: lt < 0 ? 0 : Math.min(1, lt / T1) };
+  }
+  if (id === 'dilation') {
+    const g = gam(S.b2), m = model();
+    return { g, b: S.b2, T0, CV: CV2, W: W2, t: reduce ? 0.92 * g * T0 : S.t2, ttxt: fmt(reduce ? 1 : m.t, 1), tautxt: fmt(reduce ? 1 / g : m.tau, 1) };
+  }
+  return { k: reduce ? 1 : clamp((performance.now() - S.convT) / 1400, 0, 1) };
+};
+window.LUCH_REAL.click = k => act(k);
+
 setLesson(S.lesson);
 fit();
 requestAnimationFrame(loop);

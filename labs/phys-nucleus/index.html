@@ -1453,6 +1453,50 @@ window.LUCH_SUGGEST = () => {
   return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
 };
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-nucleus.js): fast-changing values go through LUCH_REAL.live
+window.LUCH_REAL = () => {
+  const id = LID(), M = { module: 'nucleus' };
+  if (id === 'radio') {
+    if (S.mode === 'rays') return { ...M, scene: 'nucleus-rays', help: 'Магнит — включить поле, держатель — сменить преграду', field: S.field, ab: S.ab };
+    const iso = ISO[S.iso];
+    return { ...M, scene: 'nucleus-decay', help: 'Счётчик или лоток — пуск / пауза, пробирки — изотоп', iso: S.iso, isos: ISO.map(q => q.name), T: fmtT(iso.T, iso), run: S.run, half: S.halfT !== null ? fmtT(S.halfT * iso.T, iso) : '' };
+  }
+  if (id === 'nucleus') {
+    const A = S.Z + S.N, be = beOf(S.Z, S.N), mf = S.Z * MP + S.N * MN, dm = be ? be / UMEV : 0;
+    return { ...M, scene: 'nucleus-build', help: 'Лотки и кнопки ± — протоны и нейтроны, таблички — самое прочное ядро', Z: S.Z, N: S.N, A, sym: SYM[S.Z] || '?', name: elName(S.Z),
+      be: be ? fmt(be, 1) : '', bpn: be && A > 1 ? fmt(be / A, 2) : '', mf: fmt(mf, 4), mn: be ? fmt(mf - dm, 4) : '', dm: be && A > 1 ? fmt(dm, 4) : '', st: S.st,
+      targets: L().targets.map(tg => ({ s: tg.s, A: tg.A, Z: tg.Z, found: !!S.found[tg.s] })), pick: S.pick };
+  }
+  if (id === 'reactions') {
+    const R = RX[S.r], u = S.un[S.r], s = sides(S.r), pr = particle(u.A, u.Z);
+    const it = q => q ? { A: q[0], Z: q[1], s: q[2] } : { A: u.A, Z: u.Z, s: pr.s, unk: true };
+    return { ...M, scene: 'nucleus-react', help: 'Кнопки A ± и Z ± — подобрать «?», 1–4 — выбрать реакцию', r: S.r, name: R.name, L: R.L.map(it), R: R.R.map(it), pr: pr.name, ok: pr.ok,
+      AL: s.AL, AR: s.AR, ZL: s.ZL, ZR: s.ZR, bal: balance(S.r), solved: RX.map(r => !!S.solved[r.id]) };
+  }
+  if (id === 'dose') {
+    if (S.dm === 'scale') return { ...M, scene: 'nucleus-dose-scale', help: 'Предметы — измерить дозу', src: S.src, seen: Object.keys(S.dseen), cmp: S.cmpPick, ask: !!(S.dseen.flight && S.dseen.xray),
+      items: DOSE.map(q => ({ id: q.id, short: q.short, full: q.full, v: fg(q.mSv) + ' мЗв', lg: Math.log10(q.mSv) })) };
+    if (S.dm === 'shield') return { ...M, scene: 'nucleus-dose-shield', help: 'Источник — выбрать луч, держатель или пластины — поставить преграду', row: S.row, sh: { ...S.sh },
+      ok: ['a', 'b', 'g'].map(k => SH_OK[k].includes(S.sh[k])), names: Object.fromEntries(Object.entries(SHM).map(([k, v]) => [k, v.n])) };
+    return { ...M, scene: 'nucleus-dose-dist', help: 'Стрелки — ближе / дальше, секундомер — время', dist: S.dist, t: tLabel(), ti: TIMES.findIndex(q => q[0] === S.dtime), rate: fg(doseRate()), dose: fg(distDose()), low: distDose() < 1 };
+  }
+  return { ...M, scene: 'nucleus-npp', help: 'Кнопки ▲▼ или стержни — управление, насос — вкл / выкл, красная — аварийная защита', pump: S.pump, scram: S.scram };
+};
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (id === 'radio') { const iso = ISO[S.iso]; return { dec: S.nuc.map(q => q.d ? 1 : 0).join(''), n: nLeft(), t: fmtT(S.dt * iso.T, iso), dt: S.dt, run: S.run, hist: S.hist, half: S.halfT }; }
+  if (id === 'reactions') return { anim: S.anim && S.anim.i === S.r ? S.anim.t : null };
+  if (id === 'npp') { const k = kOf(), pe = Pel(); return { P: S.P, h: S.h, T: S.Tc, ph: S.ph, k, Pel: pe, hold: S.everHold ? 5 : S.hold, fP: fmt(S.P, S.P < 10 ? 1 : 0), fk: fmt(k, 3), fT: fmt(S.Tc, 0), fPel: fmt(pe, 0) }; }
+  return {};
+};
+window.LUCH_REAL.click = k => {
+  if (!k) return;
+  if (k === 'ab') { const o = ['none', 'paper', 'al', 'pb']; return act('ab-' + o[(o.indexOf(S.ab) + 1) % o.length]); }
+  if (k.startsWith('shc-')) { const r = k.slice(4), o = ['none', 'paper', 'al', 'pb', 'con']; return act(`sh-${r}-${o[(o.indexOf(S.sh[r]) + 1) % o.length]}`); }
+  if (k === 'tm') return act('tm-' + ((TIMES.findIndex(q => q[0] === S.dtime) + 1) % TIMES.length));
+  act(k);
+};
+
 setLesson(S.lesson);
 fit();
 requestAnimationFrame(loop);

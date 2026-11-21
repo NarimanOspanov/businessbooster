@@ -655,6 +655,11 @@ scene.addEventListener('pointermove', e => { if (!drag) return; dragTo(toSvg(e))
 function dropCard() {
   const i = drag.i, c = S.cards[i], b = BINS.findIndex((x, j) => inBin(c, j));
   if (b < 0) return;
+  binCard(i, b);
+}
+// put galaxy card i into bin b (drag on the scheme or a click in the 3D view)
+function binCard(i, b) {
+  const c = S.cards[i];
   if (BINS[b].t === GALS[i].t) {
     c.bin = b; const left = S.cards.filter(x => x.bin === null).length;
     toast(left ? `Верно: ${GALS[i].n} — ${BINS[b].name}. Осталось ${left}.` : 'Все 6 галактик рассортированы верно!');
@@ -991,6 +996,43 @@ window.LUCH_CONTEXT = () => {
     `Сейчас на площадке: ${now}`,
     `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
   ].join('\n');
+};
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-astro.js): планетарий, звезда на подставке, витрина галактик, телескоп со спектрографом
+let realSel = null; // galaxy picked in 3D, then a bin is clicked
+window.LUCH_REAL = () => {
+  const id = LID(), M = { module: 'astro' };
+  if (id !== 'gal') realSel = null;
+  if (id === 'solar') {
+    const o = orb();
+    return { ...M, scene: 'astro-orrery', help: 'Пульт и флажки П, А — орбита; Земля, Марс — готовые орбиты', rp: S.rp, ra: S.ra, a: o.a, e: o.e, b: o.b, T: o.T, vp: o.vp, va: o.va, jup: S.jup, ecc: S.ecc,
+      refs: REF.map(r => ({ n: r.n, a: r.a, c: parseInt(r.c.slice(1), 16) })) };
+  }
+  if (id === 'stars') {
+    const s = star(S.M);
+    return { ...M, scene: 'astro-stars', help: 'Пульт — масса звезды, модель Солнца — «как Солнце»', M: S.M, mtxt: fsig(S.M), T: s.T, L: s.L, Ltxt: fsig(s.L), R: s.R, life: s.life, lifeTxt: lifeTxt(s.life), fate: fate(S.M),
+      col: tColor(s.T), refs: REFSTARS, hot: S.hot, cool: S.cool };
+  }
+  if (id === 'gal') {
+    if (realSel !== null && (!S.cards[realSel] || S.cards[realSel].bin !== null)) realSel = null;
+    const m = model();
+    return { ...M, scene: 'astro-gal', help: 'Нажмите галактику, затем корзину её типа', gals: GALS.map((g, i) => ({ n: g.n, t: g.t, ratio: g.ratio || 0, tilt: g.tilt || 0, rot: g.rot || 0, bin: S.cards[i].bin })),
+      bins: BINS, sel: realSel, placed: m.placed, wrong: S.wrong, Rg: S.Rg, vg: S.vg, Tg: m.Tg };
+  }
+  const g = GX[S.gi], H = fitH();
+  return { ...M, scene: 'astro-hubble', help: 'Галактики — выбрать, пульт — метка λ и «Записать замер»', gi: S.gi, gn: g.n, gd: g.d, lam: S.lam, lt: lamTrue(g),
+    gx: GX.map((x, i) => ({ n: x.n, d: x.d, v: S.rec[i] ? S.rec[i].v : null })), nrec: Object.keys(S.rec).length, H: isFinite(H) ? H : null };
+};
+// smooth planet motion in 3D
+window.LUCH_REAL.live = () => ({ t: reduce ? 0 : S.t });
+window.LUCH_REAL.click = k => {
+  if (k.startsWith('gsel:')) { const i = +k.slice(5); if (S.cards[i] && S.cards[i].bin === null) realSel = realSel === i ? null : i; return; }
+  if (k.startsWith('gbin:')) {
+    if (realSel === null) { toast('Сначала нажмите на галактику, потом — на корзину.'); return; }
+    binCard(realSel, +k.slice(5)); realSel = null; update(); return;
+  }
+  if (k === 'l--' || k === 'l++') { setLam(S.lam + (k === 'l++' ? 1 : -1)); update(); return; }
+  if (k === 'reset') realSel = null;
+  act(k);
 };
 window.LUCH_SUGGEST = () => {
   const Ls = L(), done = S.done[Ls.id];

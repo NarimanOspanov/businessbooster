@@ -1000,6 +1000,33 @@ function setLesson(i) {
   if (cur) { const br = strip.getBoundingClientRect(), cr = cur.getBoundingClientRect(); strip.scrollLeft = Math.max(0, strip.scrollLeft + (cr.left - br.left) - (br.width - cr.width) / 2); }
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-quant.js): the same set-ups as real equipment on a table
+window.LUCH_REAL = () => {
+  const id = LID(), M = { module: 'quant' }, m = model(), done = !!S.done[id];
+  if (id === 'photo') return { ...M, scene: 'quant-photo', help: 'Пластинки — сменить катод, стрелки у лампы — λ, у источника — U',
+    metal: S.metal, mcol: m.mt.col, A: m.mt.A, lam: S.lam1, col: wlColor(S.lam1), range: S.lam1 < 380 ? 'ультрафиолет' : rangeName(S.lam1), flux: S.flux,
+    U: S.U, I: +m.I.toFixed(3), Ek: +Math.max(0, m.Ek).toFixed(3), lamR: Math.round(m.lamR), done };
+  if (id === 'photon') return { ...M, scene: 'quant-photon', help: 'Светофильтры — 400/530/650 нм, стрелки у шкалы — λ на 1 и 10 нм',
+    lam: S.lam2, col: wlColor(S.lam2), range: rangeName(S.lam2), E: +m.E.toFixed(3), N: m.N, Ntxt: sci(m.N, 2), ptxt: sci(m.p, 2), pk: m.p / 6.63e-27,
+    ok: Math.abs(m.N - 3e18) <= 0.03e18, done };
+  if (id === 'laser') return { ...M, scene: 'quant-laser', help: 'Зеркала — снять/поставить, клавиши — 2 или 3 уровня, стрелки — накачка',
+    lv: S.lv, mirrors: S.mirrors, pump: S.pump, nth: +m.nth.toFixed(3), need: LAS.need, done };
+  const pd = []; for (let i = 0; i < WV.bins; i++) { let s = 0; for (let j = 0; j < 6; j++) s += pattern(-WV.half + (i + (j + 0.5) / 6) * 2 * WV.half / WV.bins); pd.push(s); }
+  const pm = Math.max(...pd) || 1;
+  return { ...M, scene: 'quant-wave', help: 'Щели — одна/две, датчик — вкл/выкл, стрелки — U, клавиши — быстро/очистить',
+    U: S.U4, lam: +m.lam.toFixed(5), dx: +m.dx.toFixed(1), slits: S.slits, det: S.det, fast: S.fast, pd: pd.map(v => +(v / pm).toFixed(3)), done };
+};
+// fast-changing values for the 3D view, read every frame (laser populations, electrons on the screen)
+window.LUCH_REAL.live = () => ({ n2: S.n2, q: S.q, P: S.mirrors ? LAS.Pk * S.q : 0, n: hits.n, pts: hits.pts, bins: hits.bins,
+  fl: hits.fl.map(f => ({ k: (performance.now() - f.t0) / 900, y: f.y })) });
+window.LUCH_REAL.click = k => {
+  const nudge = { 'lam--': ['lam1', -50], 'lam++': ['lam1', 50], 'u--': ['U', -0.5], 'u++': ['U', 0.5], 'l2-10': ['lam2', -10], 'l2+10': ['lam2', 10],
+    'U4-10': ['U4', -10], 'U4+10': ['U4', 10], 'U4-1': ['U4', -1], 'U4+1': ['U4', 1] }[k];
+  if (nudge) return setVal(nudge[0], S[nudge[0]] + nudge[1]);
+  if (k === 'slits') return act(S.slits === 2 ? 'sl-1' : 'sl-2');
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), Ls = L(), id = Ls.id;

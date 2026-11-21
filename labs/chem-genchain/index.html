@@ -959,6 +959,33 @@ window.LUCH_SUGGEST = () => {
   return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
 };
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-chem-gen.js): substances in glassware, molecule models, a synthesis rig
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-gen' };
+  if (m.kind === 'chain') {
+    const last = S.last ? m.rows[S.last[0]].steps[S.last[1]] : null;
+    return { ...base, scene: id === 'inorg' ? 'cgen-inorg' : 'cgen-org',
+      help: S.selR ? 'Нажмите карточку «?» над стрелкой — поставить реактив' : 'Нажмите склянку с реактивом, потом карточку «?» над стрелкой',
+      rows: m.rows.map((r, ri) => ({ title: r.title, nodes: r.nodes.map(n => [n[0], n[1]]), done: m.rowDone[ri],
+        fill: r.steps.map((_, i) => { const f = S.fill[ri + '-' + i]; return f ? chipOf(f).l : null; }) })),
+      chips: m.chips.map(c => ({ k: c.k, l: c.l, s: c.s })), sel: S.selR, filled: m.filled, total: m.total, wrong: S.wrong, done: !!S.done[id],
+      last: S.last ? S.last.slice() : null, lastEq: last ? last.eq : null, lastCond: last ? last.cond : null };
+  }
+  const G = m.G;
+  return { ...base, scene: 'cgen-syn',
+    help: m.atGoal ? 'Кнопки впереди — другая цель или «заново»' : 'Нажмите вещество с голубым кольцом — следующая стадия; кнопки впереди — цель и шаг назад',
+    nodes: Object.keys(NODES).map(k => ({ k, d: NODES[k].d, n: NODES[k].n, x: NODES[k].x, y: NODES[k].y })),
+    edges: EDGES.map(e => ({ a: e.a, b: e.b, c: e.c })),
+    route: S.route.slice(), next: m.next.map(e => e.b), best: S.reached[S.goal] && m.best ? m.best.slice() : null,
+    from: G.from, to: G.to, goalName: G.name, goal: S.goal, goals: GOALS.map((x, i) => ({ short: x.short, done: !!S.reached[i] })),
+    atGoal: m.atGoal, steps: m.steps, bestLen: m.best ? m.best.length - 1 : null, reached: m.reached,
+    yieldTxt: m.steps ? fmt(Math.pow(YIELD, m.steps) * 100, 0) + ' %' : '—', routeTxt: pathTxt(S.route) };
+};
+window.LUCH_REAL.click = k => {
+  if (/^(ch-|sl-|nd-)/.test(k)) tap(k);
+  else act(k);
+};
+
 setLesson(S.lesson);
 fit();
 requestAnimationFrame(loop);

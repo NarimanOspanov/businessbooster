@@ -957,6 +957,38 @@ function setLesson(i) {
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-matter.js): a microscope and an atom kit, a tank with dye, a vessel with a piston
+window.LUCH_REAL = () => {
+  const id = LID(), Ls = L(), base = { module: 'matter' };
+  if (id === 'molecules') {
+    const m = model();
+    return { ...base, scene: 'matter-molecules',
+      help: S.st === 'zoom' ? 'Ручки микроскопа и кнопки — увеличение ×10, табличка — конструктор' : 'Миска — положить атом, атом на столе — убрать, «Соединить», табличка — микроскоп',
+      st: S.st, z: Math.round(S.z * 100) / 100, zoomed: !!S.got.zoom, zoomTxt: '×' + big(6 * 10 ** S.z), field: niceLen(fieldMM(S.z)), level: zoomLevel(S.z),
+      targets: Ls.targets.map(T => ({ id: T.id, f: T.f, sub: T.sub, name: T.name })), built: { ...S.built }, n: m.n, asm: S.asm.slice(), f: m.f,
+      last: S.last ? { f: S.last.f, sub: S.last.sub, name: S.last.name } : null };
+  }
+  if (id === 'diffusion') return { ...base, scene: 'matter-diffusion', help: 'Перегородка — убрать, кнопки — температура воды, «Заново» — повторить',
+    T: S.T2, wall: S.wall, mixed: S.mixed, cold: S.cold, hot: S.hot, goal: Ls.goal, tCold: Ls.tCold, tHot: Ls.tHot, temps: Ls.temps, nDye: Ls.nDye, nWater: Ls.nWater,
+    runs: S.runs.map(r => ({ T: r.T, t: Math.round(r.t * 10) / 10 })) };
+  const [a, b] = vessel();
+  return { ...base, scene: 'matter-states', help: 'Поршень — нажать/отпустить, плитка или кнопки — температура, второй сосуд — перелить',
+    T: S.T3, s: state3(), wide: S.wide, a, b, temps: Ls.temps, press: { ...S.press }, pour: { ...S.pour } };
+};
+// values that change every frame (particles, piston, time) — read by the scene in kit.onFrame
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (id === 'diffusion') return { p2: S.p2, frac: dyeRight(), t: S.t2, wall: S.wall };
+  if (id === 'states') return { p3: S.p3, py: S.py, lim: pistonLimit(), ratio: gasRatio() };
+  return {};
+};
+window.LUCH_REAL.click = k => {
+  if (LID() === 'states' && k === 'piston') k = (S.pyT != null ? S.pyT > V3.top + 1 : S.py > V3.top + 2) ? 'lift' : 'push';
+  if (LID() === 'states' && k === 'tcyc') { const ts = L().temps; k = 'T3-' + ts[(ts.indexOf(S.T3) + 1) % ts.length]; }
+  if (/^(a[HOC]|r\d+|wall)$/.test(k)) { tap(k); return; }
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), Ls = L(), id = Ls.id;
