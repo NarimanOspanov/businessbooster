@@ -1060,6 +1060,53 @@ function setLesson(i) {
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-bio-methods.js): a real aquarium, a school microscope, Petri dishes
+const r2 = x => Math.round(x * 100) / 100;
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), M = { module: 'bio-methods' };
+  if (id === 'observe') return { ...M, scene: 'bio-aquarium', help: 'Рыбка — +1 взмах · секундомер — старт · кнопки −1/+1 °C — температура воды',
+    T: S.T, tmin: TMIN, tmax: TMAX, run: !!S.trial, taps: S.trial ? S.trial.taps : 0, trials: S.trials.map(t => [t.T, t.taps, t.ok ? 1 : 0]), pair: m.pair };
+  if (id === 'micro') return { ...M, scene: 'bio-microscope', help: 'Объективы 4×/10×/40× · лампа · рычажок диафрагмы · винты (слева −, справа +) · стекло — к центру · йод · экран — ядро',
+    obj: S.obj, mag: m.mag, fov: m.fov, lamp: S.lamp, dia: r2(S.dia), need: NEED[S.obj], bright: r2(m.bright), lit: m.lit, coarse: r2(S.coarse), fine: r2(S.fine),
+    df: r2(m.focus - F0), err: r2(m.err), tol: DEPTH[S.obj], sharp: m.sharp, sx: r2(S.sx), sy: r2(S.sy), centered: m.centered,
+    stained: S.stained, found: S.found, hit: S.found && S.lastHit ? S.lastHit.map(v => Math.round(v * 10000) / 10000) : null };
+  return { ...M, scene: 'bio-dishes', help: 'Клавиши у чашек — вода, свет, тепло · число семян · календарь — ждать 5 дней · потом вывод',
+    dishes: S.dishes.map((d, j) => ({ water: d.water, light: d.light, warm: d.warm, n: d.n,
+      gd: Array.from({ length: d.n }, (_, i) => SEEDU[j][i] < pGerm(d) ? r2(germDay(j, i)) : -1), k: m.finished ? m.res[j].k : null })),
+    running: S.running, finished: m.finished, valid: m.valid, issue: m.issues[0] || '', answer: S.answer, days: DAYS };
+};
+// fast values for the 3D view, read every frame
+window.LUCH_REAL.live = () => {
+  const id = LID(), now = performance.now();
+  if (id === 'observe') return { ph: phaseAt(now), left: S.trial ? Math.max(0, TRIAL - (now - S.trial.t0) / 1000) : null, tap: S.tapFx ? (now - S.tapFx) / 1000 : 99 };
+  if (id === 'micro') return { stain: S.stain };
+  return { day: S.day };
+};
+window.LUCH_REAL.click = k => {
+  if (k === 'dia') { S.dia = S.dia >= 0.95 ? 0 : clamp(Math.round((S.dia + 0.2) * 10) / 10, 0, 1); update(); return; }
+  if (k === 'slide') {
+    // the slide one step closer to the centre of the field of view
+    if (Math.abs(S.sx) < 0.05 && Math.abs(S.sy) < 0.05) { toast('Кожица уже в центре поля зрения.'); return; }
+    const st = v => Math.abs(v) <= 1.5 ? 0 : v - Math.sign(v) * 1.5;
+    S.sx = st(S.sx); S.sy = st(S.sy); update(); return;
+  }
+  if (k === 'nuc') {
+    // a tap on the eyepiece screen: the nucleus nearest to the crosshair in the middle of the view
+    const mm = model(), kk = 2 * VC.r / mm.fov, px = -S.sx, py = -S.sy;
+    let best = null;
+    if (Math.abs(px) <= SPEC.w && Math.abs(py) <= SPEC.h) {
+      const r = Math.floor((py + SPEC.h) / CELL.H);
+      for (let i = Math.floor((px + SPEC.w) / CELL.L) - 1; i <= Math.floor((px + SPEC.w) / CELL.L) + 1; i++) {
+        const c = cellBox(r, i); if (c && (!best || Math.hypot(c.nx - px, c.ny - py) < Math.hypot(best.nx - px, best.ny - py))) best = c;
+      }
+    }
+    viewClick(best ? { x: VC.x - (best.nx + S.sx) * kk, y: VC.y - (best.ny + S.sy) * kk } : { x: VC.x, y: VC.y });
+    return;
+  }
+  if (k.startsWith('tg-')) { const [, j, c] = k.split('-'); toggleDish(+j, c); buildScheme(); return; }
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id;

@@ -1215,6 +1215,52 @@ window.LUCH_SUGGEST = () => {
   const q = { arc: 'Почему рука отдёргивается раньше, чем становится больно?', brain: 'Почему при травме левого полушария слабеет правая рука?', sense: 'Почему близоруким нужны минусовые очки?', sleep: 'Зачем повторять через растущие промежутки?' }[L.id];
   return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
 };
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-bio-nerves.js): anatomical models and the lesson's experiment on the desk
+const r2 = x => isFinite(x) ? Math.round(x * 100) / 100 : null;
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), M = { module: 'bio-nerves' };
+  if (id === 'arc') {
+    const F = S.fire;
+    return { ...M, scene: 'nv-arc', help: 'Буква-метка → карточка звена · свеча — коснуться огня · нейрон — его части',
+      ap: APK.map(k => [k, AP[k].name, AP[k].c]), letters: SLOTS.map(s => s.L), lab: S.lab.slice(), cur: S.cur,
+      placed: m.placed, fired: S.fired, t: Math.round(m.t),
+      fire: F ? { ok: F.ok, bad: F.bad, run: !!F.run, t0: Math.round(F.t0), dur: Math.round(1500 * F.stop) } : null };
+  }
+  if (id === 'brain') {
+    const fl = S.flash && performance.now() - S.flash.t < 900 ? S.flash : null;
+    return { ...M, scene: 'nv-brain', help: 'Нажимайте на отдел мозга · кнопки — подписи и «сначала»',
+      br: BRK.map(k => [k, BR[k].name, BR[k].c]), q: S.q, n: SIT.length, sit: S.q < SIT.length ? [SIT[S.q].a, SIT[S.q].b] : null,
+      solved: [...new Set(SIT.slice(0, S.q).map(s => s.r))], fl: fl ? fl.id : '', flOk: fl ? fl.ok : false,
+      part: S.q >= SIT.length ? S.part : null, names: S.names, miss: S.miss, W: Math.round(m.W) };
+  }
+  if (id === 'sense') {
+    const got = [m.near, m.myo, m.ear];
+    if (S.mode === 'eye') {
+      const o = m.o;
+      return { ...M, scene: 'nv-eye', help: 'Хрусталик — выпуклее · кнопки — очки, тип глаза, предмет · Ухо — к улитке',
+        eye: S.eye, eyeName: EYES[S.eye].name, obj: S.obj, txt: OBJS[S.obj].txt, acc: S.acc, gl: S.gl,
+        P: r2(o.P), dr: r2(o.dr), di: r2(Math.min(999, o.di)), mis: r2(o.mis), sharp: o.sharp, got };
+    }
+    return { ...M, scene: 'nv-ear', help: '÷1,25 и ×1,25 на генераторе — частота · части уха — что это',
+      fq: S.fq, fqTxt: hz(S.fq), pos: Math.round(m.pos * 1000) / 1000, tpos: Math.round(TPOS * 1000) / 1000, hit: m.earNow,
+      ticks: [16000, 4000, 1000, 250, 50].map(v => [hz(v), Math.round(cochPos(v) * 1000) / 1000]), got };
+  }
+  const MM = m.M;
+  return { ...M, scene: 'nv-sleep', help: 'Кнопки — сон и отбой · день календаря — перенести ближайшее повторение',
+    sleep: S.sleep, bed: clock(S.bed), bedH: S.bed % 24, wake: clock(m.wake), wakeOk: m.wakeOk, wst: STN[m.wst],
+    hyp: Array.from({ length: Math.round(S.sleep * 4) }, (_, i) => stageAt(i * 15).replace('N', '')).join(''),
+    reps: S.reps.slice(), curve: Array.from({ length: 29 }, (_, i) => Math.round(MM.R(i / 4) * 100)), R7: Math.round(MM.R7 * 100) };
+};
+window.LUCH_REAL.click = k => {
+  if (k.startsWith('a:')) { act(k.slice(2)); return; }
+  if (k.startsWith('day:')) {
+    const day = clamp(+k.slice(4), 0.25, 6.75);
+    if (!S.reps.length) S.reps.push(day);
+    else { let bi = 0; S.reps.forEach((r, i) => { if (Math.abs(r - day) < Math.abs(S.reps[bi] - day)) bi = i; }); S.reps[bi] = day; }
+    renderTools(); update(); return;
+  }
+  tap(k);
+};
 
 setLesson(S.lesson);
 fit();

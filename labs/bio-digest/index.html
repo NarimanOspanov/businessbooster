@@ -1257,6 +1257,59 @@ function setLesson(i) {
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-bio-digest.js): Donders lung model with a spirometer, anatomical tract model, food counter, nephron model
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), hex = s => parseInt(s.slice(1), 16), base = { module: 'bio-digest' }, r2 = x => Math.round(x * 100) / 100;
+  if (id === 'breath') return { ...base, scene: 'dig-breath', help: 'Ручка мембраны — макс. вдох / выдох, шарики — спокойно, мундштук — спокойное дыхание',
+    peak: S.peak, vcDone: S.vcDone, vc: r2(S.vc), auto: S.auto, frc: FRC, rv: RV, umin: UMIN, umax: UMAX, maxs: MAXS };
+  if (id === 'digest') {
+    const all = S.jb.every(b => b >= 0), loc = S.pos < 0 ? 'plate' : ROUTE[S.pos];
+    return { ...base, scene: 'dig-tract', help: 'Флакон сока, затем отдел на модели — положить сок; тарелка — вести обед дальше',
+      sel: S.sel, pos: S.pos, loc, locName: ROUTE_NAME[loc], all, right: m.right,
+      spots: SPOTS.map(s => s.id), spotName: SPOTS.map(s => s.short),
+      juice: JUICE.map((j, c) => ({ sh: j.sh, c: hex(j.c), at: S.jb[c], ok: S.jb[c] >= 0 && j.ans.includes(SPOTS[S.jb[c]].id) })),
+      abs: NUTK.map(k => Math.round(S.meal[k].abs * 100)) };
+  }
+  if (id === 'food') {
+    const Tt = m.T;
+    return { ...base, scene: 'dig-food', help: 'Продукт или ценник — добавить порцию, «−» — убрать, корзина — очистить меню',
+      cnt: S.cnt.slice(), foods: FOODS.map(x => ({ n: x.n, kcal: x.kcal, vc: x.vc >= 50, va: x.va >= 200 })), right: m.right,
+      T: { kcal: Math.round(Tt.kcal), p: Math.round(Tt.p), fat: Math.round(Tt.fat), carb: Math.round(Tt.carb), fatPct: Math.round(Tt.fatPct), vc: Math.round(Tt.vc), va: Math.round(Tt.va) }, ok: { ...Tt.ok } };
+  }
+  const all = m.set === SUB.length, U = m.U;
+  return { ...base, scene: 'dig-excr', help: 'Колба — сменить ответ (да → в кровь → в мочу → нет), бутылка и «+/−» — питьё, лампа — жара',
+    subs: SUB.map((s, i) => ({ name: s.name, c: hex(s.c), fi: S.fi[i], re: S.re[i], ok: all ? rowOk(i) : null })),
+    set: m.set, right: m.right, hot: S.hot, drink: S.drink, urine: U.urine, primary: U.primary, flood: U.flood };
+};
+window.LUCH_REAL.live = () => LID() === 'breath' ? { u: S.u, flow: S.flow, spiro: S.spiro, hiU: S.hiU, loU: S.loU } : null;
+window.LUCH_REAL.click = k => {
+  const id = LID();
+  if (id === 'breath') {
+    if (k === 'pull') { S.auto = false; S.target = S.u < UMAX - 0.1 && !S.peak ? UMAX : S.u > UMIN + 0.1 ? UMIN : UMAX; renderTools(); return; }
+    return act(k === 'calm' ? 'calm' : k);
+  }
+  if (id === 'digest') {
+    if (/^j\d$/.test(k)) { const c = +k.slice(1); S.sel = S.sel === c ? -1 : c; dirty = true; return; }
+    if (k.startsWith('o-')) return tap(k);
+    return act(k);
+  }
+  if (id === 'food') {
+    let mm = k.match(/^food-(\d+)$/); if (mm) return addFood(+mm[1], 1);
+    mm = k.match(/^minus-(\d+)$/); if (mm) return addFood(+mm[1], -1);
+    return act(k);
+  }
+  const mm = k.match(/^sub-(\d)$/);
+  if (mm) {
+    const i = +mm[1];
+    if (S.fi[i] !== true) setFi(i, true);
+    else if (S.re[i] === null) setRe(i, 'blood');
+    else if (S.re[i] === 'blood') setRe(i, 'urine');
+    else setFi(i, false);
+    return;
+  }
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id;

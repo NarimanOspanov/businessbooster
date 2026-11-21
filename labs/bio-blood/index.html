@@ -1162,6 +1162,39 @@ window.LUCH_SUGGEST = () => {
   const q = { comp: 'Почему у эритроцитов нет ядра?', heart: 'Почему стенка левого желудочка толще правого?', bp: 'Почему тоны слышны только между верхним и нижним давлением?', imm: 'Чем вакцина отличается от сыворотки?' }[L.id];
   return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
 };
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-bio-blood.js): centrifuge and microscope, an anatomical heart model in section, a real tonometer, a vaccination room
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), M = { module: 'bio-blood' };
+  if (id === 'comp') return { ...M, scene: 'blood-comp', help: 'Центрифуга · номер клетки · кнопки типов',
+    spun: S.spun, sep: !!m.spun, lab: S.lab.slice(), cur: S.cur, placed: m.placed, right: m.right, cells: TG.map(g => [g.x, g.y, g.type, g.kind || '']), vol: ru(S.mass * 0.07), done: !!S.done.comp };
+  if (id === 'heart') return { ...M, scene: 'blood-heart', help: 'Камеры, клапаны, сосуды — что это · кнопки — пуск, фаза, пульс',
+    hr: S.hr, play: S.play, phase: S.play ? null : m.phase, part: S.part, done: !!S.done.heart };
+  if (id === 'bp') { const P = PATS[S.pat]; return { ...M, scene: 'blood-bp', help: 'Груша — накачать · винт — спуск · кнопки — отметить тоны',
+    pat: S.pat, name: P.name, valve: S.valve, rate: S.rate, ms: S.marks.s, md: S.marks.d, okS: m.okS, okD: m.okD, done: !!S.done.bp }; }
+  const P = IP[S.ipt], C = S.ipt ? m.c1 : m.c0, c = S.inj[S.ipt];
+  let band = ''; for (let t = 0; t <= P.D; t++) band += C.A(t) >= 1 ? '1' : '0';
+  return { ...M, scene: 'blood-imm', help: 'Карточка — пациент · флакон — ввести · кнопки — сдвинуть день',
+    ipt: S.ipt, name: P.name, ill: P.ill, V: P.V, D: P.D, long: P.long, vac: { ...c.vac }, ser: { ...c.ser },
+    aV: Math.round(C.aV * 100) / 100, mem: C.mem, prot: C.prot, ok: C.ok, ok0: m.ok0, ok1: m.ok1, band };
+};
+// fast values for the 3D animation (heart phase, cuff pressure, tones, centrifuge run)
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (id === 'comp') return { spinMs: performance.now() - S.spinT, cur: S.cur };
+  if (id === 'heart') { const p = phaseAt(S.tc), c = p.c; return { tc: S.tc, ph: p.id, u: p.len ? p.x / p.len : 0, pos: p.pos, T: c.T, sa: c.sa, sv: c.sv, dp: c.dp }; }
+  if (id === 'bp') { const P = PATS[S.pat]; return { cuff: S.cuff, tone: S.simT - S.lastBeat.t < 0.35 && S.lastBeat.tone, open: S.cuff < pArt(P, S.bt), beat: S.bt / BEAT }; }
+  return {};
+};
+window.LUCH_REAL.click = k => {
+  const st = /^(vac|ser)([+-])$/.exec(k);
+  if (st) {
+    const P = IP[S.ipt], c = S.inj[S.ipt][st[1]], stp = P.long ? 5 : 1;
+    if (!c.on) c.on = true; else c.day = clamp(c.day + (st[2] === '+' ? stp : -stp), 0, P.maxInj);
+    renderTools(); update(); return;
+  }
+  if (/^(tg\d|tube$|pp-|bulb$|cuff$|steth$|dial$|virus$|thr$)/.test(k)) { tap(k); return; }
+  act(k);
+};
 
 setLesson(S.lesson);
 fit();

@@ -1258,6 +1258,57 @@ window.LUCH_SUGGEST = () => {
   return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
 };
 
+// «Как в жизни»: 3D-сцены кабинета биологии (luch/real3d-bio-cell.js)
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'bio-cell' };
+  if (id === 'membrane') return { ...base, scene: 'bio-osmo', help: 'Стёкла — кровь или лук, флаконы — 0 / 0,9 / 5 %, солонка и вода — ±0,5 %, микроскоп — новая клетка',
+    cell: S.cell, name: OSM[S.cell].name, c: S.c, cTxt: fmt(S.c, 1) + ' %', burst: S.burst, state: m.state,
+    obs: { lysis: !!S.obs.lysis, turgor: !!S.obs.turgor, plasm: !!S.obs.plasm } };
+  if (id === 'nucleus') return { ...base, scene: 'bio-amoeba', help: 'Стрелки — сдвинуть иглу, игла — разрезать, +1 / +3 — сутки, пипетка — пересадить ядро',
+    cut: S.cut, k: +((S.cutX - AMO.cx) / AMO.R).toFixed(3), nk: [(AMO.nx - AMO.cx) / AMO.R, (AMO.ny - AMO.cy) / AMO.R], fL: pc(m.f.L), fR: pc(m.f.R),
+    day: S.day, days: AMO.days, late: S.day > AMO.rescue, can: S.pieces.some(p => !p.nuc && !p.dead),
+    pieces: S.pieces.map(p => ({ side: p.side, nuc: p.nuc, dead: p.dead, count: p.count, area: +p.area.toFixed(3), trans: !!p.trans })),
+    death: S.seen.death, rescue: S.seen.rescue };
+  if (id === 'organelles') {
+    const names = {}; Object.keys(ORG).forEach(k => names[k] = ORG[k].name);
+    return { ...base, scene: 'bio-organ', help: 'Карточка — взять, часть модели клетки — положить на неё, лампа — свет',
+      light: S.light, sel: S.sel, matched: JOBS.filter(j => S.matched[j.id]).map(j => j.id), jobs: JOBS.map(j => ({ id: j.id, lines: j.lines })), names,
+      prod: fmt(m.prod, 1), use: fmt(m.use, 1), net: m.net };
+  }
+  const placed = { plant: [], both: [], animal: [] };
+  FEAT.forEach(f => { const z = S.placed[f.id]; if (z) placed[z].push(f.short); });
+  return { ...base, scene: 'bio-compare', help: 'Лоток — положить признак туда, карточка — взять другую',
+    cur: m.cur ? m.cur.text : null, n: m.placed, tot: FEAT.length, miss: m.miss, placed, left: S.deck.length };
+};
+// быстрые значения для осмоса: объём клетки меняется плавно, вода течёт
+window.LUCH_REAL.live = () => { if (LID() !== 'membrane') return null; const o = osm(); return { V: S.V, flow: o.flow, press: o.press, burst: S.burst }; };
+window.LUCH_REAL.click = k => {
+  if (k === 'sUp') return setSalt(S.c + 0.5);
+  if (k === 'sDn') return setSalt(S.c - 0.5);
+  if (k === 'kL' || k === 'kR') {
+    if (S.cut) { toast('Амёба уже разрезана. Нажмите «Заново», чтобы начать сначала.'); return; }
+    S.cutX = clamp(S.cutX + (k === 'kL' ? -12 : 12), AMO.cx - AMO.R + 10, AMO.cx + AMO.R - 10); update(); return;
+  }
+  if (k === 'cut' && S.cut) { toast('Амёба уже разрезана. Листайте сутки.'); return; }
+  if (/^j-/.test(k)) {
+    const j = k.slice(2); if (S.matched[j]) return;
+    S.sel = S.sel === j ? null : j; dirty = true;
+    if (S.sel) toast('Карточка взята. Нажмите на часть модели клетки.');
+    return;
+  }
+  if (/^o-/.test(k)) {
+    const o = k.slice(2); if (!ORG[o]) return;
+    if (!S.sel) { toast('Сначала выберите карточку с работой.'); return; }
+    const z = o === 'vac' ? ORG.vac.ell : ORG[o].zones[0];
+    tryJob(S.sel, z[0], z[1]); return;
+  }
+  if (/^z-/.test(k)) {
+    if (!S.deck.length) { toast('Все признаки уже разложены.'); return; }
+    placeFeat(k.slice(2)); return;
+  }
+  act(k);
+};
+
 setLesson(S.lesson);
 fit();
 requestAnimationFrame(loop);
