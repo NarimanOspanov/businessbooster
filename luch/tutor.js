@@ -44,7 +44,9 @@
   if (lang === 'ru') return;
 
   const CY = /[А-Яа-яЁё]/;
-  const KEY = 'luch-i18n-' + lang;
+  // версия кэша: поднимаем, когда переводы в базе исправили (у посетителей подтянутся заново)
+  const KEY = 'luch-i18n-' + lang + '-v2';
+  try { localStorage.removeItem('luch-i18n-' + lang); } catch (e) {}
   let cache;
   try { cache = new Map(JSON.parse(store.get(KEY) || '[]')); } catch (e) { cache = new Map(); }
   for (const [k, v] of cache) if (k === v && /[А-Яа-яЁё]{4}/.test(k) && !/[ӘәҒғҚқҢңӨөҰұҮүІі]/.test(k)) cache.delete(k); // неудачные «переводы» из старых версий
