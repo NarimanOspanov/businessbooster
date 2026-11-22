@@ -331,7 +331,7 @@
     <div class="lt-head">${AV}<div class="lt-sp"><b>Наставник</b><div class="lt-cap empty" id="lt-cap" title="Нажмите, чтобы прочитать целиком">Спросите — объясню, подскажу, проверю.</div></div>
       <button class="lt-ib" id="lt-vm" type="button" aria-pressed="false" title="Разговор голосом" hidden>${WAVE}<span class="lt-tx">Голосом</span></button>
       <button class="lt-ib" id="lt-bd" type="button" title="Доска: рисовать и показывать наставнику" aria-label="Доска">✎</button>
-      <button class="lt-ib lt-stop" id="lt-stop" type="button" title="Остановить озвучку (или скажите «стоп»)" hidden>■ Стоп</button>
+      <button class="lt-ib lt-stop" id="lt-stop" type="button" data-noi18n title="${lang === 'kk' ? 'Кідірту («тоқта» деп айтуға да болады)' : 'Пауза (или скажите «стоп»)'}" aria-label="${lang === 'kk' ? 'Кідірту' : 'Пауза'}" hidden><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="1.5" width="3.2" height="11" rx="1" fill="currentColor"/><rect x="8.3" y="1.5" width="3.2" height="11" rx="1" fill="currentColor"/></svg></button>
       <button class="lt-ib" id="lt-hist" type="button" aria-pressed="false" title="Вся переписка" aria-label="Вся переписка">☰</button><button class="lt-ib" id="lt-close" type="button" aria-label="Свернуть" title="Свернуть">✕</button></div>
     <div class="lt-log" id="lt-log" aria-live="polite"></div>
     <div class="lt-sug" id="lt-sug"></div>
@@ -512,7 +512,7 @@
       if (aborted || !speech) return '';
       const wav = encodeWav(chunks, rate, 16000);
       const b64 = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(String(fr.result).split(',')[1]); fr.readAsDataURL(wav); });
-      const res = await fetch('/api/tutor/stt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: b64, mime: 'audio/wav' }) });
+      const res = await fetch('/api/tutor/stt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: b64, mime: 'audio/wav', lang }) });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || 'stt');
       return (j.text || '').trim();

@@ -105,10 +105,13 @@ function userAi(req) {
   if (!k || k.length < 20 || k.length > 300 || !/^[A-Za-z0-9_.-]+$/.test(k)) return null;
   return ["gemini", "openai", "anthropic"].includes(p) ? { p, k } : null;
 }
-async function streamOpenAI(key, system, messages, write, signal) {
+// наш собственный ключ OpenAI — запасной путь, когда нет ключа Claude (Gemini — только в последнюю очередь)
+const SERVER_OPENAI_MODEL = process.env.TUTOR_OPENAI_MODEL || "gpt-4.1-mini";
+const serverOpenAIKey = () => keyFrom("OPENAI_API_KEY", ".openaikey");
+async function streamOpenAI(key, system, messages, write, signal, model) {
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST", signal, headers: { "Content-Type": "application/json", Authorization: "Bearer " + key },
-    body: JSON.stringify({ model: USER_OPENAI_MODEL, stream: true, max_tokens: 3000, messages: [{ role: "system", content: system }, ...messages.map((m) => m.image
+    body: JSON.stringify({ model: model || USER_OPENAI_MODEL, stream: true, max_tokens: 3000, messages: [{ role: "system", content: system }, ...messages.map((m) => m.image
       ? { role: m.role, content: [{ type: "text", text: m.content }, { type: "image_url", image_url: { url: "data:" + m.image.mime + ";base64," + m.image.data } }] }
       : { role: m.role, content: m.content })] }),
   });
@@ -305,12 +308,15 @@ async function tts(text) {
   h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34); h.write("data", 36); h.writeUInt32LE(b.length, 40);
   return Buffer.concat([h, b]);
 }
-async function stt(b64, mime) {
+async function stt(b64, mime, lang) {
   const key = keyFrom("ELEVENLABS_API_KEY", ".elevenlabs-key");
   if (key) {
     try {
       const fd = new FormData();
       fd.append("model_id", process.env.TUTOR_SCRIBE_MODEL || "scribe_v1");
+      // язык сайта подсказываем явно — без него короткая фраза по-казахски распознавалась как хинди
+      const lc = { kk: "kaz", ru: "rus", en: "eng", es: "spa" }[lang];
+      if (lc) fd.append("language_code", lc);
       fd.append("file", new Blob([Buffer.from(b64, "base64")], { type: mime }), mime === "audio/wav" ? "q.wav" : "q.audio");
       const r = await fetch("https://api.elevenlabs.io/v1/speech-to-text", { method: "POST", headers: { "xi-api-key": key }, body: fd, signal: AbortSignal.timeout(20000) });
       const j = await r.json().catch(() => ({}));
@@ -364,7 +370,7 @@ function handleStt(req, res, { readBody, clientIp }) {
     const audio = String(b.audio || ""), mime = /^audio\/[a-z0-9.+-]+$/.test(b.mime || "") ? b.mime : "audio/wav";
     if (!audio || audio.length > 990000) return send(400, { ok: false, error: "нет записи" });
     if (!voiceAllowed(clientIp(req))) return send(429, { ok: false, error: "слишком много запросов" });
-    try { send(200, { ok: true, text: await stt(audio, mime) }); }
+    try { send(200, { ok: true, text: await stt(audio, mime, String(b.lang || "")) }); }
     catch (e) { console.log("[tutor stt] " + (e && e.message)); send(502, { ok: false, error: "не получилось распознать речь" }); }
   })().catch(() => { try { send(500, { ok: false, error: "error" }); } catch { /* уже ответили */ } });
 }
@@ -399,14 +405,15 @@ function handleChat(req, res, { readBody, clientIp }) {
         else if (own.p === "openai") await streamOpenAI(own.k, system, messages, write, ac.signal);
         else await streamUserClaude(own.k, system, messages, write, ac.signal);
       } else {
-        const c = claudeClient();
+        const c = claudeClient(), ok = serverOpenAIKey();
         if (c) await streamClaude(c, system, messages, write, ac.signal);
+        else if (ok) await streamOpenAI(ok, system, messages, write, ac.signal, SERVER_OPENAI_MODEL);
         else await streamGemini(system, messages, write, ac.signal, null, true);
       }
     } catch (e) {
       if (!ac.signal.aborted) {
         console.log("[tutor] " + (own ? "own " + own.p + ": " + String((e && e.message) || e).split(own.k).join("***").slice(0, 160) : (e && e.message ? e.message : e)));
-        write("\n\n" + (own ? keyError(e) : "Не получилось ответить. Попробуйте спросить ещё раз."));
+        write("\n\n" + (own ? keyError(e) : b.lang === "kk" ? "Жауап бере алмадым. Тағы бір рет сұрап көріңіз." : "Не получилось ответить. Попробуйте спросить ещё раз."));
       }
     }
     if (!res.writableEnded) res.end();
@@ -430,6 +437,15 @@ async function oneShot(system, user, ms) {
   if (c) {
     const r = await c.messages.create({ model: CLAUDE_MODEL, max_tokens: 4000, system, messages: [{ role: "user", content: user }] });
     return (r.content || []).filter((x) => x.type === "text").map((x) => x.text).join("");
+  }
+  const ok = serverOpenAIKey();
+  if (ok) {
+    const r = await fetch("https://api.openai.com/v1/chat/completions", { method: "POST", signal: AbortSignal.timeout(ms || 60000),
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + ok },
+      body: JSON.stringify({ model: SERVER_OPENAI_MODEL, max_tokens: 4000, messages: [{ role: "system", content: system }, { role: "user", content: user }] }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error("openai_" + r.status);
+    return String((((j.choices || [])[0] || {}).message || {}).content || "");
   }
   const j = await gemini(GEMINI_MODEL, { systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: user }] }],
     generationConfig: { maxOutputTokens: 8000, temperature: 0.5, responseMimeType: "application/json" } }, ms || 30000);
