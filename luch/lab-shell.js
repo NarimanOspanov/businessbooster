@@ -64,6 +64,7 @@
   const curTab = () => PANES.find(id => T(id) && T(id).getAttribute('aria-selected') === 'true') || 'overview';
   const groupOf = id => (id === 'scheme' || id === 'calc') ? 'practice' : 'theory';
   function paint() {
+    document.documentElement.dataset.lsg = group;
     bar.querySelectorAll('.g').forEach(b => b.setAttribute('aria-selected', b.dataset.g === group));
     const subs = GROUPS[group].subs, cur = curTab();
     sub.hidden = !subs.length;
@@ -1069,6 +1070,67 @@
     apply();
     mq.addEventListener('change', apply);
     let rt = 0; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (on && innerWidth !== at) apply(); }, 250); });
+  })();
+
+  // ---------- телефон: урок по трём вкладкам (22.11.2026) ----------
+  // Было на телефоне одной простынёй: задание, стенд, кнопки опыта, вкладки, длинный текст теории и крупная лента уроков.
+  // Стало (≤600 px): вкладки «Теория · Практика · ДЗ» сразу под шапкой и прилипают к верху экрана.
+  //   Теория — название урока, лекция голосом, «К практике» и конспект урока ссылкой (текст — на открытой странице /learn/).
+  //   Практика — задание, стенд, кнопки опыта и вкладки «Опыт и управление / Расчёты».
+  //   ДЗ — только домашнее задание. Лента уроков — маленькие номера. Шире 600 px всё как раньше.
+  (() => {
+    const header = document.querySelector('.app > header') || document.querySelector('header');
+    if (!header) return;
+    const mq = matchMedia('(max-width:600px)');
+    const home = document.createComment('ls-bar');
+    const css = document.createElement('style');
+    css.textContent = `@media (max-width:600px){
+    html.ls-m .ls-tabs{position:sticky;top:0;z-index:40;background:var(--bg,#0b1019);border-bottom:1px solid var(--line,#26324a);margin:0 0 10px}
+    html.ls-m .ls-tabs button.g{font-size:13px;padding:15px 4px 13px}
+    html.ls-m[data-lsg="theory"] .task.ls-mv,html.ls-m[data-lsg="theory"] #stage,html.ls-m[data-lsg="theory"] .tools.ls-mv,
+    html.ls-m[data-lsg="hw"] .task.ls-mv,html.ls-m[data-lsg="hw"] #stage,html.ls-m[data-lsg="hw"] .tools.ls-mv{display:none!important}
+    html.ls-m[data-lsg="theory"] .ls-sub{display:none}
+    html.ls-m[data-lsg="theory"] .panel{display:flex;flex-direction:column}
+    html.ls-m[data-lsg="theory"] #pane-overview{order:-1;padding-bottom:0}
+    html.ls-m[data-lsg="theory"] #pane-overview > :not(.lesson-k):not(h2){display:none}
+    html.ls-m[data-lsg="theory"] #pane-overview h2{margin-bottom:0}
+    html.ls-m[data-lsg="theory"] .ls-story{padding:16px}
+    html.ls-m[data-lsg="theory"] .ls-story .play i{width:52px;height:52px;font-size:19px}
+    html.ls-m[data-lsg="theory"] .ls-story .play b{font-size:17px}
+    .ls-mth{display:none}
+    html.ls-m[data-lsg="theory"] .ls-mth{display:flex;gap:8px;margin:12px 16px 18px}
+    html.ls-m .ls-mth .ls-btn{flex:1 1 0;text-align:center;text-decoration:none;padding:13px 10px;font-size:14.5px;border-radius:12px}
+    html.ls-m .ls-mth .ls-btn.main{background:var(--accent,#ffb547);color:#1b1206}
+    html.ls-m .ls-mth [hidden]{display:none}
+    html.ls-m .strip{gap:6px;align-items:center}
+    html.ls-m .lessons{gap:6px;padding:2px 0}
+    html.ls-m .lesson{flex:0 0 auto;min-height:38px;padding:6px 12px;border-radius:999px;gap:0;align-items:center}
+    html.ls-m .lesson svg,html.ls-m .lesson .t{display:none}
+    html.ls-m .lesson .n{margin:0;font-size:12.5px;white-space:nowrap}
+    html.ls-m .lesson .chk{position:static;margin-left:6px}
+    html.ls-m .lesson[aria-current="true"]{background:var(--fg,#e8ecf4);color:var(--bg,#0b1019);border-color:var(--fg,#e8ecf4)}
+    html.ls-m .strip .navbtn{min-width:40px;min-height:38px;padding:0 10px}
+  }`;
+    document.head.appendChild(css);
+    // «К практике» и конспект урока (открытая страница /learn/ с текстом лекции)
+    const SUBJ = { phys: 'fizika', math: 'matematika', chem: 'himiya', bio: 'biologiya', cs: 'informatika' };
+    const m = /^\/labs\/([a-z]+)-([a-z0-9-]+)\/?/.exec(location.pathname);
+    const notesUrl = () => (m && SUBJ[m[1]] ? ((window.LuchI18n && window.LuchI18n.lang === 'kk') ? '/kk' : '') + '/learn/' + SUBJ[m[1]] + '/' + m[2] + '/' + (lessonIdx() + 1) + '/' : '');
+    const box = document.createElement('div'); box.className = 'ls-mth';
+    box.innerHTML = '<button type="button" class="ls-btn main" data-go>К практике →</button><a class="ls-btn ghost" data-notes>Конспект урока</a>';
+    story.after(box);
+    box.querySelector('[data-go]').addEventListener('click', () => { openTab(lastSub.practice); scrollTo(0, 0); });
+    const notes = box.querySelector('[data-notes]');
+    const fixNotes = () => { const u = notesUrl(); notes.hidden = !u; if (u) notes.href = u; };
+    fixNotes();
+    if (lessonsBox) new MutationObserver(fixNotes).observe(lessonsBox, { attributes: true, subtree: true, attributeFilter: ['aria-current'] });
+    function place() {
+      if (mq.matches && !home.parentNode) { bar.before(home); header.after(bar); document.documentElement.classList.add('ls-m'); }
+      else if (!mq.matches && home.parentNode) { home.replaceWith(bar); document.documentElement.classList.remove('ls-m'); }
+    }
+    place(); mq.addEventListener('change', place);
+    // сменили вкладку на телефоне — показываем её с начала
+    bar.addEventListener('click', e => { if (mq.matches && e.target.closest('.g')) requestAnimationFrame(() => { if (scrollY > bar.offsetTop) scrollTo(0, 0); }); });
   })();
 
   window.LuchShell = { lessonIdx, lessonUrl, openHw, openTab, learnState, noteHelp, whatNext, nextTopic: () => nextTopic, goNext, startPending: () => startShown, storyPlaying: () => !!st, mediaBusy: () => !!(st && st.audio && !st.audio.paused && !st.audio.ended) || [...document.querySelectorAll('video,audio')].some(m => !m.paused && !m.ended && !m.muted), openQuiz, prefetchQuiz };
