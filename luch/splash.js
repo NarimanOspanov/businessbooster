@@ -3,6 +3,19 @@
 // поэтому показывается сразу, ещё до того, как страница нарисовалась.
 (() => {
   if (window.__oeSplash) return; window.__oeSplash = true;
+  // ?embed=real — только объёмная сцена опыта «Как в жизни» на весь экран (её встраивает видеоразбор ENT QUIZ в iframe)
+  if (new URLSearchParams(location.search).get('embed') === 'real') {
+    window.__oeEmbed = true; document.documentElement.classList.add('oe-embed');
+    try { localStorage.setItem('luch-real', '1'); } catch (e) {}
+    const es = document.createElement('style');
+    es.textContent = `html.oe-embed,html.oe-embed body{overflow:hidden!important;background:#0b1019!important}
+    html.oe-embed body #stage#stage.stage{position:fixed!important;inset:0!important;z-index:2147483001!important;margin:0!important;border:0!important;border-radius:0!important;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;display:flex!important;flex-direction:column;justify-content:center;background:#0b1019}
+    html.oe-embed body #stage#stage > :not(#scene):not(.rl-view){display:none!important}
+    html.oe-embed .ls-start,html.oe-embed .ls-story,html.oe-embed .lt-btn,html.oe-embed .lt-panel{display:none!important}
+    html.oe-embed body #scene#scene{display:block!important;width:100%!important;max-height:100vh}`;
+    (document.head || document.documentElement).appendChild(es);
+    return; // без заставки
+  }
   const reduce = matchMedia('(prefers-reduced-motion:reduce)').matches;
   const st = document.createElement('style');
   st.textContent = `
