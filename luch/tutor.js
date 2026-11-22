@@ -15,7 +15,11 @@
   const fromUrl = new URLSearchParams(location.search).get('lang');
   // Выбор запоминается в localStorage и действует на всех страницах; ?lang=kk из ссылки (ENT QUIZ) тоже запоминается.
   const LANGS_ON = true;
-  let lang = LANGS.some(l => l[0] === fromUrl) ? fromUrl : (LANGS_ON ? (store.get('luch-lang') || 'ru') : 'ru');
+  // по умолчанию — казахский (большинство учеников сдают ЕНТ на казахском); поисковым роботам — русский оригинал страницы,
+  // как указано в hreflang (казахские версии для поиска — открытые конспекты /kk/learn/)
+  const BOT = /bot|crawl|spider|slurp|yandex|google|bing|lighthouse|headless/i.test(navigator.userAgent || '');
+  const DEF = BOT ? 'ru' : 'kk';
+  let lang = LANGS.some(l => l[0] === fromUrl) ? fromUrl : (LANGS_ON ? (store.get('luch-lang') || DEF) : 'ru');
   if (!LANGS.some(l => l[0] === lang)) lang = 'ru';
   if (fromUrl) store.set('luch-lang', lang);
   document.documentElement.lang = lang;
@@ -272,7 +276,11 @@
     body.lt-board-on .lt-panel{max-height:min(48vh,420px)}
     .lt-bf{display:none}
     .lt-panel,.lt-panel.lt-compact{right:0;left:0;bottom:0;width:100%;max-height:min(70vh,560px);border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
-    .lt-btn{opacity:.96;bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+    /* на телефоне сова маленькая и в самом углу, чтобы не закрывать урок */
+    .lt-btn{opacity:.96;padding:3px;right:calc(10px + env(safe-area-inset-right,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+    .lt-btn.lt-left{left:calc(10px + env(safe-area-inset-left,0px))}
+    .lt-btn .lt-av{width:34px;height:34px}
+    .lt-btn .lt-dot{top:1px;right:1px;width:9px;height:9px}
     .lt-btn .lt-bt{max-width:calc(100vw - 110px)}
     .lt-ib .lt-tx{display:none}
   }

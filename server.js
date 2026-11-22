@@ -11963,7 +11963,8 @@ http
       const type = MIME[path.extname(filePath).toLowerCase()] || "application/octet-stream";
       // главная и интерактивные уроки: canonical на openschool.work и ссылка на открытый конспект темы
       if (type === MIME[".html"] && !isReceptionHost) { try { data = LEARN.decorate(urlPath, data); } catch (e) { /* без canonical */ } }
-      res.writeHead(200, { "Content-Type": type }).end(data);
+      // HTML всегда сверяем с сервером: после выкладки ученик сразу получает новую страницу, а не копию из кэша браузера
+      res.writeHead(200, type === MIME[".html"] ? { "Content-Type": type, "Cache-Control": "no-cache" } : { "Content-Type": type }).end(data);
     });
   })
   .listen(PORT, () => console.log(`Saudager running on port ${PORT}`));
