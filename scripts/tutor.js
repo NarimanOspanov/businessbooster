@@ -719,8 +719,6 @@ function handleStoryImg(req, res, { clientIp }) {
 // POST /api/luch/i18n { lang: "en"|"kk"|"es", texts: ["русская строка", …] } → { tr: ["перевод", …] }
 // Кэш: память процесса + таблица luch.i18n; модель вызывается только для новых строк.
 const I18N_LANGS = { en: "English", kk: "Kazakh (Қазақ тілі, Cyrillic script)", es: "Spanish (Español)" };
-const I18N_MODEL = process.env.LUCH_I18N_MODEL || process.env.GEMINI_MODEL || "gemini-3.7-flash";
-const I18N_FALLBACK = process.env.LUCH_I18N_FALLBACK || "gemini-3.5-flash-lite";
 const i18nMem = new Map(); // `${lang}:${hash}` → перевод
 const sha1 = (s) => require("crypto").createHash("sha1").update(s).digest("hex");
 const i18nHits = new Map();
@@ -760,24 +758,21 @@ async function i18nModel(lang, texts) {
     const r = await c.messages.create({ model: process.env.LUCH_I18N_CLAUDE || USER_CLAUDE_MODEL, max_tokens: 16000, system, messages: [{ role: "user", content: user }] });
     return (r.content || []).filter((x) => x.type === "text").map((x) => x.text).join("");
   };
-  if (keyFrom("GEMINI_API_KEY", ".gemini-key")) try {
-    const body = { systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: user }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 16000, responseMimeType: "application/json" } };
-    // Gemini часто отвечает 503 «high demand»: повтор через паузу, потом запасная модель
-    let j, err;
-    for (const [m, wait] of [[I18N_MODEL, 0], [I18N_MODEL, 1500], [I18N_FALLBACK, 0], [I18N_FALLBACK, 3000]]) {
-      if (wait) await new Promise((r) => setTimeout(r, wait));
-      try { j = await gemini(m, body, 90000); break; } catch (e) { err = e; if (!/50[03]|429|overload|UNAVAILABLE/i.test(String(e && e.message))) throw e; }
-    }
-    if (!j) throw err;
-    const c = ((j.candidates || [])[0] || {}).content;
-    out = c && c.parts ? c.parts.map((p) => (p.thought ? "" : p.text || "")).join("") : "";
-  } catch (e) { if (!claudeClient()) throw e; console.log("[i18n] gemini → claude: " + String(e && e.message).slice(0, 40)); out = await viaClaude(); } // Gemini перегружен (503) — переводит Claude
-  else out = await viaClaude();
+  out = await viaClaude(); // переводит только Claude (Gemini для интерфейса не используем)
   const a = out.indexOf("["), z = out.lastIndexOf("]");
   const arr = JSON.parse(out.slice(a, z + 1));
   if (!Array.isArray(arr) || arr.length !== texts.length) throw new Error("i18n: length mismatch " + (arr && arr.length) + "/" + texts.length);
   return arr.map((x, i) => (typeof x === "string" && x.trim() ? x : texts[i]));
+}
+let missReady = null;
+async function i18nMiss(lang, rows) {
+  const sql = require("mssql"), pool = await db().getPool();
+  if (!missReady) missReady = pool.request().query("IF OBJECT_ID('luch.i18n_miss') IS NULL CREATE TABLE luch.i18n_miss (src_hash CHAR(40) NOT NULL, lang NVARCHAR(8) NOT NULL, src NVARCHAR(MAX) NOT NULL, hits INT NOT NULL DEFAULT 1, created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(), CONSTRAINT PK_i18n_miss PRIMARY KEY (src_hash, lang))").catch((e) => { missReady = null; throw e; });
+  await missReady;
+  await pool.request().input("lang", sql.NVarChar(8), lang).input("j", sql.NVarChar(sql.MAX), JSON.stringify(rows)).query(`
+    MERGE luch.i18n_miss AS t USING (SELECT * FROM OPENJSON(@j) WITH (h CHAR(40), s NVARCHAR(MAX))) AS s ON t.src_hash = s.h AND t.lang = @lang
+    WHEN MATCHED THEN UPDATE SET hits = t.hits + 1
+    WHEN NOT MATCHED THEN INSERT (src_hash, lang, src) VALUES (s.h, @lang, s.s);`);
 }
 const i18nPending = new Map(); // одна и та же строка, запрошенная разными посетителями одновременно, переводится один раз
 async function translate(lang, texts) {
@@ -788,6 +783,7 @@ async function translate(lang, texts) {
     try { for (const r of await i18nFromDb(lang, miss)) i18nMem.set(lang + ":" + r.src_hash, r.dst); } catch (e) { console.log("[i18n db] " + (e && e.message)); }
     texts.forEach((t, i) => { const v = i18nMem.get(lang + ":" + hashes[i]); if (v !== undefined) res[i] = v; else if (!need.some((n) => n.h === hashes[i])) need.push({ h: hashes[i], s: t }); });
   }
+  if (need.length && !claudeClient()) { i18nMiss(lang, need.map((x) => ({ h: x.h, s: x.s }))).catch((e) => console.log("[i18n miss] " + (e && e.message))); need.length = 0; }
   const parts = [];
   for (let k = 0; k < need.length; k += 30) parts.push(need.slice(k, k + 30));
   const one = async (part) => {
