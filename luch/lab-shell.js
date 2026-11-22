@@ -355,7 +355,7 @@
   }
   function stKeys(e) {
     if (!st) return;
-    if (e.key === 'Escape') { e.preventDefault(); if (st.el.classList.contains('fs')) setFs(false); else stopStory(); }
+    if (e.key === 'Escape') { e.preventDefault(); const vp = st.el.querySelector('.volp'); if (vp && !vp.hidden) vp.hidden = true; else if (st.el.classList.contains('fs')) setFs(false); else stopStory(); }
     else if ((e.key === 'f' || e.key === 'F' || e.key === 'а' || e.key === 'А') && !/INPUT|TEXTAREA/.test(e.target.tagName)) { e.preventDefault(); toggleFs(); }
     else if (e.key === ' ' && !/INPUT|TEXTAREA/.test(e.target.tagName)) { e.preventDefault(); togglePause(); }
     else if (/INPUT/.test(e.target.tagName)) return; // стрелки на ползунке громкости — ему
@@ -439,6 +439,8 @@
     });
     el.querySelector('.volp input').addEventListener('input', e => setVol(e.target.value / 100));
     el.querySelector('.volp').addEventListener('click', e => e.stopPropagation());
+    // регулятор громкости закрывается нажатием в любом другом месте (Esc — в stKeys)
+    document.addEventListener('pointerdown', e => { const p = el.querySelector('.volp'); if (p && !p.hidden && !e.target.closest('.volw')) p.hidden = true; }, true);
     el.querySelector('.pv h4').textContent = lessonTitle() || document.title;
     el.querySelector('.pic').addEventListener('dblclick', e => { e.preventDefault(); toggleFs(); });
     return el;
@@ -547,7 +549,12 @@
       el.classList.remove('wait');
       // картинка: плавная смена, лёгкий наезд камеры
       const old = pic.querySelector('img.on, .brd.on');
-      const vis = visualOf(sec), node = vis === 'board' ? boardOf(sec) : vis === 'scheme' ? schemeOf() : im ? im.cloneNode() : null;
+      const vis = visualOf(sec);
+      if (vis === 'img' && !im) { // картинка ещё не готова или не загрузилась: показываем схему опыта (или оставляем прежнюю) и пробуем снова
+        delete st.img[i];
+        setTimeout(() => { if (!st || st.run !== my || st.i !== i) return; loadImg(i).then(im2 => { if (!im2 || !st || st.run !== my || st.i !== i) return; const o = pic.querySelector('img.on, .brd.on, svg.on, .on'); const n2 = im2.cloneNode(); pic.appendChild(n2); requestAnimationFrame(() => { n2.classList.add('on'); if (o) { o.classList.remove('on'); setTimeout(() => o.remove(), 900); } }); }); }, 6000);
+      }
+      const node = vis === 'board' ? boardOf(sec) : vis === 'scheme' ? schemeOf() : im ? im.cloneNode() : (!old && sceneSvg()) ? schemeOf() : null;
       if (node) {
         pic.appendChild(node);
         requestAnimationFrame(() => { node.classList.add('on'); if (old) old.classList.remove('on'); setTimeout(() => old && old.remove(), 900); pic.classList.add('has'); });

@@ -5518,6 +5518,7 @@ async function placeDemoCall(toNumber, agentOverride, scenario, lang) {
 // new/updated storefront URLs. The key file must be served from this host.
 // ---------------------------------------------------------------------------
 
+const LEARN = require("./scripts/learn.js");
 const INDEXNOW_KEY = "8c2f1e4b9a374d5f8b6a1c0d2e3f4a5b";
 // Canonical host: the Azure default hostname serves the same content, so all
 // canonical URLs, sitemaps and feeds point search engines at the real domain.
@@ -11834,6 +11835,9 @@ http
       return;
     }
 
+    // Open School: конспекты /learn/ и /kk/learn/, robots/sitemap/llms.txt для openschool.work (scripts/learn.js)
+    if (LEARN.handle(req, res, urlPath)) return;
+
     if (urlPath === "/robots.txt") {
       res.writeHead(200, { "Content-Type": MIME[".txt"], "Cache-Control": "public, max-age=3600" });
       // /go/ are outbound buy redirects — no reason for crawlers to follow them
@@ -11957,6 +11961,8 @@ http
         return;
       }
       const type = MIME[path.extname(filePath).toLowerCase()] || "application/octet-stream";
+      // главная и интерактивные уроки: canonical на openschool.work и ссылка на открытый конспект темы
+      if (type === MIME[".html"] && !isReceptionHost) { try { data = LEARN.decorate(urlPath, data); } catch (e) { /* без canonical */ } }
       res.writeHead(200, { "Content-Type": type }).end(data);
     });
   })
