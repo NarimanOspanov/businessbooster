@@ -58,9 +58,11 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px 20
 
 .intro{display:flex;justify-content:space-between;align-items:flex-end;gap:16px 32px;flex-wrap:wrap;margin:26px 0 18px}
 .intro h2{font:500 clamp(22px,3vw,32px)/1.15 var(--font-display);margin:0 0 10px;text-wrap:balance;max-width:20ch}
-.ag-play{margin-top:14px;display:inline-flex;align-items:center;gap:8px;background:var(--fg);color:var(--bg);border:0;border-radius:999px;padding:10px 16px;font:600 14px var(--font-body);cursor:pointer}
-.ag-play:hover{opacity:.9}
-.ag-play.on{background:var(--accent);color:var(--bg)}
+.ag-play{margin-top:16px;display:inline-flex;align-items:center;gap:12px;background:var(--accent);color:#1b1206;border:0;border-radius:999px;padding:7px 20px 7px 7px;font:700 15px/1.2 var(--font-body);cursor:pointer;text-align:left;box-shadow:0 8px 24px -8px rgba(255,181,71,.55);transition:transform .15s,box-shadow .15s}
+.ag-play:hover{transform:translateY(-1px);box-shadow:0 12px 28px -8px rgba(255,181,71,.7)}
+.ag-play i{flex:none;width:40px;height:40px;border-radius:50%;background:#1b1206;color:var(--accent);display:grid;place-items:center;font-style:normal;font-size:15px;padding-left:2px}
+.ag-play small{display:block;font:500 12.5px/1.2 var(--font-body);opacity:.72;margin-top:2px}
+.ag-play.on{background:var(--fg);color:var(--bg);box-shadow:none}.ag-play.on i{background:var(--bg);color:var(--fg);padding-left:0}
 /* «возьми за руку»: пока ученик ни разу не слушал гид — мягкая пульсация и подсказка */
 .ag-wrap{position:relative;display:inline-block}
 .ag-play.hint{background:var(--accent);animation:ag-pulse 2s ease-out infinite}
@@ -173,9 +175,9 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px 20
 
   <div class="intro">
     <div>
-      <h2>Физика от простого к сложному</h2>
-      <p>Вся школьная физика с 7 по 11 класс на одной карте. Сверху основы, ниже ветки разделов: чем ниже тема, тем она сложнее. Нажмите на тему, чтобы увидеть, что в ней и что стоит пройти до неё.</p>
-      <button class="ag-play" id="agPlay" type="button">▶ Аудиогид по курсу</button>
+      <h2>Физика</h2>
+      <p>Школьная физика с 7 по 11 класс: от движения и сил до атома и Вселенной.</p>
+      <button class="ag-play" id="agPlay" type="button"><i aria-hidden="true">▶</i><span>Послушай, как здесь учиться<small>Аудиогид · 3 минуты</small></span></button>
     </div>
     <div class="stats" id="stats"></div>
   </div>
@@ -258,6 +260,13 @@ const PHYS_TOPICS = [
   { id: 'astro', b: 'mod', g: 11, t: 'Астрофизика', items: ['Солнечная система', 'Звёзды', 'Галактики', 'Расширение Вселенной'], req: ['nucleus', 'newton', 'space'], status: 'done', href: '/labs/phys-astro/', lessons: 4, doneItems: 4 },
   { id: 'particles', b: 'mod', g: 11, t: 'Элементарные частицы', items: ['Зоопарк частиц', 'Античастицы', 'Как увидеть частицу', 'Коллайдер и Стандартная модель'], req: ['nucleus', 'relat'], status: 'done', href: '/labs/phys-particles/', lessons: 4, doneItems: 4 },
 ];
+const SHORT = {
+  phys: 'Школьная физика с 7 по 11 класс: от движения и сил до атома и Вселенной.',
+  math: 'Школьная математика с 5 по 11 класс: от действий с числами до производной и вероятностей.',
+  chem: 'Школьная химия с 7 по 11 класс: от смесей и атомов до органики и электролиза.',
+  bio: 'Школьная биология с 7 по 11 класс: от клетки и растений до генетики, эволюции и экологии.',
+  cs: 'Информатика с 5 по 11 класс: от первых алгоритмов до Python, сайтов, баз данных и искусственного интеллекта.',
+};
 const STATUS = { done: 'опыты готовы', part: 'часть опытов готова', soon: 'скоро' };
 
 // Предметы: у физики уже есть опыты, у остальных пока программа обучения (physics/subjects-data.js).
@@ -417,8 +426,9 @@ function useSubject(id) {
   T = Object.fromEntries(TOPICS.map(t => [t.id, Object.assign(t, { status: t.status || 'soon' })]));
   selected = null;
   document.querySelectorAll('.subj').forEach(b => b.setAttribute('aria-pressed', b.dataset.s === SUBJ.id));
-  $('.intro h2').textContent = SUBJ.title;
-  $('.intro p').textContent = SUBJ.intro;
+  // коротко: название предмета и одна строка «какие классы и что внутри» (длинное описание остаётся для конспектов /learn/)
+  $('.intro h2').textContent = SUBJ.name;
+  $('.intro p').textContent = SHORT[SUBJ.id] || String(SUBJ.intro).split('. ')[0] + '.';
   const doneN = TOPICS.filter(t => t.status !== 'soon').length, lessonsN = TOPICS.reduce((a, t) => a + (t.lessons || 0), 0);
   const subN = TOPICS.reduce((a, t) => a + t.items.length, 0);
   $('#stats').innerHTML = [
@@ -576,7 +586,8 @@ const audioGuide = (() => {
     try { const r = await fetch('/api/luch/i18n', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang, texts }) }); const j = await r.json(); return j.tr || texts; } catch (e) { return texts; }
   };
   const tts = text => fetch('/api/tutor/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, hq: true }) }).then(r => r.ok ? r.blob() : null).catch(() => null);
-  const setBtn = on => { btn.classList.toggle('on', on); btn.textContent = on ? '❚❚ Остановить' : '▶ Аудиогид по курсу'; };
+  const BTN = { ru: ['Послушай, как здесь учиться', 'Аудиогид · 3 минуты', 'Остановить', 'Аудиогид играет'], kk: ['Мұнда қалай оқитынын тыңда', 'Аудиогид · 3 минут', 'Тоқтату', 'Аудиогид ойнап тұр'] };
+  const setBtn = on => { const b = BTN[(window.LuchI18n && window.LuchI18n.lang) === 'kk' ? 'kk' : 'ru']; btn.classList.toggle('on', on); btn.innerHTML = `<i aria-hidden="true">${on ? '❚❚' : '▶'}</i><span>${on ? b[2] : b[0]}<small>${on ? b[3] : b[1]}</small></span>`; };
 
   // субтитры: аккуратная плашка внизу экрана, видна при любой прокрутке; голос можно выключить
   const css = document.createElement('style');
