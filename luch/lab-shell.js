@@ -326,7 +326,7 @@
   sub.after(story);
   const LANG2 = (window.LuchI18n && window.LuchI18n.lang) || 'ru';
   // подписи внутри блоков без автоперевода (data-noi18n: там казахский текст лекции и теста из базы)
-  const KKL = {"Готовлю лекцию":"Дәрісті дайындап жатырмын","Пока готовлю — знаете ли вы?":"Дайындап жатқанда — білесіз бе?","Минутку":"Бір минут","Сейчас будет лекция с картинками: что это, зачем нужно, как работает и немного истории.":"Қазір суреттері бар дәріс басталады: бұл не, не үшін керек, қалай жұмыс істейді және аздап тарих.","Закрепим · вопрос ":"Бекітейік · сұрақ ","Закрепим · ":"Бекітейік · ","Закрепили · ":"Бекіттік · ","Готовлю вопросы по уроку…":"Сабақ бойынша сұрақтарды дайындап жатырмын…","Верно!":"Дұрыс!","Не совсем.":"Толық емес.","Следующий вопрос →":"Келесі сұрақ →","Отлично! Всё понял 🎉":"Керемет! Бәрін түсіндің 🎉","Хорошо! Почти без ошибок.":"Жақсы! Қатесіз дерлік.","Есть над чем подумать — спроси наставника, что осталось непонятным.":"Ойланатын нәрсе бар — түсініксіз қалғанын тәлімгерден сұра.","🎤 Разобрать ошибки":"🎤 Қателерді талдау","Дальше →":"Әрі қарай →","Сделать ДЗ":"Үй тапсырмасын орындау","Ещё раз":"Тағы бір рет","Итог":"Қорытынды"," из ":" / "};
+  const KKL = {"Перейти к другому уроку?":"Басқа сабаққа өтесіз бе?","Сейчас открыт урок «{t}». Перейти к уроку {n}{n2}?":"Қазір «{t}» сабағы ашық. {n}-сабаққа{n2} өтесіз бе?","Перейти":"Өту","Остаться":"Қалу","Готовлю лекцию":"Дәрісті дайындап жатырмын","Пока готовлю — знаете ли вы?":"Дайындап жатқанда — білесіз бе?","Минутку":"Бір минут","Сейчас будет лекция с картинками: что это, зачем нужно, как работает и немного истории.":"Қазір суреттері бар дәріс басталады: бұл не, не үшін керек, қалай жұмыс істейді және аздап тарих.","Закрепим · вопрос ":"Бекітейік · сұрақ ","Закрепим · ":"Бекітейік · ","Закрепили · ":"Бекіттік · ","Готовлю вопросы по уроку…":"Сабақ бойынша сұрақтарды дайындап жатырмын…","Верно!":"Дұрыс!","Не совсем.":"Толық емес.","Следующий вопрос →":"Келесі сұрақ →","Отлично! Всё понял 🎉":"Керемет! Бәрін түсіндің 🎉","Хорошо! Почти без ошибок.":"Жақсы! Қатесіз дерлік.","Есть над чем подумать — спроси наставника, что осталось непонятным.":"Ойланатын нәрсе бар — түсініксіз қалғанын тәлімгерден сұра.","🎤 Разобрать ошибки":"🎤 Қателерді талдау","Дальше →":"Әрі қарай →","Сделать ДЗ":"Үй тапсырмасын орындау","Ещё раз":"Тағы бір рет","Итог":"Қорытынды"," из ":" / "};
   const L = t => (LANG2 === 'kk' && KKL[t]) || t;
   // Старые ролики-рилсы (разделы «Механика», «Оптика») больше не показываем: везде одинаково — лекция, потом практика
   const reelBtn = () => null;
@@ -1131,6 +1131,46 @@
     place(); mq.addEventListener('change', place);
     // сменили вкладку на телефоне — показываем её с начала
     bar.addEventListener('click', e => { if (mq.matches && e.target.closest('.g')) requestAnimationFrame(() => { if (scrollY > bar.offsetTop) scrollTo(0, 0); }); });
+  })();
+
+  // ---------- переход на другой урок — с подтверждением (22.11.2026) ----------
+  // Лента уроков (01 02 03…) и стрелки ‹ › сразу уводили с урока, и ученик терял место в опыте. Теперь сначала спрашиваем.
+  (() => {
+    let pass = false;
+    const css = document.createElement('style');
+    css.textContent = `.ls-cf{position:fixed;inset:0;z-index:120;background:rgba(5,8,14,.6);display:grid;place-items:center;padding:16px}
+    .ls-cf .b{width:min(380px,100%);background:var(--surface,#121a28);border:1px solid var(--line,#26324a);border-radius:18px;padding:18px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+    .ls-cf h3{margin:0 0 8px;font:600 18px/1.3 var(--font-body,"Golos Text",sans-serif);color:var(--fg,#e8ecf4)}
+    .ls-cf p{margin:0 0 16px;color:var(--muted,#8b96ad);font-size:15px;line-height:1.45}
+    .ls-cf .r{display:flex;gap:8px}.ls-cf .r button{flex:1;min-height:46px;font-size:15px;border-radius:12px}`;
+    document.head.appendChild(css);
+    const targetOf = el => {
+      const list = cards(), cur = lessonIdx();
+      if (el.closest('#prevL')) return cur - 1;
+      if (el.closest('#nextL')) return cur + 1;
+      const b = el.closest('.lessons .lesson, .lessons button'); if (!b) return null;
+      return b.dataset.i !== undefined ? +b.dataset.i : list.indexOf(b);
+    };
+    document.addEventListener('click', e => {
+      if (pass || !e.isTrusted) return; // программные клики (открытие по ?l=, «Дальше» после теста) — без вопроса
+      const el = e.target.closest('.lessons .lesson, .lessons button, #prevL, #nextL'); if (!el || el.disabled) return;
+      const to = targetOf(el), list = cards();
+      if (to === null || to < 0 || to >= list.length || to === lessonIdx()) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      const tb = list[to], tt = tb && tb.querySelector('.t') ? tb.querySelector('.t').textContent.trim() : '';
+      const w = document.createElement('div'); w.className = 'ls-cf'; w.setAttribute('role', 'dialog'); w.dataset.noi18n = '';
+      const ask = L('Сейчас открыт урок «{t}». Перейти к уроку {n}{n2}?').replace('{t}', esc(lessonTitle())).replace('{n}', to + 1).replace('{n2}', tt ? ' «' + esc(tt) + '»' : '');
+      w.innerHTML = '<div class="b"><h3>' + L('Перейти к другому уроку?') + '</h3><p>' + ask + '</p><div class="r"><button type="button" class="ls-btn ghost" data-x>' + L('Остаться') + '</button><button type="button" class="ls-btn main" data-ok>' + L('Перейти') + '</button></div></div>';
+      document.body.appendChild(w);
+      const close = () => { w.remove(); removeEventListener('keydown', key, true); };
+      const key = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); close(); } };
+      addEventListener('keydown', key, true);
+      w.addEventListener('click', ev => {
+        if (ev.target === w || ev.target.closest('[data-x]')) return close();
+        if (ev.target.closest('[data-ok]')) { close(); pass = true; try { el.click(); } finally { pass = false; } }
+      });
+      w.querySelector('[data-ok]').focus();
+    }, true);
   })();
 
   window.LuchShell = { lessonIdx, lessonUrl, openHw, openTab, learnState, noteHelp, whatNext, nextTopic: () => nextTopic, goNext, startPending: () => startShown, storyPlaying: () => !!st, mediaBusy: () => !!(st && st.audio && !st.audio.paused && !st.audio.ended) || [...document.querySelectorAll('video,audio')].some(m => !m.paused && !m.ended && !m.muted), openQuiz, prefetchQuiz };
