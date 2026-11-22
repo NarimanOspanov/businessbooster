@@ -234,12 +234,38 @@ async function speak(text, hq) {
   return a;
 }
 function ttsMem(ck, a) { ttsCache.set(ck, a); if (ttsCache.size > 400) ttsCache.delete(ttsCache.keys().next().value); }
+// ---------- медиа в Azure Blob Storage (контейнер photos, публичное чтение) ----------
+// Голос лекций и гида: luch/tts/<sha256>.mp3; картинки лекций: luch/img/<sha1(ключ)>_<номер>.jpg.
+// В базе остаются только ключи (luch.tts_cache / luch.story_image с пустым data) — по ним знаем, что файл есть.
+let blobMod = null; const blob = () => blobMod || (blobMod = require("./azure-blob.js"));
+const blobOn = () => { try { return !!blob().config(); } catch (e) { return false; } };
+const imgBlobName = (key, i) => "luch/img/" + require("crypto").createHash("sha1").update(key).digest("hex") + "_" + i + ".jpg";
+async function blobGet(name) {
+  if (!blobOn()) return null;
+  const res = await fetch(blob().publicUrl(name), { signal: AbortSignal.timeout(15000) }).catch(() => null);
+  return res && res.ok ? Buffer.from(await res.arrayBuffer()) : null;
+}
 async function ttsDbGet(k) {
+  const fromBlob = await blobGet("luch/tts/" + k + ".mp3");
+  if (fromBlob && fromBlob.length > 500) return { type: "audio/mpeg", buf: fromBlob };
+  return ttsDbGetOld(k);
+}
+async function ttsDbGetOld(k) {
   const sql = require("mssql"), pool = await db().getPool();
   const r = await pool.request().input("k", sql.Char(64), k).query("SELECT mime, data FROM luch.tts_cache WHERE k = @k");
-  const row = r.recordset[0]; return row ? { type: row.mime, buf: Buffer.from(row.data) } : null;
+  const row = r.recordset[0]; return row && row.data && row.data.length > 500 ? { type: row.mime, buf: Buffer.from(row.data) } : null;
 }
 async function ttsDbPut(k, a) {
+  if (blobOn()) {
+    await blob().put("luch/tts/" + k + ".mp3", a.buf, a.type);
+    const sql = require("mssql"), pool = await db().getPool();
+    await pool.request().input("k", sql.Char(64), k).input("m", sql.VarChar(40), a.type)
+      .query("IF NOT EXISTS (SELECT 1 FROM luch.tts_cache WHERE k = @k) INSERT INTO luch.tts_cache (k, mime, data) VALUES (@k, @m, 0x)");
+    return;
+  }
+  return ttsDbPutOld(k, a);
+}
+async function ttsDbPutOld(k, a) {
   const sql = require("mssql"), pool = await db().getPool();
   await pool.request().input("k", sql.Char(64), k).input("m", sql.VarChar(40), a.type).input("d", sql.VarBinary(sql.MAX), a.buf)
     .query("IF NOT EXISTS (SELECT 1 FROM luch.tts_cache WHERE k = @k) INSERT INTO luch.tts_cache (k, mime, data) VALUES (@k, @m, @d)");
@@ -664,10 +690,12 @@ function shrinkJpeg(buf) {
 async function imgGet(key, i) {
   const ck = key + "#" + i;
   if (imgMem.has(ck)) return imgMem.get(ck);
+  const b = await blobGet(imgBlobName(key, i));
+  if (b && b.length > 500) { const v = { mime: "image/jpeg", data: b }; imgRemember(ck, v); return v; }
   try {
     const sql = require("mssql"), pool = await db().getPool();
     const r = await pool.request().input("k", sql.NVarChar(300), key).input("i", sql.TinyInt, i).query("SELECT mime, data FROM luch.story_image WHERE story_key = @k AND idx = @i");
-    if (r.recordset[0]) { const v = { mime: r.recordset[0].mime, data: r.recordset[0].data }; imgRemember(ck, v); return v; }
+    if (r.recordset[0] && r.recordset[0].data && r.recordset[0].data.length > 500) { const v = { mime: r.recordset[0].mime, data: r.recordset[0].data }; imgRemember(ck, v); return v; }
   } catch (e) { console.log("[story img db] " + (e && e.message)); }
   return null;
 }
@@ -685,7 +713,8 @@ async function imgMake(key, i, sec) {
   imgRemember(key + "#" + i, v);
   try {
     const sql = require("mssql"), pool = await db().getPool();
-    await pool.request().input("k", sql.NVarChar(300), key).input("i", sql.TinyInt, i).input("m", sql.VarChar(40), v.mime).input("d", sql.VarBinary(sql.MAX), v.data)
+    const stored = blobOn() ? await blob().put(imgBlobName(key, i), v.data, v.mime).then(() => true).catch((e) => { console.log("[story img blob] " + (e && e.message)); return false; }) : false;
+    await pool.request().input("k", sql.NVarChar(300), key).input("i", sql.TinyInt, i).input("m", sql.VarChar(40), v.mime).input("d", sql.VarBinary(sql.MAX), stored ? Buffer.alloc(0) : v.data)
       .query("IF NOT EXISTS (SELECT 1 FROM luch.story_image WHERE story_key = @k AND idx = @i) INSERT luch.story_image (story_key, idx, mime, data) VALUES (@k, @i, @m, @d)");
   } catch (e) { console.log("[story img db write] " + (e && e.message)); }
   return v;
@@ -697,6 +726,11 @@ function handleStoryImg(req, res, { clientIp }) {
   // картинки общие для всех языков: казахская/английская лекция показывает картинки русской (сюжеты те же)
   const sk = storeKey(key.replace(/\|\w+$/, "|ru"));
   (async () => {
+    if (blobOn() && !imgMem.has(sk + "#" + i)) {
+      const sql = require("mssql"), pool = await db().getPool();
+      const has = await pool.request().input("k", sql.NVarChar(300), sk).input("i", sql.TinyInt, i).query("SELECT DATALENGTH(data) n FROM luch.story_image WHERE story_key = @k AND idx = @i").then((x) => x.recordset[0]).catch(() => null);
+      if (has && !has.n) { res.writeHead(302, { Location: blob().publicUrl(imgBlobName(sk, i)), "Cache-Control": "public, max-age=86400" }); return res.end(); }
+    }
     let v = await imgGet(sk, i);
     if (!v) {
       const story = await storyGet(sk);
