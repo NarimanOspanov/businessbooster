@@ -745,7 +745,9 @@
     const box = stageTask || taskBox();
     if (idx < 0 || !box) return;
     const b = document.createElement('button'); b.type = 'button'; b.className = 'ls-tplay';
-    b.innerHTML = '<i>▶</i>Как выполнить задание'; b.title = 'Наставник объяснит задание голосом';
+    // коротко, одним словом — длинная надпись не помещалась на телефоне
+    b.setAttribute('data-noi18n', ''); b.innerHTML = '<i>▶</i>' + (LANG2 === 'kk' ? 'Тапсырма' : 'Задание');
+    b.title = LANG2 === 'kk' ? 'Ұстаз тапсырманы дауыспен түсіндіреді' : 'Наставник объяснит задание голосом';
     b.addEventListener('click', e => { e.stopPropagation(); playStory(idx); });
     const k = box.querySelector('.k'); if (k) k.after(b); else box.prepend(b);
   }
