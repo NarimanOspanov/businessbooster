@@ -10,11 +10,11 @@
 // сервер (/api/luch/i18n, кэш в базе), здесь они запоминаются в localStorage.
 (() => {
   if (window.LuchI18n) return;
-  const LANGS = [['ru', 'Рус'], ['en', 'Eng'], ['kk', 'Қаз'], ['es', 'Esp']];
+  const LANGS = [['ru', 'Рус'], ['kk', 'Қаз']]; // лекции, озвучка и тесты готовы на этих двух (en/es выключены)
   const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
   const fromUrl = new URLSearchParams(location.search).get('lang');
-  // Пока сайт только на русском: переключатель скрыт, другие языки включаются лишь вручную через ?lang=en (для проверки).
-  const LANGS_ON = false;
+  // Выбор запоминается в localStorage и действует на всех страницах; ?lang=kk из ссылки (ENT QUIZ) тоже запоминается.
+  const LANGS_ON = true;
   let lang = LANGS.some(l => l[0] === fromUrl) ? fromUrl : (LANGS_ON ? (store.get('luch-lang') || 'ru') : 'ru');
   if (!LANGS.some(l => l[0] === lang)) lang = 'ru';
   if (fromUrl) store.set('luch-lang', lang);
@@ -27,6 +27,8 @@
     .li-lang button{background:none;border:0;border-radius:7px;padding:6px 9px;font:600 12px/1 var(--font-body,"Golos Text",sans-serif);color:var(--muted,#8b96ad);cursor:pointer}
     .li-lang button[aria-pressed="true"]{background:var(--fg,#e8ecf4);color:var(--bg,#0b1019)}
     .li-lang button:hover{color:var(--fg,#e8ecf4)}
+    header > .brand + .li-lang{margin-left:12px}
+    @media (max-width:600px){header > .brand + .li-lang{margin-left:auto}.li-lang button{padding:6px 7px}header > .li-lang ~ .oe-acc{margin-left:auto}}
     html.li-wait body{opacity:0}
     body{transition:opacity .18s}`;
   document.head.appendChild(css);
@@ -35,7 +37,8 @@
     const box = document.createElement('div'); box.className = 'li-lang'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Language'); box.dataset.noi18n = '';
     box.innerHTML = LANGS.map(([c, n]) => `<button type="button" data-l="${c}" aria-pressed="${c === lang}">${n}</button>`).join('');
     box.addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.dataset.l !== lang) api.set(b.dataset.l); });
-    header.appendChild(box);
+    // сразу за логотипом: на телефоне помещается в первую строку шапки и не сталкивает «Войти» вниз
+    const br = header.querySelector(':scope > .brand'); if (br) br.after(box); else header.appendChild(box);
   };
   if (LANGS_ON) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount(); }
   if (lang === 'ru') return;
@@ -44,8 +47,9 @@
   const KEY = 'luch-i18n-' + lang;
   let cache;
   try { cache = new Map(JSON.parse(store.get(KEY) || '[]')); } catch (e) { cache = new Map(); }
+  for (const [k, v] of cache) if (k === v && /[А-Яа-яЁё]{4}/.test(k) && !/[ӘәҒғҚқҢңӨөҰұҮүІі]/.test(k)) cache.delete(k); // неудачные «переводы» из старых версий
   const done = new Set(cache.values());          // уже переведённые строки (для казахского они тоже кириллица)
-  const queue = new Set(), inflight = new Set(), waiting = new Set();
+  const queue = new Set(), inflight = new Set(), waiting = new Set(), failed = new Set(); // failed — не перевелось сейчас, до перезагрузки не спрашиваем
   const SKIP = 'script,style,textarea,code,pre,[data-noi18n],.lt-m';
   const ATTRS = ['placeholder', 'aria-label', 'title', 'alt'];
   // числа меняются каждый кадр («12,3 см») — переводим шаблон «{0} см», а числа подставляем обратно
@@ -54,7 +58,7 @@
     const k = s.trim(); if (!k || !CY.test(k) || done.has(k)) return null;
     const nums = k.match(NUM) || []; let i = 0;
     const tmpl = nums.length ? k.replace(NUM, () => '{' + (i++) + '}') : k;
-    if (done.has(tmpl)) return null;
+    if (done.has(tmpl) || failed.has(tmpl)) return null;
     const t = cache.get(tmpl);
     if (t !== undefined) { const out = nums.length ? t.replace(/\{(\d+)\}/g, (m, n) => nums[+n] !== undefined ? nums[+n] : m) : t; return s.replace(k, out); }
     queue.add(tmpl); return undefined;
@@ -91,7 +95,7 @@
     try {
       const r = await fetch('/api/luch/i18n', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang, texts: batch }) });
       const j = await r.json();
-      if (r.ok && Array.isArray(j.tr)) { batch.forEach((k, i) => { const t = j.tr[i]; cache.set(k, t); done.add(t); }); save(); }
+      if (r.ok && Array.isArray(j.tr)) { batch.forEach((k, i) => { const t = j.tr[i]; if (typeof t !== 'string') { failed.add(k); return; } cache.set(k, t); done.add(t); }); save(); } // null — сервер не перевёл, спросим после перезагрузки
     } catch (e) {}
     batch.forEach(k => inflight.delete(k)); running--;
     const ws = [...waiting]; waiting.clear();

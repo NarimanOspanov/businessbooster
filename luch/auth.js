@@ -28,6 +28,9 @@
     @media (max-width:600px){.oe-acc{margin-left:8px}.oe-acc .nm{display:none}.oe-acc a,.oe-acc button{padding:0 10px}}`;
   document.head.appendChild(css);
   const acc = document.createElement('div'); acc.className = 'oe-acc'; acc.dataset.noi18n = '';
+  // блок аккаунта не переводится автоматически (там имя ученика) — свои подписи переводим здесь
+  const KK = { 'Войти': 'Кіру', 'Войти: прогресс сохранится и будет на любом устройстве': 'Кіру: прогресс сақталады және кез келген құрылғыда болады', 'Аккаунт': 'Аккаунт', 'Мой кабинет': 'Жеке кабинет', 'Друзья и группы': 'Достар мен топтар', 'Выйти': 'Шығу' };
+  const T = s => (window.LuchI18n && window.LuchI18n.lang === 'kk' && KK[s]) || s;
   // меню аккаунта закрывается нажатием мимо и клавишей Esc
   document.addEventListener('click', (e) => { const m = acc.querySelector('.oe-menu'); if (m && !m.hidden && !acc.contains(e.target)) { m.hidden = true; const b = acc.querySelector('[aria-haspopup]'); if (b) b.setAttribute('aria-expanded', 'false'); } });
   document.addEventListener('keydown', (e) => { const m = acc.querySelector('.oe-menu'); if (e.key === 'Escape' && m && !m.hidden) { m.hidden = true; const b = acc.querySelector('[aria-haspopup]'); if (b) { b.setAttribute('aria-expanded', 'false'); b.focus(); } } });
@@ -35,11 +38,11 @@
   function paint() {
     mount();
     const u = A.user;
-    if (!u) { acc.innerHTML = '<button type="button">Войти</button>'; acc.firstChild.onclick = () => clerk ? A.openSignIn() : null; acc.firstChild.title = 'Войти: прогресс сохранится и будет на любом устройстве'; return; }
+    if (!u) { acc.innerHTML = '<button type="button">' + T('Войти') + '</button>'; acc.firstChild.onclick = () => clerk ? A.openSignIn() : null; acc.firstChild.title = T('Войти: прогресс сохранится и будет на любом устройстве'); return; }
     const nick = A.data && A.data.user && A.data.user.nick;
     const first = esc((nick || u.firstName || u.fullName || u.primaryEmailAddress?.emailAddress || 'Кабинет').split(' ')[0]);
-    acc.innerHTML = `<a href="/me/" role="button" aria-haspopup="menu" aria-expanded="false" title="Аккаунт">${u.imageUrl ? `<img src="${esc(u.imageUrl)}" alt="">` : `<span class="av">${first[0] || '•'}</span>`}<span class="nm">${first}</span></a>` +
-      `<div class="oe-menu" role="menu" hidden><a role="menuitem" href="/me/">Мой кабинет</a><a role="menuitem" href="/social/">Друзья и группы</a><button role="menuitem" type="button" data-out>Выйти</button></div>`;
+    acc.innerHTML = `<a href="/me/" role="button" aria-haspopup="menu" aria-expanded="false" title="${T('Аккаунт')}">${u.imageUrl ? `<img src="${esc(u.imageUrl)}" alt="">` : `<span class="av">${first[0] || '•'}</span>`}<span class="nm">${first}</span></a>` +
+      `<div class="oe-menu" role="menu" hidden><a role="menuitem" href="/me/">${T('Мой кабинет')}</a><a role="menuitem" href="/social/">${T('Друзья и группы')}</a><button role="menuitem" type="button" data-out>${T('Выйти')}</button></div>`;
     const btn = acc.querySelector('a[aria-haspopup]'), menu = acc.querySelector('.oe-menu');
     const show = (on) => { menu.hidden = !on; btn.setAttribute('aria-expanded', String(on)); };
     btn.onclick = (e) => { e.preventDefault(); show(menu.hidden); if (!menu.hidden) menu.querySelector('a').focus(); };

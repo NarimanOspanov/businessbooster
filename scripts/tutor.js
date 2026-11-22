@@ -720,6 +720,7 @@ function handleStoryImg(req, res, { clientIp }) {
 // Кэш: память процесса + таблица luch.i18n; модель вызывается только для новых строк.
 const I18N_LANGS = { en: "English", kk: "Kazakh (Қазақ тілі, Cyrillic script)", es: "Spanish (Español)" };
 const I18N_MODEL = process.env.LUCH_I18N_MODEL || process.env.GEMINI_MODEL || "gemini-3.7-flash";
+const I18N_FALLBACK = process.env.LUCH_I18N_FALLBACK || "gemini-3.5-flash-lite";
 const i18nMem = new Map(); // `${lang}:${hash}` → перевод
 const sha1 = (s) => require("crypto").createHash("sha1").update(s).digest("hex");
 const i18nHits = new Map();
@@ -754,16 +755,25 @@ async function i18nModel(lang, texts) {
   ].join("\n");
   const user = JSON.stringify(texts);
   let out = "";
-  if (keyFrom("GEMINI_API_KEY", ".gemini-key")) {
-    const j = await gemini(I18N_MODEL, { systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: user }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 16000, responseMimeType: "application/json" } }, 90000);
+  const viaClaude = async () => {
+    const c = claudeClient(); if (!c) throw new Error("no_model_key");
+    const r = await c.messages.create({ model: process.env.LUCH_I18N_CLAUDE || USER_CLAUDE_MODEL, max_tokens: 16000, system, messages: [{ role: "user", content: user }] });
+    return (r.content || []).filter((x) => x.type === "text").map((x) => x.text).join("");
+  };
+  if (keyFrom("GEMINI_API_KEY", ".gemini-key")) try {
+    const body = { systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: user }] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 16000, responseMimeType: "application/json" } };
+    // Gemini часто отвечает 503 «high demand»: повтор через паузу, потом запасная модель
+    let j, err;
+    for (const [m, wait] of [[I18N_MODEL, 0], [I18N_MODEL, 1500], [I18N_FALLBACK, 0], [I18N_FALLBACK, 3000]]) {
+      if (wait) await new Promise((r) => setTimeout(r, wait));
+      try { j = await gemini(m, body, 90000); break; } catch (e) { err = e; if (!/50[03]|429|overload|UNAVAILABLE/i.test(String(e && e.message))) throw e; }
+    }
+    if (!j) throw err;
     const c = ((j.candidates || [])[0] || {}).content;
     out = c && c.parts ? c.parts.map((p) => (p.thought ? "" : p.text || "")).join("") : "";
-  } else {
-    const c = claudeClient(); if (!c) throw new Error("no_model_key");
-    const r = await c.messages.create({ model: process.env.LUCH_I18N_CLAUDE || CLAUDE_MODEL, max_tokens: 16000, system, messages: [{ role: "user", content: user }] });
-    out = (r.content || []).filter((x) => x.type === "text").map((x) => x.text).join("");
-  }
+  } catch (e) { if (!claudeClient()) throw e; console.log("[i18n] gemini → claude: " + String(e && e.message).slice(0, 40)); out = await viaClaude(); } // Gemini перегружен (503) — переводит Claude
+  else out = await viaClaude();
   const a = out.indexOf("["), z = out.lastIndexOf("]");
   const arr = JSON.parse(out.slice(a, z + 1));
   if (!Array.isArray(arr) || arr.length !== texts.length) throw new Error("i18n: length mismatch " + (arr && arr.length) + "/" + texts.length);
@@ -791,7 +801,7 @@ async function translate(lang, texts) {
     i18nToDb(lang, rows).catch((e) => console.log("[i18n db write] " + (e && e.message)));
   };
   for (let k = 0; k < parts.length; k += 4) await Promise.all(parts.slice(k, k + 4).map(one));
-  return texts.map((t, i) => (res[i] !== undefined ? res[i] : i18nMem.get(lang + ":" + hashes[i]) ?? t));
+  return texts.map((t, i) => (res[i] !== undefined ? res[i] : i18nMem.get(lang + ":" + hashes[i]) ?? null)); // null — не перевелось (модель недоступна): клиент не кэширует и спросит снова
 }
 function handleI18n(req, res, { readBody, clientIp }) {
   const send = (code, obj) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
