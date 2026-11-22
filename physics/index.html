@@ -187,6 +187,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px 20
 </div>
 
 <script src="/physics/subjects-data.js"></script>
+<script src="/luch/guides.js"></script>
 <script>
 (() => {
 const $ = s => document.querySelector(s);
@@ -445,7 +446,7 @@ window.LUCH_SUGGEST = () => selected
 // ---------- аудиогид по странице: наставник рассказывает и подсвечивает, о чём говорит ----------
 const audioGuide = (() => {
   const btn = $('#agPlay'); let run = 0, audio = null;
-  const lang = (window.LuchI18n && window.LuchI18n.lang) || 'ru';
+  let lang = 'ru'; // язык берём при запуске: /luch/tutor.js (LuchI18n) грузится позже этого скрипта
   const mobile = () => matchMedia('(max-width:760px)').matches;
   // открыть тему во время рассказа: на компьютере — боковая панель, на телефоне — раскрыть в списке
   const showTopic = id => { if (!T[id]) return; if (mobile()) openInList(id); else select(id); };
@@ -483,7 +484,7 @@ const audioGuide = (() => {
     function hl(el) { const w = win(); if (!el || !w) return; if (w.LuchTutor && w.LuchTutor.highlight) w.LuchTutor.highlight(el); else { el.style.outline = '3px solid #ffb547'; el.style.outlineOffset = '4px'; } }
     function open(u, title) {
       if (!box) build(title);
-      box.querySelector('.bar b').textContent = 'saudager.ai' + u.split('?')[0] + ' · ' + (title || 'урок');
+      box.querySelector('.bar b').textContent = location.host + u.split('?')[0] + ' · ' + (title || 'урок');
       box.querySelector('.bar a').href = u;
       if (u !== url) {
         url = u; try { if (realBefore === undefined) realBefore = localStorage.getItem('luch-real'); localStorage.setItem('luch-real', '0'); } catch (e) {}
@@ -499,15 +500,15 @@ const audioGuide = (() => {
       try { w.LuchTutor && w.LuchTutor.hideTip && w.LuchTutor.hideTip(); } catch (e) {}
       if (stage === 'theory') {
         tag.textContent = '1 · Теория';
-        hl(q('.ls-start') || btnByText(/Прослушать лекцию/));
+        hl(q('.ls-start') || btnByText(/Прослушать лекцию|Дәрісті тыңдау|Лекцияны тыңдау/));
       } else if (stage === 'practice') {
         tag.textContent = '2 · Практика: опыт';
-        const skip = btnByText(/Перейти к практике/); if (skip) skip.click();
+        const skip = btnByText(/Перейти к практике|Практикаға өту/); if (skip) skip.click();
         const sch = q('.rl-tog [data-v="scheme"]'); if (sch && sch.getAttribute('aria-pressed') !== 'true') sch.click();
         later(() => hl(q('#scene')), 400); later(() => hl(q('.task, .taskbox, #stage .task')), 4200);
       } else if (stage === 'real') {
         tag.textContent = '3 · «Как в жизни» — 3D';
-        const skip = btnByText(/Перейти к практике/); if (skip) skip.click();
+        const skip = btnByText(/Перейти к практике|Практикаға өту/); if (skip) skip.click();
         const r = q('.rl-tog [data-v="real"]'); if (r) r.click();
         later(() => hl(q('.rl-view') || q('#scene')), 1600);
       } else if (stage === 'quiz') {
@@ -531,27 +532,31 @@ const audioGuide = (() => {
     }
     return { go, close };
   })();
-  const physSteps = () => {
+  // гид по курсу: тексты для каждого предмета на ru и kk — в /luch/guides.js; на других языках — русский текст через перевод
+  const G = window.LUCH_GUIDES || {};
+  const guideSteps = () => {
+    const g = G[SUBJ.id], L = g[lang] ? lang : 'ru', x = g[L], c = G.common[L];
     const ready = TOPICS.filter(t => t.status !== 'soon'), lessonsN = ready.reduce((a, t) => a + (t.lessons || 0), 0);
-    const demo = T.current && T.current.status !== 'soon' ? 'current' : (ready[0] || {}).id;
+    const demo = T[g.demo] && T[g.demo].status !== 'soon' ? g.demo : (ready[0] || {}).id;
+    const lesson = T[demo].href + '?l=1', title = T[demo].t;
     return [
-      { t: `Привет! Я Марат, твой наставник по физике. Здесь вся школьная физика, с седьмого по одиннадцатый класс, и она подойдёт в любом возрасте: и школьнику, и взрослому, который хочет наконец понять, как устроен мир. Это ${ready.length} ${plural(ready.length, 'тема', 'темы', 'тем')} и ${lessonsN} ${plural(lessonsN, 'урок', 'урока', 'уроков')}. Сидеть над учебником не нужно: всё показано через картинки, опыты и примеры из жизни. Сначала теория, потом практика.`, sel: '.intro h2', act: () => { pv.close(); select(null); } },
-      { t: 'Физику часто считают набором скучных формул. Но за каждой формулой стои́т то, что ты видишь каждый день: почему лёд не тонет, как заряжается телефон, почему ложка в стакане кажется сломанной.', sel: '#stats' },
-      { t: 'Начинаем с основ: как измерять и из чего всё состоит. От них расходятся пять веток: механика, тепло, электричество, оптика, атом и Вселенная. Чем ниже тема на карте, тем она сложнее, а линии подскажут, что пройти сначала.', sel: mobile() ? '#list' : '.treebox' },
-      { t: 'Вот, например, тема «Электрический ток». Нажимаешь на неё, видишь, что в ней изучают, и переходишь к урокам. Давай я покажу, как устроен урок внутри.', sel: topicEl(demo, '.cta'), act: () => { pv.close(); showTopic(demo); } },
-      { t: 'Каждый урок начинается с теории. Нажимаешь «Прослушать лекцию», и я с картинками и голосом рассказываю, что это, зачем нужно и как работает, объясняю формулы и что предстоит сделать в опыте. Без зубрёжки, на простых примерах.', act: () => pv.go(T[demo].href + '?l=1', 'theory', T[demo].t) },
-      { t: 'Потом практика. Здесь ты сам ставишь опыт: собираешь цепь, замыкаешь ключ, двигаешь реостат и смотришь, как разгорается лампочка. Рядом задание и приборы с показаниями.', act: () => pv.go(T[demo].href + '?l=1', 'practice', T[demo].t) },
-      { t: 'А в режиме «Как в жизни» та же установка стои́т объёмно, как настоящие приборы на лабораторном столе. Её можно покрутить, а на приборы можно нажимать.', act: () => pv.go(T[demo].href + '?l=1', 'real', T[demo].t) },
-      { t: 'Если застрял, нажми на иконку в правом нижнем углу или просто скажи вслух. Я вижу твой экран и подскажу именно там, где ты остановился. А после практики короткий тест из четырёх вопросов, чтобы закрепить. И, если захочешь, домашнее задание.', act: () => pv.go(T[demo].href + '?l=1', 'quiz', T[demo].t) },
-      { t: 'В итоге ты не просто запомнишь формулы, а поймёшь, как устроен мир вокруг: почему летит мяч, как работает двигатель, откуда берётся радуга. И всё это бесплатно.', sel: mobile() ? '#list' : '#tree .node.done', act: () => { pv.close(); select(null); } },
-      { t: 'Учиться вместе веселее. Добавляй друзей, смотри, кто что прошёл, переписывайся и собирайся с классом в группы, с общим рейтингом и чатом.', act: () => pv.go('/social/?demo=1#g/DEMO0001', 'social', 'Друзья и группы — пример') },
-      { t: 'А если вы родитель, пригласите ребёнка в друзья. Вы будете видеть его прогресс, а я буду рассказывать, как он учится: что получается и что стоит подтянуть. Ставьте цели и вознаграждайте ребёнка за проделанную работу.', act: () => pv.go('/me/?demo=1', 'parent', 'Кабинет ребёнка — пример') },
-      ...(window.LuchAuth && window.LuchAuth.user ? [] : [{ t: 'И войди в аккаунт, это пара секунд через Google или почту: я запомню твой прогресс и буду объяснять именно под тебя.', sel: '.oe-acc', act: () => pv.close() }]),
-      { t: 'Выбирай любую зелёную тему и начинай. Я буду рядом.', sel: mobile() ? '#list details' : '#tree .node.done', act: () => pv.close() },
+      { t: x.intro.replace('{count}', c.count(ready.length, lessonsN, plural)), sel: '.intro h2', act: () => { pv.close(); select(null); } },
+      { t: x.why, sel: '#stats' },
+      { t: x.map + ' ' + c.mapEnd, sel: mobile() ? '#list' : '.treebox' },
+      { t: c.demo.replace('{t}', demo === g.demo ? x.topic : title), sel: topicEl(demo, '.cta'), act: () => { pv.close(); showTopic(demo); } },
+      { t: x.theory, act: () => pv.go(lesson, 'theory', title) },
+      { t: x.practice, act: () => pv.go(lesson, 'practice', title) },
+      ...(x.real ? [{ t: x.real, act: () => pv.go(lesson, 'real', title) }] : []),
+      { t: c.quiz, act: () => pv.go(lesson, 'quiz', title) },
+      { t: x.outcome, sel: mobile() ? '#list' : '#tree .node.done', act: () => { pv.close(); select(null); } },
+      { t: c.social, act: () => pv.go('/social/?demo=1#g/DEMO0001', 'social', 'Друзья и группы — пример') },
+      { t: c.parent, act: () => pv.go('/me/?demo=1', 'parent', 'Кабинет ребёнка — пример') },
+      ...(window.LuchAuth && window.LuchAuth.user ? [] : [{ t: c.login, sel: '.oe-acc', act: () => pv.close() }]),
+      { t: c.final, sel: mobile() ? '#list details' : '#tree .node.done', act: () => pv.close() },
     ];
   };
   const steps = () => {
-    if (SUBJ.id === 'phys' && lang === 'ru') return physSteps();
+    if (G[SUBJ.id] && G.common) return guideSteps();
     const base = TOPICS.filter(t => t.b === 'base').map(t => `«${t.t}»`).join(' и ');
     const g0 = GRADES[0], g1 = GRADES[GRADES.length - 1], n = BRANCHES.length;
     return [
@@ -564,7 +569,7 @@ const audioGuide = (() => {
     ];
   };
   const tr = async texts => {
-    if (lang === 'ru') return texts;
+    if (lang === 'ru' || (G[SUBJ.id] && G[SUBJ.id][lang])) return texts;
     try { const r = await fetch('/api/luch/i18n', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang, texts }) }); const j = await r.json(); return j.tr || texts; } catch (e) { return texts; }
   };
   const tts = text => fetch('/api/tutor/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, hq: true }) }).then(r => r.ok ? r.blob() : null).catch(() => null);
@@ -597,7 +602,7 @@ const audioGuide = (() => {
     @media (prefers-reduced-motion:reduce){.ag-sub{transition:none}}`;
   document.head.appendChild(css);
   const sub = document.createElement('div'); sub.className = 'ag-sub'; sub.setAttribute('role', 'region'); sub.setAttribute('aria-label', 'Субтитры аудиогида');
-  sub.innerHTML = '<div style="flex:1"><div class="who">Марат · аудиогид</div><div class="tx" aria-live="polite"></div></div><div class="bt"><button type="button" class="pause" aria-label="Пауза" title="Пауза (пробел)">❚❚</button><button type="button" class="rate" aria-label="Скорость 1×" title="Скорость: 1×, 1,2×, 1,5×, 2×">1×</button><button type="button" class="mute" aria-label="Выключить голос" title="Выключить голос — останутся субтитры">🔊</button><button type="button" class="x" aria-label="Остановить аудиогид" title="Остановить">✕</button></div><div class="prog" role="slider" tabindex="0" aria-label="Перемотка аудиогида" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i><b></b></div>';
+  sub.innerHTML = '<div style="flex:1"><div class="who">Марат · аудиогид</div><div class="tx" aria-live="polite" data-noi18n></div></div><div class="bt"><button type="button" class="pause" aria-label="Пауза" title="Пауза (пробел)">❚❚</button><button type="button" class="rate" aria-label="Скорость 1×" title="Скорость: 1×, 1,2×, 1,5×, 2×">1×</button><button type="button" class="mute" aria-label="Выключить голос" title="Выключить голос — останутся субтитры">🔊</button><button type="button" class="x" aria-label="Остановить аудиогид" title="Остановить">✕</button></div><div class="prog" role="slider" tabindex="0" aria-label="Перемотка аудиогида" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i><b></b></div>';
   document.body.appendChild(sub);
   const subTx = sub.querySelector('.tx'), muteBtn = sub.querySelector('.mute'), bar = sub.querySelector('.prog'), prog = bar.querySelector('i'), knob = bar.querySelector('b');
   const setProg = f => { const pc = Math.max(0, Math.min(100, f * 100)); prog.style.width = pc + '%'; knob.style.left = pc + '%'; bar.setAttribute('aria-valuenow', Math.round(pc)); };
@@ -644,10 +649,11 @@ const audioGuide = (() => {
     if (!audio) { audio = new Audio(); audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA='; audio.play().catch(() => {}); } // разрешить звук жестом
     else { try { audio.pause(); } catch (e) {} }
     if (!st) {
+      lang = (window.LuchI18n && window.LuchI18n.lang) || 'ru';
       st = steps().map(s => Array.isArray(s) ? { t: s[0], sel: s[1] } : s); texts = await tr(st.map(s => s.t));
       nSteps = st.length; bar.querySelectorAll('s').forEach(x => x.remove());
       for (let k = 1; k < nSteps; k++) { const t = document.createElement('s'); t.style.left = (k / nSteps * 100) + '%'; bar.appendChild(t); }
-      subTx.textContent = 'Готовлю рассказ…';
+      subTx.textContent = lang === 'kk' ? 'Әңгіме дайындалып жатыр…' : 'Готовлю рассказ…';
     }
     if (my !== run) return;
     for (let i = from; i < st.length; i++) {
