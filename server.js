@@ -11924,6 +11924,13 @@ http
     // Главная saudager.ai — карта предметов «Луча»; лендинг Reception365 живёт на /reception/
     // и остаётся главной на своём домене reception365.
     const isReceptionHost = /reception365/i.test(String(req.headers.host || ""));
+    // Служебное наружу не отдаём: код сервера и скриптов, данные (заявки, записи), зависимости, скрытые файлы.
+    // Раньше это всё раздавалось как статика — например, /data/leads.jsonl и /server.js открывались любому.
+    if (/^\/(data|scripts|deploy|node_modules)(\/|$)/i.test(urlPath) || /(^|\/)\./.test(urlPath) ||
+        /^\/(server\.js|package(-lock)?\.json)$/i.test(urlPath) || /\.(jsonl|md|py|sql|env|log|bak)$/i.test(urlPath)) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }).end("Not found");
+      return;
+    }
     let staticPath = urlPath;
     if (urlPath === "/" && !isReceptionHost) staticPath = "/physics/";
     if (urlPath === "/reception" || urlPath === "/reception/") staticPath = "/";
