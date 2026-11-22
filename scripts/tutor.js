@@ -729,7 +729,7 @@ function handleStoryImg(req, res, { clientIp }) {
     if (blobOn() && !imgMem.has(sk + "#" + i)) {
       const sql = require("mssql"), pool = await db().getPool();
       const has = await pool.request().input("k", sql.NVarChar(300), sk).input("i", sql.TinyInt, i).query("SELECT DATALENGTH(data) n FROM luch.story_image WHERE story_key = @k AND idx = @i").then((x) => x.recordset[0]).catch(() => null);
-      if (has && !has.n) { res.writeHead(302, { Location: blob().publicUrl(imgBlobName(sk, i)), "Cache-Control": "public, max-age=86400" }); return res.end(); }
+      if (has && !Number(has.n)) { res.writeHead(302, { Location: blob().publicUrl(imgBlobName(sk, i)), "Cache-Control": "public, max-age=86400" }); return res.end(); }
     }
     let v = await imgGet(sk, i);
     if (!v) {
