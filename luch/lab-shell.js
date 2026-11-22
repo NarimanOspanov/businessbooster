@@ -324,6 +324,9 @@
   const story = document.createElement('div'); story.className = 'ls-story';
   sub.after(story);
   const LANG2 = (window.LuchI18n && window.LuchI18n.lang) || 'ru';
+  // подписи внутри блоков без автоперевода (data-noi18n: там казахский текст лекции и теста из базы)
+  const KKL = {"Готовлю лекцию":"Дәрісті дайындап жатырмын","Пока готовлю — знаете ли вы?":"Дайындап жатқанда — білесіз бе?","Минутку":"Бір минут","Сейчас будет лекция с картинками: что это, зачем нужно, как работает и немного истории.":"Қазір суреттері бар дәріс басталады: бұл не, не үшін керек, қалай жұмыс істейді және аздап тарих.","Закрепим · вопрос ":"Бекітейік · сұрақ ","Закрепим · ":"Бекітейік · ","Закрепили · ":"Бекіттік · ","Готовлю вопросы по уроку…":"Сабақ бойынша сұрақтарды дайындап жатырмын…","Верно!":"Дұрыс!","Не совсем.":"Толық емес.","Следующий вопрос →":"Келесі сұрақ →","Отлично! Всё понял 🎉":"Керемет! Бәрін түсіндің 🎉","Хорошо! Почти без ошибок.":"Жақсы! Қатесіз дерлік.","Есть над чем подумать — спроси наставника, что осталось непонятным.":"Ойланатын нәрсе бар — түсініксіз қалғанын тәлімгерден сұра.","🎤 Разобрать ошибки":"🎤 Қателерді талдау","Дальше →":"Әрі қарай →","Сделать ДЗ":"Үй тапсырмасын орындау","Ещё раз":"Тағы бір рет","Итог":"Қорытынды"," из ":" / "};
+  const L = t => (LANG2 === 'kk' && KKL[t]) || t;
   // Старые ролики-рилсы (разделы «Механика», «Оптика») больше не показываем: везде одинаково — лекция, потом практика
   const reelBtn = () => null;
   const taskBox = () => [...document.querySelectorAll('[class*="task"]')].find(e => e.offsetParent && !e.closest('.ls-story,.ls-start,#pane-hw,.lt-panel,.lt-tip') && e.getBoundingClientRect().width > 120);
@@ -413,7 +416,7 @@
       '<ul><li data-s="text">Пишу лекцию</li><li data-s="img">Рисую картинки</li><li data-s="voice">Записываю голос</li></ul></div><i class="wt"></i><button class="big" data-a="pp" aria-label="Пауза"><span>❚❚</span></button>' +
       '<button class="pbtn px" data-a="close" aria-label="Закрыть" title="Закрыть (Esc)">✕</button>' +
       '<button class="pbtn pfs fsb" data-a="fs" aria-label="На весь экран" title="На весь экран (F)">' + FS_ICON.on + '</button></div>' +
-      '<div class="txt" data-noi18n><b>Готовлю лекцию</b><div class="fact"></div></div>' +
+      '<div class="txt" data-noi18n><b>' + L('Готовлю лекцию') + '</b><div class="fact"></div></div>' +
       '<div class="dots"></div>' +
       '<div class="ctl"><button class="ic" data-a="prev" aria-label="Назад">‹</button><button class="pp" data-a="pp"></button><button class="ic" data-a="next" aria-label="Дальше">›</button>' +
       '<button class="ic rate" data-a="rate" aria-label="Скорость 1,2×" title="Скорость: 1×, 1,2×, 1,5×, 2×">1,2×</button>' +
@@ -452,9 +455,9 @@
   }
   function factsLoop(me) {
     const box = me.el.querySelector('.fact'), list = pageFacts();
-    if (!list.length) { box.innerHTML = '<small>Минутку</small>Сейчас будет лекция с картинками: что это, зачем нужно, как работает и немного истории.'; return; }
+    if (!list.length) { box.innerHTML = '<small>' + L('Минутку') + '</small>' + L('Сейчас будет лекция с картинками: что это, зачем нужно, как работает и немного истории.') + ''; return; }
     let k = 0;
-    const show = () => { box.innerHTML = '<small>Пока готовлю — знаете ли вы?</small>' + esc(list[k % list.length]); };
+    const show = () => { box.innerHTML = '<small>' + L('Пока готовлю — знаете ли вы?') + '</small>' + esc(list[k % list.length]); };
     show();
     me.factT = setInterval(() => { box.classList.add('out'); setTimeout(() => { k++; show(); box.classList.remove('out'); }, 400); }, 4800);
   }
@@ -918,7 +921,7 @@
   function openQuiz() {
     document.querySelectorAll('.ls-quiz').forEach(x => x.remove());
     const w = document.createElement('div'); w.className = 'ls-quiz'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-label', 'Закрепим знания');
-    w.innerHTML = '<div class="card" data-noi18n><div class="top"><div class="k">Закрепим · ' + esc(lessonTitle()) + '</div><button class="x" data-a="close" aria-label="Закрыть">✕</button></div><div class="body"><div class="load">Готовлю вопросы по уроку…</div></div></div>';
+    w.innerHTML = '<div class="card" data-noi18n><div class="top"><div class="k">' + L('Закрепим · ') + '' + esc(lessonTitle()) + '</div><button class="x" data-a="close" aria-label="Закрыть">✕</button></div><div class="body"><div class="load">' + L('Готовлю вопросы по уроку…') + '</div></div></div>';
     document.body.appendChild(w);
     const body = w.querySelector('.body');
     let qs = [], i = 0, res = [];
@@ -929,17 +932,17 @@
     function showQ() {
       const q = qs[i];
       body.innerHTML = bar() + '<h3>' + esc(q.q) + '</h3><div class="opts">' + q.options.map((o, k) => '<button type="button" class="o" data-k="' + k + '"><b>' + (k + 1) + '</b><span>' + esc(o) + '</span></button>').join('') + '</div><div class="fb" hidden></div><div class="acts" hidden></div>';
-      w.querySelector('.k').textContent = 'Закрепим · вопрос ' + (i + 1) + ' из ' + qs.length;
+      w.querySelector('.k').textContent = L('Закрепим · вопрос ') + (i + 1) + L(' из ') + qs.length;
       const f = body.querySelector('.o'); if (f) f.focus();
     }
     function showEnd() {
       const ok = res.filter(Boolean).length, n = qs.length;
       journal(j => { j.quiz = { ok, n, at: Date.now() }; });
-      w.querySelector('.k').textContent = 'Закрепили · ' + lessonTitle();
-      const msg = ok === n ? 'Отлично! Всё понял 🎉' : ok >= n - 1 ? 'Хорошо! Почти без ошибок.' : 'Есть над чем подумать — спроси наставника, что осталось непонятным.';
+      w.querySelector('.k').textContent = '' + L('Закрепили · ') + '' + lessonTitle();
+      const msg = ok === n ? '' + L('Отлично! Всё понял 🎉') + '' : ok >= n - 1 ? '' + L('Хорошо! Почти без ошибок.') + '' : '' + L('Есть над чем подумать — спроси наставника, что осталось непонятным.') + '';
       body.innerHTML = bar() + '<div class="big">' + ok + ' из ' + n + '</div><p style="margin:0 0 4px;font-size:15px;line-height:1.5">' + msg + '</p>' +
-        '<div class="acts">' + (ok < n ? '<button class="ls-btn main" data-a="ask">🎤 Разобрать ошибки</button>' : '') +
-        '<button class="ls-btn ' + (ok < n ? '' : 'main') + '" data-a="nextL">Дальше →</button><button class="ls-btn ghost" data-a="hw">Сделать ДЗ</button><button class="ls-btn ghost" data-a="again">Ещё раз</button></div>';
+        '<div class="acts">' + (ok < n ? '<button class="ls-btn main" data-a="ask">' + L('🎤 Разобрать ошибки') + '</button>' : '') +
+        '<button class="ls-btn ' + (ok < n ? '' : 'main') + '" data-a="nextL">' + L('Дальше →') + '</button><button class="ls-btn ghost" data-a="hw">' + L('Сделать ДЗ') + '</button><button class="ls-btn ghost" data-a="again">' + L('Ещё раз') + '</button></div>';
     }
     w.addEventListener('click', e => {
       if (e.target === w) return close();
@@ -949,9 +952,9 @@
         res.push(right);
         body.querySelectorAll('.o').forEach(o => { o.disabled = true; const kk = +o.dataset.k; if (kk === q.correct) o.classList.add('ok'); else if (kk === k) o.classList.add('no'); });
         const fb = body.querySelector('.fb'); fb.hidden = false;
-        fb.innerHTML = (right ? '<b>Верно!</b> ' : '<b class="no">Не совсем.</b> ') + esc(q.why || '');
+        fb.innerHTML = (right ? '<b>' + L('Верно!') + '</b> ' : '<b class="no">' + L('Не совсем.') + '</b> ') + esc(q.why || '');
         const acts = body.querySelector('.acts'); acts.hidden = false;
-        acts.innerHTML = '<button class="ls-btn main" data-a="next">' + (i + 1 < qs.length ? 'Следующий вопрос →' : 'Итог') + '</button>';
+        acts.innerHTML = '<button class="ls-btn main" data-a="next">' + (i + 1 < qs.length ? '' + L('Следующий вопрос →') + '' : '' + L('Итог') + '') + '</button>';
         body.querySelector('.bar').outerHTML = bar();
         acts.querySelector('button').focus();
         return;
