@@ -1149,6 +1149,8 @@
           const a = +m[1], b = +m[2]; if (a <= prev) { prev = a; return; } prev = a; clearTimeout(lt);
           // после практики — закрепить: 4 коротких вопроса (готовим их заранее)
           if (sh.prefetchQuiz) sh.prefetchQuiz();
+          // тест открываем сами через пару секунд (раньше — только по кнопке в чате, и его не замечали)
+          if (sh.openQuiz) setTimeout(() => { if (!document.querySelector('.ls-quiz') && !(sh.storyPlaying && sh.storyPlaying())) sh.openQuiz(); }, 2600);
           const quiz = sh.openQuiz ? [['✅ Закрепить: 4 вопроса', () => sh.openQuiz()]] : [];
           if (a >= b) {
             const n = sh.nextTopic && sh.nextTopic();
