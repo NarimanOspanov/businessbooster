@@ -14,6 +14,29 @@
     html.oe-embed .ls-start,html.oe-embed .ls-story,html.oe-embed .lt-btn,html.oe-embed .lt-panel{display:none!important}
     html.oe-embed body #scene#scene{display:block!important;width:100%!important;max-height:100vh}`;
     (document.head || document.documentElement).appendChild(es);
+    // &set={"desc":{…},"live":{…}} — числа задачи поверх описания сцены опыта (LUCH_REAL() и LUCH_REAL.live()):
+    // объекты сливаются, в массивах элемент ищется по id, потом по type/kind, иначе по номеру
+    let SET = null; try { SET = JSON.parse(new URLSearchParams(location.search).get('set') || 'null'); } catch (e) {}
+    if (SET && typeof SET === 'object') {
+      const isO = x => x && typeof x === 'object' && !Array.isArray(x);
+      const merge = (d, p) => {
+        for (const k of Object.keys(p)) {
+          const pv = p[k], dv = d[k];
+          if (Array.isArray(pv) && Array.isArray(dv)) pv.forEach((pi, i) => {
+            const j = isO(pi) && pi.id != null ? dv.findIndex(x => x && x.id === pi.id) : isO(pi) && (pi.type || pi.kind) ? dv.findIndex(x => x && (pi.type ? x.type === pi.type : x.kind === pi.kind)) : i;
+            if (j < 0) return; dv[j] = isO(pi) && isO(dv[j]) ? merge(dv[j], pi) : pi;
+          });
+          else if (isO(pv) && isO(dv)) merge(dv, pv); else d[k] = pv;
+        }
+        return d;
+      };
+      const wrap = f => new Proxy(f, {
+        apply(t, th, a) { const d = Reflect.apply(t, th, a); return isO(d) && SET.desc ? merge(d, SET.desc) : d; },
+        get(t, k) { const v = t[k]; if (k === 'live' && typeof v === 'function' && SET.live) return () => { const d = v(); return isO(d) ? merge(d, SET.live) : d; }; return v; },
+      });
+      let real;
+      Object.defineProperty(window, 'LUCH_REAL', { configurable: true, get: () => real, set: f => { real = typeof f === 'function' ? wrap(f) : f; } });
+    }
     return; // без заставки
   }
   const reduce = matchMedia('(prefers-reduced-motion:reduce)').matches;
