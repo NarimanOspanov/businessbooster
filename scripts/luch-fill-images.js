@@ -30,7 +30,7 @@ async function gen(prompt) {
 (async () => {
   if (!blob.config()) throw new Error("нет строки подключения к хранилищу");
   const pool = await db.getPool();
-  const rows = (await pool.request().query("SELECT story_key, body_json FROM luch.lesson_story WHERE story_key LIKE '/labs/%|ru|f4'")).recordset;
+  const rows = (await pool.request().query("SELECT story_key, body_json FROM luch.lesson_story WHERE story_key LIKE '%|ru|f4'")).recordset;
   const have = new Set((await pool.request().query("SELECT story_key + '#' + CAST(idx AS varchar) k FROM luch.story_image")).recordset.map((x) => x.k));
   const todo = [];
   for (const r of rows) JSON.parse(r.body_json).sections.forEach((s, i) => {

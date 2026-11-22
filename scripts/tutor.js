@@ -718,14 +718,26 @@ async function imgGet(key, i) {
 function imgRemember(ck, v) { imgMem.set(ck, v); if (imgMem.size > 80) imgMem.delete(imgMem.keys().next().value); }
 async function imgMake(key, i, sec) {
   const scene = sec.img || (sec.title + ". " + sec.text);
-  const j = await gemini(STORY_IMAGE_MODEL, {
-    contents: [{ role: "user", parts: [{ text: IMG_STYLE + "\nСюжет: " + scene }] }],
-    generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "16:9" } },
-  }, 120000);
-  const parts = (((j.candidates || [])[0] || {}).content || {}).parts || [];
-  const im = parts.find((p) => p.inline_data || p.inlineData);
-  if (!im) throw new Error("no image");
-  const v = { mime: "image/jpeg", data: await shrinkJpeg(Buffer.from((im.inline_data || im.inlineData).data, "base64")) };
+  let raw;
+  const ok = serverOpenAIKey();
+  if (ok) { // как scripts/luch-fill-images.js: OpenAI gpt-image-1.5 low (у Gemini кончился баланс)
+    const r = await fetch("https://api.openai.com/v1/images/generations", { method: "POST", signal: AbortSignal.timeout(120000),
+      headers: { Authorization: "Bearer " + ok, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: process.env.LUCH_OPENAI_IMAGE_MODEL || "gpt-image-1.5", prompt: IMG_STYLE + "\nСюжет: " + scene, size: "1536x1024", quality: "low", n: 1 }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.data || !j.data[0]) throw new Error("openai image " + r.status);
+    raw = Buffer.from(j.data[0].b64_json, "base64");
+  } else {
+    const j = await gemini(STORY_IMAGE_MODEL, {
+      contents: [{ role: "user", parts: [{ text: IMG_STYLE + "\nСюжет: " + scene }] }],
+      generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "16:9" } },
+    }, 120000);
+    const parts = (((j.candidates || [])[0] || {}).content || {}).parts || [];
+    const im = parts.find((p) => p.inline_data || p.inlineData);
+    if (!im) throw new Error("no image");
+    raw = Buffer.from((im.inline_data || im.inlineData).data, "base64");
+  }
+  const v = { mime: "image/jpeg", data: await shrinkJpeg(raw) };
   imgRemember(key + "#" + i, v);
   try {
     const sql = require("mssql"), pool = await db().getPool();
