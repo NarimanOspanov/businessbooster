@@ -69,6 +69,44 @@ function claudeClient() {
   return claude;
 }
 
+// ---------- дневные лимиты вопросов наставнику (23.11.2026) ----------
+// гость (по IP) — GUEST_DAY, вошедший (Clerk) — USER_DAY, Pro (luch.tutor_pro) — без лимита; свой ключ ИИ — как раньше.
+// Оплаты пока нет: Pro включает владелец вручную (INSERT в luch.tutor_pro), ученик пишет ему в Telegram.
+const GUEST_DAY = Number(process.env.TUTOR_GUEST_DAY) || 5, USER_DAY = Number(process.env.TUTOR_USER_DAY) || 30;
+const PRO_CONTACT = process.env.TUTOR_PRO_TG || "nariman_ovv";
+let quotaReady = null;
+async function quotaPool() {
+  const pool = await db().getPool();
+  if (!quotaReady) quotaReady = pool.request().query(
+    "IF OBJECT_ID('luch.tutor_use') IS NULL CREATE TABLE luch.tutor_use (k NVARCHAR(90) NOT NULL, d DATE NOT NULL, n INT NOT NULL DEFAULT 0, CONSTRAINT PK_tutor_use PRIMARY KEY (k, d));" +
+    "IF OBJECT_ID('luch.tutor_pro') IS NULL CREATE TABLE luch.tutor_pro (user_id NVARCHAR(90) NOT NULL PRIMARY KEY, note NVARCHAR(200) NULL, until DATETIME2 NULL, created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME());"
+  ).catch((e) => { quotaReady = null; throw e; });
+  await quotaReady; return pool;
+}
+async function whoAsks(req, deps) {
+  const h = String(req.headers.authorization || ""), t = h.startsWith("Bearer ") ? h.slice(7) : "";
+  if (t && deps.verifyToken) { try { const c = await deps.verifyToken(t); if (c && c.sub) return { user: c.sub }; } catch { /* просрочен — считаем гостем */ } }
+  return { ip: deps.clientIp(req) };
+}
+// null — можно; иначе { need: 'login' | 'pro', error }
+async function quota(req, deps, lang) {
+  const who = await whoAsks(req, deps), kk = lang === "kk";
+  let pool; try { pool = await quotaPool(); } catch (e) { console.log("[tutor quota] " + (e && e.message)); return null; } // база недоступна — не мешаем учиться
+  const sql = require("mssql");
+  if (who.user) {
+    const pro = await pool.request().input("u", sql.NVarChar(90), who.user).query("SELECT 1 x FROM luch.tutor_pro WHERE user_id = @u AND (until IS NULL OR until > SYSUTCDATETIME())").then((r) => r.recordset.length).catch(() => 0);
+    if (pro) return null;
+  }
+  const k = who.user ? "u:" + who.user : "ip:" + who.ip, lim = who.user ? USER_DAY : GUEST_DAY;
+  const r = await pool.request().input("k", sql.NVarChar(90), k).input("lim", sql.Int, lim).query(
+    "DECLARE @d DATE = CAST(SYSUTCDATETIME() AS DATE);" +
+    "MERGE luch.tutor_use WITH (HOLDLOCK) t USING (SELECT @k k, @d d) s ON t.k = s.k AND t.d = s.d " +
+    "WHEN MATCHED AND t.n < @lim THEN UPDATE SET n = t.n + 1 WHEN NOT MATCHED THEN INSERT (k, d, n) VALUES (@k, @d, 1) OUTPUT $action a;").catch(() => ({ recordset: [{ a: "INSERT" }] }));
+  if (r.recordset.length) return null; // посчитали вопрос
+  if (!who.user) return { need: "login", error: kk ? `Бүгінгі ${GUEST_DAY} тегін сұрақ таусылды. Жалғастыру үшін кіріңіз — тіркелгендерге күніне ${USER_DAY} сұрақ.` : `Бесплатные ${GUEST_DAY} вопросов на сегодня закончились. Войдите, чтобы продолжить — после входа ${USER_DAY} вопросов в день.` };
+  return { need: "pro", tg: PRO_CONTACT, error: kk ? `Бүгінгі ${USER_DAY} тегін сұрақ таусылды. Шексіз сұрақ үшін Pro нұсқасын қосыңыз — Telegram-да жазыңыз: @${PRO_CONTACT}` : `Бесплатные ${USER_DAY} вопросов на сегодня закончились. Чтобы спрашивать без ограничений, подключите Pro — напишите в Telegram: @${PRO_CONTACT}` };
+}
+
 const hits = new Map();
 let day = { d: "", n: 0 };
 function allowed(ip) {
@@ -375,8 +413,9 @@ function handleStt(req, res, { readBody, clientIp }) {
   })().catch(() => { try { send(500, { ok: false, error: "error" }); } catch { /* уже ответили */ } });
 }
 
-function handleChat(req, res, { readBody, clientIp }) {
-  const fail = (code, msg) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); res.end(JSON.stringify({ ok: false, error: msg })); };
+function handleChat(req, res, deps) {
+  const { readBody, clientIp } = deps;
+  const fail = (code, msg, extra) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); res.end(JSON.stringify(Object.assign({ ok: false, error: msg }, extra || {}))); };
   if (req.method !== "POST") return fail(405, "POST");
   (async () => {
     let b = {};
@@ -387,6 +426,7 @@ function handleChat(req, res, { readBody, clientIp }) {
     // со своим ключом общий дневной лимит не тратим — только защита от слишком частых запросов
     const block = own ? (ownAllowed(clientIp(req)) ? null : "Слишком часто — подождите минуту.") : allowed(clientIp(req));
     if (block) return fail(429, block);
+    if (!own) { const q = await quota(req, deps, b.lang); if (q) return fail(429, q.error, { need: q.need, tg: q.tg }); }
     const page = String(b.page || "").slice(0, 80);
     const ctx = String(b.context || "").slice(0, MAX_CTX);
     const els = String(b.elements || "").slice(0, 3000);

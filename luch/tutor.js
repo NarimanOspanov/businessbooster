@@ -174,6 +174,7 @@
   .lt-head .lt-ib:hover{border-color:#26324a}
   .lt-head .lt-stop{width:auto;padding:0 11px;background:#ffb547;color:#0b1019;border:0;font-weight:700;animation:lt-stp 1.2s ease-out infinite}
   .lt-head .lt-stop[hidden]{display:none}
+  .lt-need{all:unset;cursor:pointer;display:inline-flex;margin-top:10px;padding:10px 16px;border-radius:12px;background:#ffb547;color:#1a1300;font:700 14px/1 var(--font-body,'Golos Text',sans-serif)}
   @keyframes lt-stp{0%{box-shadow:0 0 0 0 rgba(255,181,71,.65)}100%{box-shadow:0 0 0 10px rgba(255,181,71,0)}}
   .lt-orb[data-s="speaking"] svg{display:none}
   .lt-orb[data-s="speaking"]:after{content:"";position:absolute;inset:0;margin:auto;width:14px;height:14px;border-radius:3px;background:#0b1019}
@@ -732,14 +733,16 @@
       while (drawn < sp.boards.length) { board.draw(sp.boards[drawn], drawn > 0); drawn++; }
       if (!feed) for (const n of marksOf(sp.say)) if (!fired.has(n)) { fired.add(n); highlight(n); }
     };
-    ctrl = new AbortController();
+    ctrl = new AbortController(); let need = null, needTg = '';
     try {
       // свой ключ ИИ ученика (хранится только в его браузере) — наставник отвечает за его счёт
       let own = null; try { own = JSON.parse(localStorage.getItem('oe-ai') || 'null'); } catch (e) {}
       const hdr = { 'Content-Type': 'application/json' }; if (own && own.p && own.k) { hdr['X-User-AI'] = own.p; hdr['X-User-Key'] = own.k; }
+      // вошедший ученик — свой дневной лимит (у гостя меньше)
+      try { const LA = window.LuchAuth; const tk = LA && LA.user ? await LA.token() : null; if (tk) hdr.Authorization = 'Bearer ' + tk; } catch (e) {}
       const res = await fetch('/api/tutor', { method: 'POST', headers: hdr, signal: ctrl.signal,
         body: JSON.stringify({ page, lang, voice: !!opts.voice, context: `${document.title}\n${context}`, elements, image: opts.image || undefined, messages: chat.slice(-20).map(m => ({ role: m.role, content: m.content })) }) });
-      if (!res.ok) { let msg = 'Не получилось ответить. Попробуйте ещё раз.'; try { msg = (await res.json()).error || msg; } catch (e) {} text = msg + (res.status === 429 && !own ? '\n\nЧтобы заниматься без ограничений, подключите свой бесплатный ключ Gemini: [saudager.ai/me#ai](/me/#ai).' : ''); }
+      if (!res.ok) { let msg = 'Не получилось ответить. Попробуйте ещё раз.', j = {}; try { j = await res.json(); msg = j.error || msg; } catch (e) {} text = msg; need = res.status === 429 ? j.need || null : null; needTg = j.tg || ''; }
       else {
         const rd = res.body.getReader(), dec = new TextDecoder();
         for (;;) {
@@ -752,6 +755,12 @@
     text = text.trim() || 'Не получилось ответить. Попробуйте ещё раз.';
     if (feed) { feed(split(text).say, true); speaker.end(); }
     live(true); const dr = a.querySelector('.lt-drawing'); if (dr) dr.remove(); boardBtn(a, text); a.appendChild(sayBtn(shown(text)));
+    if (need) { // лимит: гостю — войти, вошедшему — Pro через Telegram
+      const b = document.createElement(need === 'login' ? 'button' : 'a'); b.className = 'lt-need'; b.setAttribute('data-noi18n', '');
+      if (need === 'login') { b.type = 'button'; b.textContent = lang === 'kk' ? 'Кіру' : 'Войти'; b.onclick = () => { try { window.LuchAuth && window.LuchAuth.openSignIn(); } catch (e) {} }; }
+      else { b.href = 'https://t.me/' + (needTg || 'nariman_ovv'); b.target = '_blank'; b.rel = 'noopener'; b.textContent = (lang === 'kk' ? 'Telegram-да жазу @' : 'Написать в Telegram @') + (needTg || 'nariman_ovv'); }
+      a.appendChild(b);
+    }
     chat.push({ role: 'assistant', content: text }); saveChat();
     busy = false; send.disabled = false; ctrl = null; suggestions(); scroll();
     return text;
