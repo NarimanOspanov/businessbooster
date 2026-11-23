@@ -238,7 +238,24 @@ const ELEVEN_VOICE = process.env.TUTOR_ELEVEN_VOICE || "1ikyXz7KIkVIgmGOM6QM"; /
 const ELEVEN_MODEL = process.env.TUTOR_ELEVEN_MODEL || "eleven_turbo_v2_5"; // живые ответы наставника: быстро и естественнее flash
 const ELEVEN_MODEL_HQ = process.env.TUTOR_ELEVEN_MODEL_HQ || "eleven_multilingual_v2";
 const ELEVEN_MODEL_KK = process.env.TUTOR_ELEVEN_MODEL_KK || "eleven_v4_turbo"; // казахский: multilingual_v2 и turbo_v2_5 его не знают
-const isKk = (t) => /[әғқңөұүһі]/i.test(t); // лекции и аудиогид: готовятся заранее, звучат живее
+const isKk = (t) => /[әғқңөұүһі]/i.test(t);
+// английский (лекции и гид на en): голос Azure Speech, если есть ключ AZURE_SPEECH_KEY (+ AZURE_SPEECH_REGION); иначе ElevenLabs
+const isEn = (t) => /[A-Za-z]{3}/.test(t) && !/[А-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүІіҺһ]/.test(t);
+const AZ_EN_VOICE = process.env.TUTOR_AZURE_VOICE_EN || "en-US-AndrewNeural";
+const azKey = () => keyFrom("AZURE_SPEECH_KEY", ".azure-speech-key"), azRegion = () => keyFrom("AZURE_SPEECH_REGION", ".azure-speech-region") || "northeurope";
+const azEn = (t) => isEn(t) && !!azKey();
+async function azureTts(text, voice) {
+  const x = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  for (let a = 0; a < 4; a++) {
+    const r = await fetch("https://" + azRegion() + ".tts.speech.microsoft.com/cognitiveservices/v1", { method: "POST", signal: AbortSignal.timeout(40000),
+      headers: { "Ocp-Apim-Subscription-Key": azKey(), "Content-Type": "application/ssml+xml", "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3", "User-Agent": "open-school" },
+      body: '<speak version="1.0" xml:lang="' + voice.slice(0, 5) + '"><voice name="' + voice + '">' + x(text) + "</voice></speak>" }).catch(() => null);
+    if (r && r.ok) return Buffer.from(await r.arrayBuffer());
+    if (!r || r.status === 429 || r.status >= 500) { await new Promise((ok) => setTimeout(ok, 1500 * (a + 1))); continue; }
+    throw new Error("azure_tts_" + r.status);
+  }
+  throw new Error("azure_tts_retries");
+} // лекции и аудиогид: готовятся заранее, звучат живее
 const VOICE = process.env.TUTOR_VOICE || "Sulafat"; // Gemini: тёплый голос
 const VOICE_RULES = [
   "Сейчас разговор голосом: твой ответ сразу озвучивается, а вопрос ученика расшифрован из речи (в нём могут быть ошибки распознавания — угадывай смысл).",
@@ -267,7 +284,7 @@ async function gemini(model, body, ms = 30000) {
 // одинаковые фразы (аудиогид, подсказки наставника) озвучиваем один раз
 const ttsCache = new Map();
 async function speak(text, hq) {
-  const ck = ELEVEN_VOICE + ":" + (isKk(text) ? "kk:" + ELEVEN_MODEL_KK + ":" : "") + (hq ? "hq2:" + ELEVEN_MODEL_HQ + ":" : "") + text; // hq2 — ровный голос + выровненная громкость
+  const ck = azEn(text) ? "azure:" + AZ_EN_VOICE + ":" + (hq ? "hq:" : "") + text : ELEVEN_VOICE + ":" + (isKk(text) ? "kk:" + ELEVEN_MODEL_KK + ":" : "") + (hq ? "hq2:" + ELEVEN_MODEL_HQ + ":" : "") + text; // hq2 — ровный голос + выровненная громкость
   if (ttsCache.has(ck)) { const v = ttsCache.get(ck); ttsCache.delete(ck); ttsCache.set(ck, v); return v; }
   // лекции и аудиогид озвучиваем один раз навсегда: звук хранится в базе и переживает перезапуски
   const dk = hq ? require("crypto").createHash("sha256").update(ck).digest("hex") : null;
@@ -315,6 +332,7 @@ async function ttsDbPutOld(k, a) {
     .query("IF NOT EXISTS (SELECT 1 FROM luch.tts_cache WHERE k = @k) INSERT INTO luch.tts_cache (k, mime, data) VALUES (@k, @m, @d)");
 }
 async function speakRaw(text, hq) {
+  if (azEn(text)) { try { return { type: "audio/mpeg", buf: await azureTts(text, AZ_EN_VOICE) }; } catch (e) { console.log("[tutor tts] Azure " + (e && e.message)); } }
   const key = keyFrom("ELEVENLABS_API_KEY", ".elevenlabs-key");
   if (key) {
     try {

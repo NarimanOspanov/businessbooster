@@ -10,7 +10,10 @@
 // сервер (/api/luch/i18n, кэш в базе), здесь они запоминаются в localStorage.
 (() => {
   if (window.LuchI18n) return;
-  const LANGS = [['ru', 'Рус'], ['kk', 'Қаз']]; // лекции, озвучка и тесты готовы на этих двух (en/es выключены)
+  const LANGS = [['ru', 'Рус'], ['kk', 'Қаз']];
+  // английский готовится (переводы агентами): пока скрыт из переключателя, открывается ссылкой ?lang=en; EN_ON = true — показать всем
+  const EN_ON = false; LANGS.push(['en', 'Eng']);
+  const SHOWN = l => l[0] !== 'en' || EN_ON || store.get('luch-lang') === 'en' || fromUrl === 'en'; // лекции, озвучка и тесты готовы на этих двух (en/es выключены)
   const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
   const fromUrl = new URLSearchParams(location.search).get('lang');
   // Выбор запоминается в localStorage и действует на всех страницах; ?lang=kk из ссылки (ENT QUIZ) тоже запоминается.
@@ -39,7 +42,7 @@
   const mount = () => {
     const header = document.querySelector('header'); if (!header || header.querySelector('.li-lang')) return;
     const box = document.createElement('div'); box.className = 'li-lang'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Language'); box.dataset.noi18n = '';
-    box.innerHTML = LANGS.map(([c, n]) => `<button type="button" data-l="${c}" aria-pressed="${c === lang}">${n}</button>`).join('');
+    box.innerHTML = LANGS.filter(SHOWN).map(([c, n]) => `<button type="button" data-l="${c}" aria-pressed="${c === lang}">${n}</button>`).join('');
     box.addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.dataset.l !== lang) api.set(b.dataset.l); });
     // сразу за логотипом: на телефоне помещается в первую строку шапки и не сталкивает «Войти» вниз
     const br = header.querySelector(':scope > .brand'); if (br) br.after(box); else header.appendChild(box);
