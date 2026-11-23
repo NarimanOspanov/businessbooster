@@ -26,7 +26,7 @@
   if (!LANGS.some(l => l[0] === lang)) lang = 'ru';
   if (fromUrl) store.set('luch-lang', lang);
   document.documentElement.lang = lang;
-  const api = window.LuchI18n = { lang, langs: LANGS, set(l) { store.set('luch-lang', l); const u = new URL(location.href); u.searchParams.delete('lang'); location.href = u.toString(); } };
+  const api = window.LuchI18n = { lang, langs: LANGS, set(l) { store.set('luch-lang', l); const u = new URL(location.href); u.searchParams.delete('lang'); if (u.toString() === location.href) location.reload(); else location.href = u.toString(); /* с #предметом в адресе переход на тот же адрес страницу не перезагружает */ } };
 
   // переключатель в шапке
   const css = document.createElement('style');
