@@ -12,7 +12,7 @@
   if (window.LuchI18n) return;
   const LANGS = [['ru', 'Рус'], ['kk', 'Қаз']];
   // английский готовится (переводы агентами): пока скрыт из переключателя, открывается ссылкой ?lang=en; EN_ON = true — показать всем
-  const EN_ON = false; LANGS.push(['en', 'Eng']);
+  const EN_ON = true; LANGS.push(['en', 'Eng']);
   const SHOWN = l => l[0] !== 'en' || EN_ON || store.get('luch-lang') === 'en' || fromUrl === 'en'; // лекции, озвучка и тесты готовы на этих двух (en/es выключены)
   const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
   const fromUrl = new URLSearchParams(location.search).get('lang');
