@@ -455,7 +455,8 @@
     return (txt.match(/[^.!?]+[.!?]/g) || []).map(x => x.trim()).filter(x => x.length >= 40 && x.length <= 180);
   }
   function factsLoop(me) {
-    const box = me.el.querySelector('.fact'), list = pageFacts();
+    // факты берутся из русского текста страницы — на других языках вместо них короткая подпись на языке интерфейса
+    const box = me.el.querySelector('.fact'), list = LANG2 === 'ru' ? pageFacts() : [];
     if (!list.length) { box.innerHTML = '<small>' + L('Минутку') + '</small>' + L('Сейчас будет лекция с картинками: что это, зачем нужно, как работает и немного истории.') + ''; return; }
     let k = 0;
     const show = () => { box.innerHTML = '<small>' + L('Пока готовлю — знаете ли вы?') + '</small>' + esc(list[k % list.length]); };
