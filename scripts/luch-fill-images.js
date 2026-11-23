@@ -34,7 +34,7 @@ async function gen(prompt) {
   const have = new Set((await pool.request().query("SELECT story_key + '#' + CAST(idx AS varchar) k FROM luch.story_image")).recordset.map((x) => x.k));
   const todo = [];
   for (const r of rows) JSON.parse(r.body_json).sections.forEach((s, i) => {
-    if (s.formulas || s.scheme || i > 7 || have.has(r.story_key + "#" + i)) return;
+    if (s.formulas || (s.scheme && r.story_key.startsWith("/labs/")) || i > 7 || have.has(r.story_key + "#" + i)) return; // схема опыта есть только в лабораториях; на страницах разделов — картинка
     todo.push({ k: r.story_key, i, scene: s.img || (s.title + ". " + s.text) });
   });
   const list = todo.slice(0, LIMIT);
