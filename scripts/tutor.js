@@ -86,7 +86,10 @@ async function quotaPool() {
 async function whoAsks(req, deps) {
   const h = String(req.headers.authorization || ""), t = h.startsWith("Bearer ") ? h.slice(7) : "";
   if (t && deps.verifyToken) { try { const c = await deps.verifyToken(t); if (c && c.sub) return { user: c.sub }; } catch { /* просрочен — считаем гостем */ } }
-  return { ip: deps.clientIp(req) };
+  // Azure отдаёт адрес с портом (1.2.3.4:57359) — порт у каждого соединения свой, отрезаем
+  const raw = String(deps.clientIp(req) || "");
+  const ip = /^\d+\.\d+\.\d+\.\d+:\d+$/.test(raw) ? raw.replace(/:\d+$/, "") : /^\[.*\]:\d+$/.test(raw) ? raw.replace(/^\[(.*)\]:\d+$/, "$1") : raw;
+  return { ip };
 }
 // null — можно; иначе { need: 'login' | 'pro', error }
 async function quota(req, deps, lang) {
