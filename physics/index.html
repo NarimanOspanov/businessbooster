@@ -709,7 +709,7 @@ const audioGuide = (() => {
   (function hint() {
     let heard = false; try { heard = localStorage.getItem('ag-heard') === '1'; } catch (e) {}
     if (heard) return;
-    if (document.querySelector('.oe-splash')) return setTimeout(hint, 300); // ждём, пока уйдёт заставка
+    if (document.querySelector('.oe-splash,.ob-wrap')) return setTimeout(hint, 300); // ждём, пока уйдёт заставка и окно выбора предмета
     setTimeout(() => btn.classList.add('hint'), 700); // кнопка пульсирует оранжевым до первого запуска
   })();
   btn.addEventListener('click', () => { clearHint(); return btn.classList.contains('on') ? stop() : play(0, 0); });
@@ -717,7 +717,45 @@ const audioGuide = (() => {
   return { stop };
 })();
 
-useSubject(location.hash.slice(1));
+// первый визит на главную: модальное окно «Привет! Что хочешь изучить сегодня?» → нужный предмет; выбор запоминается
+const OB_KEY = 'os-subj', obGet = () => { try { return localStorage.getItem(OB_KEY); } catch (e) { return null; } }, obSet = v => { try { localStorage.setItem(OB_KEY, v); } catch (e) {} };
+function onboarding() {
+  let lang = 'kk'; try { lang = new URLSearchParams(location.search).get('lang') || localStorage.getItem('luch-lang') || 'kk'; } catch (e) {}
+  const kk = lang === 'kk';
+  const L = kk ? { hi: 'Сәлем! Бұл — Open School 👋', sub: 'Күрделіні қарапайым түсіндіреміз: тәжірибелермен, дауыспен және AI-тәлімгермен. Бүгін не үйренгің келеді?', foot: 'Пәнді кейін беттің жоғарғы жағынан ауыстыруға болады.', skip: 'Жай қарап шығу', close: 'Жабу' }
+    : { hi: 'Привет! Это Open School 👋', sub: 'Объясняем сложное просто: с опытами, голосом и ИИ-наставником. Что хочешь изучить сегодня?', foot: 'Предмет можно сменить позже вверху страницы.', skip: 'Просто посмотреть', close: 'Закрыть' };
+  const D = { phys: ['⚛️', '7–11 класс: от движения до атома и Вселенной', '7–11 сынып: қозғалыстан атом мен Ғаламға дейін'], math: ['📐', '5–11 класс: от чисел до производной', '5–11 сынып: сандардан туындыға дейін'],
+    chem: ['🧪', '7–11 класс: от атомов до органики', '7–11 сынып: атомнан органикаға дейін'], bio: ['🧬', '7–11 класс: от клетки до генетики', '7–11 сынып: жасушадан генетикаға дейін'], cs: ['💻', '5–11 класс: от алгоритмов до Python и ИИ', '5–11 сынып: алгоритмнен Python мен AI-ға дейін'] };
+  const css = document.createElement('style');
+  css.textContent = `.ob-wrap{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:16px;background:rgba(5,8,14,.72);backdrop-filter:blur(6px);opacity:0;transition:opacity .25s}
+    .ob-wrap.on{opacity:1}.ob{position:relative;width:min(520px,100%);max-height:calc(100vh - 32px);overflow:auto;background:var(--surface,#121a28);border:1px solid var(--line,#26324a);border-radius:18px;padding:26px 22px 18px;box-shadow:0 20px 60px rgba(0,0,0,.5);transform:translateY(10px);transition:transform .25s}
+    .ob-wrap.on .ob{transform:none}.ob h2{margin:0 0 8px;font-size:24px;line-height:1.2}.ob p{margin:0 0 18px;color:var(--muted,#8b96ad);font-size:15.5px;line-height:1.45}
+    .ob-x{position:absolute;top:10px;right:10px;width:36px;height:36px;border:0;border-radius:10px;background:none;color:var(--muted,#8b96ad);font-size:18px;cursor:pointer}.ob-x:hover{color:var(--fg,#e8ecf4)}
+    .ob-list{display:grid;gap:8px}.ob-s{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:var(--bg,#0b1019);border:1px solid var(--line,#26324a);border-radius:13px;padding:12px 14px;cursor:pointer;color:var(--fg,#e8ecf4);font:inherit;transition:border-color .15s,transform .15s}
+    .ob-s:hover,.ob-s:focus-visible{border-color:#ffb547;transform:translateY(-1px);outline:none}.ob-s i{font-style:normal;font-size:26px;width:34px;text-align:center}.ob-s b{display:block;font-size:16.5px}.ob-s small{display:block;color:var(--muted,#8b96ad);font-size:13px;margin-top:2px}
+    .ob-s::after{content:'›';margin-left:auto;color:var(--muted,#8b96ad);font-size:22px}.ob-f{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px;font-size:12.5px;color:var(--muted,#8b96ad)}
+    .ob-f button{background:none;border:0;color:var(--muted,#8b96ad);text-decoration:underline;cursor:pointer;font:inherit;padding:6px 0;flex:none}`;
+  document.head.appendChild(css);
+  const w = document.createElement('div'); w.className = 'ob-wrap'; w.setAttribute('data-noi18n', '');
+  w.innerHTML = `<div class="ob" role="dialog" aria-modal="true" aria-labelledby="obH"><button class="ob-x" type="button" aria-label="${L.close}">✕</button>
+    <h2 id="obH">${L.hi}</h2><p>${L.sub}</p>
+    <div class="ob-list">${SUBJECTS.map(s => `<button class="ob-s" type="button" data-s="${s.id}"><i aria-hidden="true">${(D[s.id] || ['📘'])[0]}</i><span><b>${s.name}</b><small>${(D[s.id] || [])[kk ? 2 : 1] || ''}</small></span></button>`).join('')}</div>
+    <div class="ob-f"><span>${L.foot}</span><button type="button" class="ob-skip">${L.skip}</button></div></div>`;
+  const close = id => {
+    if (id) { if (id !== SUBJ.id) useSubject(id); history.replaceState(null, '', id === 'phys' ? location.pathname + location.search : '#' + id); }
+    obSet(id || SUBJ.id); w.classList.remove('on'); removeEventListener('keydown', esc); setTimeout(() => w.remove(), 260);
+  };
+  const esc = e => { if (e.key === 'Escape') close(); };
+  w.addEventListener('click', e => { const b = e.target.closest('.ob-s'); if (b) return close(b.dataset.s); if (e.target === w || e.target.closest('.ob-x,.ob-skip')) close(); });
+  addEventListener('keydown', esc);
+  const show = () => { if (document.querySelector('.oe-splash')) return setTimeout(show, 250); document.body.appendChild(w); requestAnimationFrame(() => w.classList.add('on')); setTimeout(() => { const f = w.querySelector('.ob-s'); if (f) f.focus({ preventScroll: true }); }, 50); };
+  show();
+}
+const obSaved = obGet(), obStart = location.hash.slice(1) || (SUBJECTS.some(s => s.id === obSaved) ? obSaved : '');
+useSubject(obStart);
+if (!location.hash && obStart && obStart !== 'phys') history.replaceState(null, '', '#' + obStart);
+if (!location.hash && !obSaved && !window.__oeEmbed && !/bot|crawl|spider|slurp|yandex|google|bing|lighthouse|headless/i.test(navigator.userAgent || '')) onboarding();
+$('#subjects').addEventListener('click', e => { const b = e.target.closest('.subj'); if (b) obSet(b.dataset.s); });
 addEventListener('hashchange', () => { const id = location.hash.slice(1) || 'phys'; if (!SUBJ || SUBJ.id !== id) useSubject(id); });
 new ResizeObserver(() => draw()).observe(tree);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
