@@ -801,7 +801,8 @@ function handleStoryImg(req, res, { clientIp }) {
     }
     let v = await imgGet(sk, i);
     if (!v) {
-      const story = await storyGet(sk);
+      // русской лекции ещё нет (открывали только на казахском) — рисуем по тексту той, что есть; храним под общим ключом
+      const story = (await storyGet(sk)) || (await storyGet(storeKey(key)));
       if (!story || !story.sections[i] || story.sections[i].formulas) return fail(404, "no story");
       const ck = sk + "#" + i;
       let p = imgPending.get(ck);

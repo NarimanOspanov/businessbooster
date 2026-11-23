@@ -30,7 +30,11 @@ async function gen(prompt) {
 (async () => {
   if (!blob.config()) throw new Error("нет строки подключения к хранилищу");
   const pool = await db.getPool();
-  const rows = (await pool.request().query("SELECT story_key, body_json FROM luch.lesson_story WHERE story_key LIKE '%|ru|f4'")).recordset;
+  // картинки общие для языков и хранятся под русским ключом; лекцию, которую открывали только на казахском, рисуем по её тексту
+  const all = (await pool.request().query("SELECT story_key, body_json FROM luch.lesson_story WHERE story_key LIKE '%|ru|f4' OR story_key LIKE '%|kk|f4'")).recordset;
+  const byRu = new Map();
+  for (const r of all) { const ru = r.story_key.replace(/\|kk\|f4$/, "|ru|f4"); if (r.story_key === ru || !byRu.has(ru)) byRu.set(ru, { story_key: ru, body_json: r.body_json }); }
+  const rows = [...byRu.values()];
   const have = new Set((await pool.request().query("SELECT story_key + '#' + CAST(idx AS varchar) k FROM luch.story_image")).recordset.map((x) => x.k));
   const todo = [];
   for (const r of rows) JSON.parse(r.body_json).sections.forEach((s, i) => {
