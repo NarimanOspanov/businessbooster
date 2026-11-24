@@ -1,0 +1,1342 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Практикум Forward Deployed Engineer: первые недели у клиента. Интервью с клиентом, карта данных, метрики успеха, порог уверенности модели, правило или модель, маленький пилот и сборка системы — на одном сквозном примере колл-центра сети клиник.">
+<title>Практикум FDE: первые недели у клиента</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /labs/prof-fde (stage on the left, lesson notebook on the right, lesson strip under the stage). */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --vio:#a99cff;
+  --ink:#04070d;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+body.dragging{cursor:grabbing;user-select:none;-webkit-user-select:none}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.sections .sm{display:none}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.stage::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(160,185,230,.04) 1.5px,transparent 1.5px),linear-gradient(90deg,rgba(160,185,230,.04) 1.5px,transparent 1.5px);background-size:40px 40px;pointer-events:none}
+
+.task{position:absolute;top:14px;left:14px;width:300px;max-width:min(300px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none;z-index:3}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none;z-index:3}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .v.bad{color:var(--warn)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px;overflow:hidden}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .3s}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px);z-index:3}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;min-height:36px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;font-size:12px;line-height:1.45;color:var(--muted);pointer-events:none;z-index:2}
+
+/* ---------- the screen ---------- */
+.screen{position:absolute;left:14px;right:14px;top:120px;bottom:60px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;z-index:1;display:flex;flex-direction:column;gap:10px;padding-right:2px}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0}
+.bh{font:600 10.5px/1.2 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 9px;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.bh em{font-style:normal;color:var(--force);letter-spacing:.06em}
+.viz{display:block;width:100%;height:auto;overflow:visible}
+.viz text{font-family:var(--font-body)}
+.flash{animation:flash 1.8s ease-out}
+@keyframes flash{0%,45%{box-shadow:0 0 0 3px var(--arm)}100%{box-shadow:0 0 0 0 transparent}}
+.small{font-size:12.5px;color:var(--muted);margin:0}
+.src{font:400 11px/1.4 var(--font-body);color:var(--muted);margin:8px 0 0}
+
+/* cards, zones, drag */
+.pool{display:flex;flex-wrap:wrap;gap:6px}
+.pool:empty::after{content:"Все карточки разложены.";font-size:12.5px;color:var(--muted)}
+.tcard{display:flex;align-items:center;gap:8px;min-height:42px;background:var(--surface-2);border:1px solid #3a4762;border-radius:10px;padding:8px 11px;font:500 13px/1.3 var(--font-body);color:var(--fg);text-align:left;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;flex:1 1 200px;max-width:100%}
+.tcard::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--arm);flex:none}
+.tcard:hover{border-color:var(--muted)}
+.tcard.sel{border-color:var(--force);background:#2a3a56;box-shadow:0 0 0 2px rgba(255,181,71,.25)}
+.tcard.sel::before{background:var(--force)}
+.tcard.lift{opacity:.35}
+.tcard.shake{animation:shake .45s}
+@keyframes shake{20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
+.dghost{position:fixed;left:0;top:0;z-index:95;pointer-events:none;opacity:.95;transform:rotate(-1.5deg);box-shadow:0 14px 30px -8px rgba(0,0,0,.7);margin:0}
+.zones{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.zone{min-height:110px;border:1.5px dashed var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:6px;cursor:pointer;background:rgba(20,29,46,.6);transition:border-color .2s,background .2s}
+.zone.armed{border-color:var(--arm)}
+.zone.over{border-color:var(--force);background:rgba(255,181,71,.08)}
+.zone.bad{border-color:var(--warn);background:rgba(255,138,115,.1)}
+.zone .zh{font:600 11px/1.25 var(--font-body);letter-spacing:.08em;text-transform:uppercase;display:flex;align-items:center;gap:7px}
+.zone .zh small{display:block;font:400 11px/1.3 var(--font-body);letter-spacing:0;text-transform:none;color:var(--muted)}
+.placed{font-size:12px;line-height:1.3;padding:6px 8px;background:#1f3a2f;border:1px solid var(--ok);border-radius:8px;animation:pop .35s ease-out}
+.placed.minus{background:#3a2220;border-color:var(--warn)}
+@keyframes pop{from{transform:scale(.85);opacity:0}}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:42px;background:var(--fg);color:var(--bg);border:0;border-radius:10px;padding:9px 14px;font:600 13.5px/1.2 var(--font-body);cursor:pointer}
+.btn.gh{background:var(--surface-2);color:var(--fg);border:1px solid var(--line)}
+.btn:disabled{opacity:.4;cursor:default}
+.seg{display:flex;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px;flex-wrap:wrap}
+.seg button{flex:1 1 auto;background:none;border:0;border-radius:7px;min-height:38px;padding:7px 10px;font:600 12.5px/1.1 var(--font-body);color:var(--muted);cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.opt{display:block;width:100%;text-align:left;min-height:44px;background:var(--surface-2);border:1px solid #3a4762;border-radius:10px;padding:10px 12px;font:500 13.5px/1.35 var(--font-body);color:var(--fg);cursor:pointer}
+.opt:hover{border-color:var(--muted)}
+.opt.ok{border-color:var(--ok);background:#1f3a2f}
+.opt.no{border-color:var(--warn);background:#3a2220}
+.opts{display:flex;flex-direction:column;gap:6px}
+.fb{font-size:13px;line-height:1.45;margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--bg);border:1px solid var(--line)}
+.fb.ok{border-color:rgba(134,224,168,.5)}
+.fb.no{border-color:rgba(255,138,115,.5)}
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;min-height:40px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.formula{font:500 16px/1.35 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:80vh;min-height:620px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  /* phone: no overlay — task, meter, screen and tools simply stack, the page scrolls */
+  .stage{height:auto;min-height:0;display:flex;flex-direction:column;gap:8px;padding:10px}
+  .task,.meter,.tools,.screen{position:static!important;transform:none;max-width:none}
+  .task{width:auto;padding:9px 11px}
+  .task p{font-size:13px}
+  .meter{width:auto;padding:8px 10px}
+  .screen{overflow:visible}
+  .tools{align-self:center;max-width:100%}
+  .tools button{padding:6px 8px;font-size:12px}
+  .hint{display:none}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .sections .lg{display:none}.sections .sm{display:inline}
+  .crow,.ticks{grid-template-columns:minmax(0,1fr)}
+  .ticks>span{display:none}
+  .selfgrid{grid-template-columns:minmax(0,1fr)}
+  .selfgrid svg{max-width:220px;margin:0 auto}
+  .mt{grid-template-columns:96px minmax(0,1fr) 32px}
+  .tcard{flex-basis:100%}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- practicum ---------- */
+input[type=range]{width:100%;margin:6px 0 0;accent-color:var(--force);min-height:28px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.rds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:0 0 8px}
+.rd{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:7px 8px;min-width:0}
+.rd dt{font:600 9.5px/1.2 var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rd dd{margin:5px 0 0;font:500 15px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.rd dd.ok{color:var(--ok)}.rd dd.bad{color:var(--warn)}
+/* 1: interview */
+.chat{display:flex;flex-direction:column;gap:6px;max-height:230px;overflow:auto;scrollbar-width:thin;padding-right:2px}
+.msg{max-width:88%;padding:7px 10px;border-radius:11px;font-size:13px;line-height:1.4;animation:pop .3s ease-out}
+.msg.me{align-self:flex-end;background:#22314d;border-bottom-right-radius:3px}
+.msg.cl{align-self:flex-start;background:var(--surface-2);border-bottom-left-radius:3px}
+.msg.cl.bad{border:1px solid rgba(255,138,115,.6)}
+.msg small{display:block;font:600 10px/1.2 var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.msg .why{display:block;margin-top:5px;font-size:12px;color:var(--warn)}
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.fld{background:var(--bg);border:1.5px dashed var(--line);border-radius:9px;padding:7px 9px;font-size:12.5px;line-height:1.35;color:#56627d;min-height:52px}
+.fld b{display:block;font:600 10px/1.2 var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.fld.on{border-style:solid;border-color:rgba(134,224,168,.55);color:var(--fg);animation:pop .4s ease-out}
+.fld.on b{color:var(--ok)}
+.qdots{display:flex;gap:5px;align-items:center}
+.qdots i{width:11px;height:11px;border-radius:50%;border:1.5px solid var(--line)}
+.qdots i.g{background:var(--ok);border-color:var(--ok)}.qdots i.b{background:var(--warn);border-color:var(--warn)}
+/* 2: data map */
+.srcs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.srcs .zone{min-height:96px}
+.zone .ic{width:26px;height:26px;flex:none}
+.zone.gold{border-style:solid;border-color:var(--force);background:rgba(255,181,71,.07)}
+.tagd{font-size:12px;line-height:1.3;padding:5px 8px;background:#2a2342;border:1px solid var(--vio);border-radius:8px;animation:pop .35s ease-out}
+.pick6{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+/* 3: metrics */
+.mpool{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.mc{min-height:46px;text-align:left;background:var(--surface-2);border:1px solid #3a4762;border-radius:10px;padding:8px 10px;font:500 13px/1.3 var(--font-body);cursor:pointer}
+.mc:hover{border-color:var(--muted)}
+.mc.in{border-color:var(--ok);background:#1f3a2f}
+.mc.red.in{border-color:var(--warn);background:#3a2220}
+.mc.shake{animation:shake .45s}
+.mc:disabled{opacity:.35;cursor:default}
+.dash{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.dsl{border:1.5px dashed var(--line);border-radius:10px;padding:7px 8px;min-height:64px;font-size:12px;line-height:1.3;color:#56627d}
+.dsl b{display:block;font:600 9.5px/1.2 var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.dsl.on{border-style:solid;border-color:rgba(134,224,168,.55);color:var(--fg)}
+.dsl.rl.on{border-color:rgba(255,138,115,.7)}
+.calc{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.calc input{flex:1 1 120px;min-width:0;min-height:42px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px;color:var(--fg);font:500 15px var(--font-mono)}
+.eq{font:500 14px/1.4 var(--font-mono);color:var(--fg)}
+.ops{display:flex;gap:4px;flex-wrap:wrap}
+.ops svg{width:26px;height:34px}
+.ctl2{display:grid;grid-template-columns:minmax(0,1fr) 140px;gap:10px;align-items:end}
+.ctl2 label{font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.ctl2 output{font:500 13px var(--font-mono);color:var(--fg)}
+.money{display:flex;align-items:center;gap:6px;font:500 13px var(--font-mono)}
+.money input{width:80px;min-height:40px;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:6px 8px;color:var(--fg);font:500 14px var(--font-mono)}
+/* 4: threshold */
+.sliders{display:grid;gap:4px}
+.qs{display:grid;grid-template-columns:96px minmax(0,1fr) 74px;gap:8px;align-items:center;font-size:12.5px}
+.qs input{margin:0}
+.qs output{font:500 12px var(--font-mono);text-align:right;color:var(--fg)}
+.qs output.hum{color:var(--force)}
+.dot{transition:opacity .25s}
+/* 5: lanes */
+.lanes3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.lanes3 .zone{min-height:120px}
+/* 6: pilot */
+.pcs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.pc{display:flex;flex-direction:column;gap:6px;text-align:left;background:var(--surface-2);border:1px solid #3a4762;border-radius:10px;padding:9px 10px;cursor:pointer;min-height:44px}
+.pc:hover{border-color:var(--muted)}
+.pc.in{border-color:var(--ok);background:#1f3a2f}
+.pc b{font:600 13px/1.3 var(--font-body)}
+.pc small{font-size:11.5px;color:var(--muted);line-height:1.3}
+.vre{display:grid;grid-template-columns:56px minmax(0,1fr);gap:2px 6px;align-items:center;font:500 10.5px/1 var(--font-mono);color:var(--muted)}
+.sq{display:flex;gap:2px}.sq i{width:12px;height:7px;border-radius:2px;background:var(--line)}
+.sq.v i.f{background:var(--ok)}.sq.r i.f{background:var(--warn)}.sq.e i.f{background:var(--arm)}
+.pm{display:grid;gap:7px}
+.pmr{display:grid;grid-template-columns:110px minmax(0,1fr) 70px;gap:8px;align-items:center;font-size:12.5px}
+.pmr .tr{position:relative;height:10px;border-radius:5px;background:var(--line)}
+.pmr .tr b{position:absolute;left:0;top:0;bottom:0;border-radius:5px;transition:width .5s cubic-bezier(.3,1.3,.5,1),background .3s}
+.pmr .tr i{position:absolute;top:-3px;width:2px;height:16px;background:var(--fg)}
+.pmr span{font:500 12px var(--font-mono);text-align:right}
+.doc{background:#f3efe6;color:#1d1a14;border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.4}
+.doc h4{margin:0 0 8px;font:700 13px/1.2 var(--font-display);letter-spacing:.04em}
+.dsec{border-top:1px solid #d8d0bf;padding:7px 0}
+.dsec>b{display:block;font:600 10px/1.2 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:#7a705c;margin-bottom:5px}
+.dsec .fillt{color:#1b5e3b;font-weight:500}
+.dopts{display:flex;flex-direction:column;gap:4px}
+.dopts button{text-align:left;min-height:40px;background:#fff;border:1px solid #d8d0bf;border-radius:8px;padding:7px 9px;font:500 12.5px/1.3 var(--font-body);color:#1d1a14;cursor:pointer}
+.dopts button:hover{border-color:#7a705c}
+.dopts button.no{border-color:#c8553d;background:#fbe9e4}
+/* 7: system */
+.pipe{display:flex;flex-direction:column;gap:6px}
+.ps{position:relative;border:1.5px dashed var(--line);border-radius:10px;padding:8px 10px 8px 34px;min-height:44px;font-size:13px;color:var(--muted)}
+.ps::before{content:attr(data-n);position:absolute;left:9px;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font:600 10.5px/1 var(--font-mono);background:var(--bg);border:1px solid var(--line);color:var(--muted)}
+.ps.next{border-color:var(--arm);color:var(--fg);cursor:pointer}
+.ps.over{border-color:var(--force);background:rgba(255,181,71,.08)}
+.ps.fill{border-style:solid;border-color:#3a4762;background:var(--surface-2);color:var(--fg);animation:pop .35s ease-out}
+.ps.fill::before{background:var(--ok);border-color:var(--ok);color:var(--ink)}
+.ps.fill+.ps.fill::after{content:"";position:absolute;left:17px;top:-8px;width:2px;height:8px;background:var(--ok)}
+.prob{border:1px solid var(--line);border-radius:10px;padding:9px 10px;background:var(--bg)}
+.prob p{margin:0 0 7px;font-size:13px;line-height:1.4}
+.prob .lbl{font:600 10px/1.2 var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:8px 0 5px}
+.pats{display:flex;flex-wrap:wrap;gap:5px}
+.pats button{min-height:38px;background:var(--surface-2);border:1px solid #3a4762;border-radius:8px;padding:6px 9px;font:500 12px/1.2 var(--font-body);cursor:pointer}
+.pats button.ok{border-color:var(--ok);background:#1f3a2f}
+.pats button.no{border-color:var(--warn);background:#3a2220}
+.rub{display:grid;gap:5px;margin:0;padding:0;list-style:none}
+.rub li{display:flex;gap:8px;font-size:13px;line-height:1.4}
+.rub li b{color:var(--ok);font-family:var(--font-mono)}
+.ctas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.cta{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;background:var(--force);color:#1a1300;border-radius:12px;padding:12px 14px;text-decoration:none;font:600 14px/1.3 var(--font-body)}
+.cta.gh{background:var(--surface-2);color:var(--fg);border:1px solid var(--line)}
+.cta:hover{filter:brightness(1.07)}
+@media (max-width:600px){
+  .fields,.srcs,.pick6,.mpool,.pcs,.ctas{grid-template-columns:minmax(0,1fr)}
+  .dash{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .lanes3{grid-template-columns:minmax(0,1fr)}
+  .lanes3 .zone{min-height:80px}
+  .ctl2{grid-template-columns:minmax(0,1fr)}
+  .qs{grid-template-columns:78px minmax(0,1fr) 66px;gap:6px;font-size:12px}
+  .pmr{grid-template-columns:84px minmax(0,1fr) 62px}
+  .rds{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+</style>
+</head>
+<body>
+<script src="/luch/splash.js"></script>
+<div class="app">
+  <header>
+    <div class="brand" role="link" tabindex="0" title="Профессии" style="cursor:pointer" onclick="location.href='/prof/'" onkeydown="if(event.key==='Enter')location.href='/prof/'">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M12 27h12v10.5H12z" fill="#c8803e"/><path d="M10.5 31.5Q18 35.2 25.5 31.5" fill="none" stroke="#ffb547" stroke-width="3" stroke-linecap="round"/><circle cx="18" cy="33.6" r="1.6" fill="#ffd896"/><ellipse cx="18" cy="19.5" rx="11" ry="10" fill="#c8803e"/><path d="M19 15.5Q27 14.8 33.5 17.2Q38 19 37.6 23.2Q37 27.6 31.5 28Q24 28.4 19 26Z" fill="#c8803e"/><path d="M21 24.6Q27 27.4 32.5 26.9Q35.6 26.5 36.6 24.6Q32 25.8 27 24.6Q24 23.9 21 24.6Z" fill="#e7b37c"/><ellipse cx="35.6" cy="20.6" rx="2.5" ry="2.1" fill="#1b1206"/><circle cx="36.2" cy="19.9" r=".7" fill="#fff" opacity=".7"/><path d="M27.5 27.2Q30.5 28.8 33.6 27.3" fill="none" stroke="#5a3214" stroke-width="1" stroke-linecap="round"/><circle cx="22.4" cy="17.2" r="2.4" fill="#1b1206"/><circle cx="23.2" cy="16.4" r=".85" fill="#fff"/><path d="M19.8 13.6Q22.4 12.2 25 13.4" fill="none" stroke="#8a4f20" stroke-width="1.1" stroke-linecap="round"/><path d="M11.5 10.5Q4 11.5 4.2 21Q4.4 29.5 10.2 30.2Q13.4 30.4 14.2 26Q15.4 18 14.6 11.6Q13.6 10.2 11.5 10.5Z" fill="#8a4f20"/><path d="M7.4 16Q6.6 22 8.4 27" fill="none" stroke="#a8622b" stroke-width="1.2" stroke-linecap="round"/></svg>
+      <div><h1>OPEN SCHOOL AI</h1><small>Профессии · FDE · Уровень 1</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/prof/">Профессии</a><a href="/prof/fde/"><span class="lg">Forward Deployed Engineer</span><span class="sm">FDE</span></a><a href="/labs/prof-fde-practice/" aria-current="page">Практикум</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Практикум</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/7</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Экран лаборатории: практикум FDE на примере колл-центра сети клиник">
+    <div class="task" id="taskBox" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="screen" id="screen"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const big = n => Math.round(n).toLocaleString('ru-RU');
+const fmt = (x, n = 1) => (Math.round(x * 10 ** n) / 10 ** n).toFixed(n).replace('.', ',');
+const pct = (x, n = 0) => fmt(x * 100, n) + ' %';
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+// stable shuffle: the same order every time for the same salt
+const mix = (arr, salt) => { const r = mulberry(salt * 977 + 13), a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+const LESSONS = [
+  { id: 'talk', title: 'Первые 10 минут у клиента',
+    text: ['Сеть клиник «Медика». Колл-центр получает около 900 обращений в день, операторы вручную раскладывают их по шести очередям. Клиника купила ИИ-модель, демо ошибалось в каждом пятом обращении, проект встал. Тебя прислали на 6 недель.',
+           'Первый разговор — с руководителем колл-центра. Не спрашивай про модель. Узнай, кто принимает решение, как это делают сейчас и как поймём успех.'],
+    why: 'Хорошие вопросы в первые минуты экономят недели работы. Плохие — сразу показывают клиенту, что ты пришёл продавать, а не разбираться.',
+    task: 'Заполни все 7 полей карточки задачи, задав не больше 8 вопросов.',
+    hint: 'Хороший вопрос — про людей, решение, процесс, данные и цифры. Плохой — про модель, бюджет или с готовым ответом внутри.',
+    stage: 'Ответы клиента сами попадают в карточку задачи. Точки — твои 8 вопросов.',
+    check: m => m.filled === 7 && m.asked <= 8 },
+  { id: 'data', title: 'Карта данных клиента',
+    text: ['Модель учится и проверяется на данных клиента. Прежде чем строить, обойди все источники и запиши, что с каждым не так.',
+           'Отдельно найди источник «правильных ответов» — где люди уже приняли решение по прошлым обращениям. По нему ты будешь проверять модель.'],
+    why: 'Почти каждый проект с ИИ спотыкается о данные: пустые поля, нет доступа, нет выгрузки. Узнать это в первую неделю — дешевле, чем на пятой.',
+    task: 'Разложи 6 проблем по источникам данных и выбери, где взять известные правильные ответы для проверки модели.',
+    hint: 'Тяни ярлык на источник или нажми ярлык, потом источник. Подумай, где живёт эта проблема.',
+    stage: 'Линия на карте загорается, когда у источника найдена его проблема.',
+    check: m => m.placed === m.total && m.goldOk },
+  { id: 'metric', title: 'Как поймём, что получилось',
+    text: ['Договорись о цифрах до того, как строить. Иначе через 6 недель каждый будет считать успех по-своему.',
+           'Нужны метрики пользы и одна красная линия, которую нельзя пересекать. И базовая цифра «как сейчас» — без неё не с чем сравнивать.'],
+    why: 'Клиент платит за сэкономленные часы и быстрые ответы пациентам, а не за точность на демо или число встреч.',
+    task: 'Собери панель пилота: 3 метрики пользы + 1 красная линия. Потом посчитай, сколько часов в день операторы тратят сейчас.',
+    hint: 'Метрика пользы — то, что заметит пациент или директор. Тщеславная метрика — то, что приятно показать, но ничего не говорит о результате.',
+    stage: 'Под панелью — калькулятор: двигай долю автоматики и ставку оператора.',
+    check: m => m.metricsOk && m.calcOk },
+  { id: 'thresh', title: 'Порог уверенности',
+    text: ['Модель к каждому ответу добавляет уверенность (confidence) — число от 0 до 1. Выше порога — обращение уходит в очередь само. Ниже — его разбирает оператор.',
+           'Перед тобой 200 прошлых обращений, где правильный ответ известен. Ниже порог — больше автоматики и больше ошибок. Найди баланс.'],
+    why: 'Порог — главный рычаг FDE в любом проекте с ИИ: он решает, где машина работает сама, а где страхует человек.',
+    task: 'Добейся ≥ 60 % обращений автоматически при ошибках ≤ 2 %, и чтобы срочные симптомы ни разу не ушли в автомат.',
+    hint: 'Одним общим порогом не выйдет. Переключись на «Порог на очередь»: где модель надёжна, порог можно ниже; где цена ошибки огромна — только человек.',
+    stage: 'Точка — обращение: зелёная — модель права, красная — ошиблась. Яркие точки справа от линии ушли в автомат.',
+    check: m => m.auto >= 0.6 && m.err <= 0.02 && m.urg === 0 },
+  { id: 'lanes', title: 'Правило, модель или человек',
+    text: ['Не всё нужно отдавать модели. Если решение можно записать одной строкой «если… то…», это правило в коде: оно не ошибается и его легко проверить.',
+           'Модель берёт то, что нельзя описать правилом: свободный текст. А человек — то, где цена ошибки высока или нужна ответственность.'],
+    why: 'Сильный FDE использует модель там, где она нужна, а не везде. Так система дешевле, надёжнее и понятнее клиенту.',
+    task: 'Разложи 8 шагов работы колл-центра по трём дорожкам: правило в коде, модель или человек.',
+    hint: 'Спроси: можно ли записать это как «если… то…»? Нужно ли понимать живой текст? Кто отвечает, если ошибёмся?',
+    stage: 'Схема сверху показывает, по каким дорожкам идёт обращение.',
+    check: m => m.placed === m.total },
+  { id: 'pilot', title: 'Пилот: самая маленькая полезная версия',
+    text: ['Сделать всё сразу за 6 недель нельзя. Выбери кусок, который за 2 недели даст заметную пользу при низком риске.',
+           'Потом запиши договорённость на одной странице: цель, метрика, что входит, что не входит, сроки и риски.'],
+    why: 'Маленький удачный пилот открывает дверь к большому проекту. Большой неудачный — закрывает её навсегда.',
+    task: 'Собери пилот: польза ≥ 7, риск каждой части ≤ 2, работы не больше чем на 2 недели. Затем заполни все 6 разделов страницы объёма работ.',
+    hint: 'Начни с самой частой и безопасной очереди. Без журнала решений пилот нельзя проверить.',
+    stage: 'Шкалы показывают пользу, самый большой риск и срок.',
+    check: m => m.pilotOk && m.scopeN === 6 },
+  { id: 'system', title: 'Собери систему',
+    text: ['Разбей решение на части (decomposition): что приходит на вход, что делает модель, что — правила, где порог, кто проверяет.',
+           'А потом примени тот же приём к новым задачам. Почти любая задача у клиента похожа на один из пяти типовых шаблонов.'],
+    why: 'На собеседовании FDE и в работе тебя спросят именно это: как разложить чужую задачу на понятные части за 30 минут.',
+    task: 'Собери конвейер из 6 блоков по порядку, затем для 3 новых задач выбери шаблон и первый вопрос клиенту.',
+    hint: 'Конвейер: сначала понять обращение, потом проверить правила, потом решить, куда отправить, и всё записать.',
+    stage: 'Блоки встают в конвейер сверху вниз. Лишние блоки не подойдут.',
+    check: m => m.pipe === 6 && m.bankOk === 3 },
+];
+
+const KEY = 'luch-prof-fde-practice';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview' };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- 1. interview ----------
+const LEAD = 'Анна, руководитель колл-центра';
+const FIELDS = [
+  { id: 'user', n: 'Кто пользователь', q: 'Кто каждый день будет пользоваться результатом?', a: 'Операторы колл-центра — 14 человек в смене. И я, когда смотрю, где очереди застряли.', c: 'Операторы колл-центра (14 в смене) и руководитель' },
+  { id: 'dec', n: 'Какое решение', q: 'Какое решение оператор принимает по каждому обращению?', a: 'Куда его отправить. У нас 6 очередей: запись, перенос, анализы, страховка, жалобы и срочные.', c: 'В какую из 6 очередей отправить обращение' },
+  { id: 'now', n: 'Как сейчас', q: 'Покажете, как сейчас разбирают одно обращение — от звонка до очереди?', a: 'Оператор читает или слушает, ищет пациента в CRM, выбирает очередь. Минуты четыре на каждое. Пациент ждёт ответа около суток.', c: '≈ 900 в день, 4 мин на каждое, ответ ≈ через сутки' },
+  { id: 'tried', n: 'Что пробовали', q: 'Что уже пробовали и почему не получилось?', a: 'Купили модель. На демо она ошибалась в каждом пятом обращении, а один раз отправила «боль в груди» в обычную запись. Проект остановили.', c: 'Модель: ошибка в 1 из 5, срочное ушло в запись → стоп' },
+  { id: 'data', n: 'Данные и доступы', q: 'Где хранятся обращения и история разбора? Кто даёт доступ?', a: 'Всё в CRM колл-центра, карты пациентов — в медицинской системе. Доступ к медданным — только через главврача и юриста.', c: 'CRM, медсистема; медданные — через главврача и юриста' },
+  { id: 'lim', n: 'Ограничения', q: 'Чего нельзя допустить ни при каком раскладе?', a: 'Срочное обращение не должно потеряться. Медданные не уходят за пределы клиники. И операторов мы не сокращаем.', c: 'Срочные — только человек; медданные не выходят наружу' },
+  { id: 'succ', n: 'Как поймём успех', q: 'По какой цифре через 6 недель вы скажете «получилось»?', a: 'Если пациенты получают ответ в тот же день, у операторов освобождаются часы и ни одно срочное не ушло не туда.', c: 'Ответ в тот же день, меньше часов операторов, 0 срочных мимо' },
+];
+const BADQ = [
+  { q: 'Какую модель хотите — самую новую?', a: 'Я не разбираюсь в моделях… А какая лучше?', why: 'Модель — инструмент. Пока ты не знаешь задачу, выбирать инструмент рано.' },
+  { q: 'Сколько у вас бюджет на ИИ?', a: 'Это к финансовому директору. А что, уже нужны деньги?', why: 'О деньгах — после того, как понятна польза. Первым вопросом это настораживает клиента.' },
+  { q: 'Вы же согласны, что операторов можно заменить ИИ?', a: 'Нет! Никого заменять мы не собираемся.', why: 'Наводящий вопрос подсказывает ответ и портит доверие. Спрашивай открыто.' },
+  { q: 'Давайте я сразу покажу демо нашей модели?', a: 'Демо мы уже видели. Оно ошибалось.', why: 'Ты ещё ничего не узнал о задаче. Показ сейчас — это продажа, а не знакомство.' },
+  { q: 'Можно мне доступ ко всем базам прямо сегодня?', a: 'Без согласования с главврачом — нет.', why: 'Доступ просят под понятную цель и через правильных людей. Сначала узнай, какие данные есть.' },
+  { q: 'Модель ведь ошибалась из-за плохих данных, да?', a: 'Наверное… Я не знаю.', why: 'Вопрос с готовой версией внутри. Клиент соглашается, а ты ничего не узнаёшь.' },
+];
+const MAXQ = 8;
+function talkOptions() {
+  const iv = S.iv, open = FIELDS.filter(f => !iv.filled[f.id]);
+  const good = open.slice(0, 2).map(f => ({ k: 'g', id: f.id, q: f.q }));
+  const unused = BADQ.map((b, i) => i).filter(i => !iv.badUsed.includes(i));
+  const pool = unused.length >= 2 ? unused : BADQ.map((b, i) => i);
+  const bad = [pool[(iv.turn * 2) % pool.length], pool[(iv.turn * 2 + 1) % pool.length]].filter((v, i, a) => a.indexOf(v) === i).map(i => ({ k: 'b', id: i, q: BADQ[i].q }));
+  return mix(good.concat(bad), iv.turn + 1);
+}
+
+// ---------- 2. data map ----------
+const SRC = [
+  { id: 'crm', n: 'CRM колл-центра', s: 'обращения, кто звонил', ic: '<rect x="4" y="5" width="18" height="16" rx="2" fill="none" stroke="#72d4e8" stroke-width="1.6"/><path d="M4 10H22M9 5V21" stroke="#72d4e8" stroke-width="1.2"/>' },
+  { id: 'mis', n: 'Медицинская система', s: 'карты пациентов', ic: '<rect x="5" y="4" width="16" height="18" rx="2" fill="none" stroke="#ff8a73" stroke-width="1.6"/><path d="M13 8V18M8 13H18" stroke="#ff8a73" stroke-width="2"/>' },
+  { id: 'sched', n: 'Расписание врачей', s: 'свободные окна', ic: '<rect x="4" y="6" width="18" height="16" rx="2" fill="none" stroke="#a99cff" stroke-width="1.6"/><path d="M4 11H22M9 3V8M17 3V8" stroke="#a99cff" stroke-width="1.6"/>' },
+  { id: 'price', n: 'Excel с прайсом', s: 'цены на услуги', ic: '<rect x="5" y="4" width="16" height="18" rx="2" fill="none" stroke="#86e0a8" stroke-width="1.6"/><path d="M5 10H21M5 16H21M12 4V22" stroke="#86e0a8" stroke-width="1.2"/>' },
+  { id: 'rec', n: 'Записи звонков', s: 'аудио', ic: '<path d="M5 13H7M9 9V17M13 6V20M17 10V16M21 12V14" stroke="#ffb547" stroke-width="2" stroke-linecap="round"/>' },
+  { id: 'hist', n: 'История разбора', s: 'куда операторы отправили обращения за 3 года', ic: '<circle cx="13" cy="13" r="8.5" fill="none" stroke="#e8ecf4" stroke-width="1.6"/><path d="M13 8V13L17 15" stroke="#e8ecf4" stroke-width="1.6" stroke-linecap="round"/>' },
+];
+const TAGS = [
+  { id: 'empty', t: 'Поле «симптомы» пустое в 4 из 10 обращений', g: 'crm', why: 'Где оператор заполняет поля, пока говорит с пациентом?' },
+  { id: 'pd', t: 'Медицинские данные: нужен доступ и согласование', g: 'mis', why: 'Где хранятся диагнозы и анализы — самые чувствительные данные?' },
+  { id: 'noapi', t: 'Отдельная программа без API — только выгрузка вручную', g: 'sched', why: 'Какая система живёт отдельно и нужна, чтобы найти свободное окно у врача?' },
+  { id: 'daily', t: 'Обновляется раз в сутки — цены могут отставать', g: 'price', why: 'Что бухгалтерия выгружает в файл и присылает по утрам?' },
+  { id: 'audio', t: 'Это звук, а не текст: сначала расшифровать', g: 'rec', why: 'Какой источник нельзя прочитать как текст?' },
+  { id: 'rename', t: 'Год назад очереди переименовали: старые записи — по старым названиям', g: 'hist', why: 'Где хранятся решения операторов за прошлые годы?' },
+];
+
+// ---------- 3. metrics ----------
+const METRICS = [
+  { id: 'auto', t: 'Доля обращений, разобранных автоматически', g: 1 },
+  { id: 'demo', t: 'Точность модели на демо', why: 'Демо — подобранные примеры. Мерить надо на настоящих обращениях клиники.' },
+  { id: 'time', t: 'Время до ответа пациенту', g: 1 },
+  { id: 'loc', t: 'Число строк кода', why: 'Пациенту всё равно, сколько строк ты написал. Это мера усилий, а не пользы.' },
+  { id: 'urg', t: 'Срочные обращения, ушедшие в автомат: ровно 0', g: 1, red: 1 },
+  { id: 'meet', t: 'Число встреч с клиентом', why: 'Встречи — это процесс, а не результат. Клиника платит не за встречи.' },
+  { id: 'hours', t: 'Часы операторов в день', g: 1 },
+  { id: 'feat', t: 'Число функций в системе', why: 'Больше функций — не значит больше пользы. Часто наоборот.' },
+];
+const BASE_H = 900 * 4 / 60;
+
+// ---------- 4. threshold ----------
+const QUEUES = [
+  { id: 'zap', n: 'Запись', cnt: 70, lo: .5, sk: .35, safe: .72 },
+  { id: 'per', n: 'Перенос', cnt: 30, lo: .5, sk: .4, safe: .75 },
+  { id: 'an', n: 'Анализы', cnt: 35, lo: .5, sk: .45, safe: .8 },
+  { id: 'dms', n: 'Страховка', cnt: 25, lo: .45, sk: .6, safe: .88 },
+  { id: 'zh', n: 'Жалобы', cnt: 20, lo: .45, sk: .9, safe: 2 },
+  { id: 'urg', n: 'Срочные', cnt: 20, lo: .7, sk: .6, safe: .9 },
+];
+// 200 past requests with a known right answer; seeded so the task is always solvable the same way
+const DATA = (() => {
+  const r = mulberry(25), out = [];
+  QUEUES.forEach((q, qi) => {
+    for (let i = 0; i < q.cnt; i++) {
+      const c = +(q.lo + (0.99 - q.lo) * Math.pow(r(), q.sk)).toFixed(2);
+      const pw = c >= q.safe ? 0.008 : (q.safe > 1 ? 0.25 : 0.12 + (q.safe - c) * 1.6);
+      out.push({ q: q.id, qi, c, ok: r() >= pw });
+    }
+  });
+  const j = mulberry(4242); out.forEach(d => { d.jy = j() * 2 - 1; });
+  return out;
+})();
+const TMIN = 0.5;
+function thOf(q) { return S.th.mode === 'one' ? S.th.one : S.th.per[q]; }
+function evalTh(get) {
+  let a = 0, e = 0, u = 0;
+  for (const d of DATA) { const t = get(d.q); if (t < 1 && d.c >= t) { a++; if (!d.ok) e++; if (d.q === 'urg') u++; } }
+  return { a, e, u, auto: a / DATA.length, err: a ? e / a : 0 };
+}
+const CURVE = (() => { const pts = []; for (let t = 0.5; t <= 0.995; t += 0.01) { const s = evalTh(() => t); pts.push([s.auto, s.err, +t.toFixed(2)]); } return pts; })();
+
+// ---------- 5. lanes ----------
+const STEPS = [
+  { id: 'kw', t: 'В тексте «боль в груди», «не дышит» → сразу срочно человеку', g: 'rule', why: 'Это можно записать строкой «если есть слова… то…». Правило не ошибётся и сработает за миллисекунду.' },
+  { id: 'topic', t: 'Понять, о чём обращение, по свободному тексту пациента', g: 'model', why: 'Пациенты пишут как угодно. Правилом все формулировки не описать — это работа модели.' },
+  { id: 'facts', t: 'Вытащить дату, врача и филиал из сообщения', g: 'model', why: '«Можно к Ивановой в четверг после обеда?» — понять это из живого текста может только модель.' },
+  { id: 'polis', t: 'Полис страховки просрочен → очередь страховки', g: 'rule', why: 'Дата окончания полиса лежит в базе. Сравнить две даты — это правило, а не модель.' },
+  { id: 'slot', t: 'Нет окна у врача → предложить ближайшее свободное из расписания', g: 'rule', why: 'Найти ближайшее свободное окно в расписании — точный поиск по таблице. Модель здесь только добавит ошибок.' },
+  { id: 'sum', t: 'Пересказать длинное письмо пациента в 2 строки для оператора', g: 'model', why: 'Сжать живой текст — типичная задача для модели.' },
+  { id: 'low', t: 'Решить, куда отправить, когда модель не уверена', g: 'hum', why: 'Низкая уверенность — значит, модель сама «не знает». Решает человек.' },
+  { id: 'compl', t: 'Ответить пациенту на жалобу на врача', g: 'hum', why: 'Жалоба — это ответственность клиники и живые эмоции. Тут нужен человек.' },
+];
+const STEP_POOL = ['sum', 'kw', 'compl', 'facts', 'slot', 'low', 'topic', 'polis'];
+const LANES = [
+  { id: 'rule', name: 'Правило в коде', sub: 'если… то…', col: '#72d4e8' },
+  { id: 'model', name: 'Модель', sub: 'понять живой текст', col: '#a99cff' },
+  { id: 'hum', name: 'Человек', sub: 'риск и ответственность', col: '#ffb547' },
+];
+
+// ---------- 6. pilot ----------
+const PIECES = [
+  { id: 'zap', n: 'Запись и перенос', s: 'больше половины всех обращений', v: 4, r: 1, e: 2 },
+  { id: 'an', n: 'Вопросы об анализах', s: 'готовность, подготовка', v: 3, r: 2, e: 2 },
+  { id: 'dms', n: 'Страховка', s: 'нужен доступ к системе страховой', v: 3, r: 2, e: 4 },
+  { id: 'zh', n: 'Жалобы', s: 'эмоции, ответственность', v: 2, r: 4, e: 2 },
+  { id: 'urg', n: 'Срочные симптомы', s: 'ошибка опасна для жизни', v: 5, r: 5, e: 3 },
+  { id: 'log', n: 'Журнал решений + «вернуть оператору»', s: 'видно, что и почему решила система', v: 1, r: 0, e: 1 },
+  { id: 'dash', n: 'Красивая панель для директора', s: 'графики и отчёты', v: 1, r: 0, e: 2 },
+];
+const P_V = 7, P_R = 2, P_E = 5;
+const SCOPE = [
+  { id: 'goal', n: 'Цель', o: ['Операторы тратят меньше времени на запись и анализы, срочные не теряются', 'Внедрить ИИ во всей клинике', 'Показать руководству, что модель умная'], ok: 0,
+    why: ['', 'Слишком широко: это не пилот на 2 недели.', 'Это не польза для клиники, а реклама модели.'] },
+  { id: 'metric', n: 'Метрика', o: ['Клиенту понравилось', '≥ 60 % записи и анализов — автоматически, ошибок ≤ 2 %, срочных в автомате — 0', 'Точность на демо 95 %'], ok: 1,
+    why: ['«Понравилось» нельзя измерить. Нужна цифра.', '', 'Демо — не настоящие обращения клиники.'] },
+  { id: 'in', n: 'Входит', o: ['Все 6 очередей сразу', 'Запись и жалобы', 'Очереди «запись и перенос» и «анализы», журнал решений, возврат оператору'], ok: 2,
+    why: ['За 2 недели всё не успеть, а срочные нельзя автоматизировать.', 'Жалобы — высокий риск, в первый пилот их не берут.', ''] },
+  { id: 'out', n: 'Не входит', o: ['Страховка, жалобы, срочные — пока вручную; панель для директора — позже', 'Не входит ничего', 'Журнал решений — сделаем потом'], ok: 0,
+    why: ['', 'Если ничего не исключено, кто-то обязательно ждёт всего сразу.', 'Без журнала пилот нельзя проверить и опасно запускать.'] },
+  { id: 'time', n: 'Сроки', o: ['Завтра', 'Полгода', '2 недели: неделя сборки и неделя работы рядом с операторами'], ok: 2,
+    why: ['Нереально: даже доступы за день не выдадут.', 'Это уже не пилот: клиент потеряет интерес.', ''] },
+  { id: 'risk', n: 'Риски', o: ['Доступ к медданным согласуют главврач и юрист — заявка в первый же день', 'Рисков нет', 'Модель могут не купить'], ok: 0,
+    why: ['', 'Риски есть всегда. Если их не записать, они всплывут в последний день.', 'Это риск продавца, а не проекта клиники.'] },
+];
+
+// ---------- 7. system ----------
+const BLOCKS = [
+  { id: 'in', t: 'Приём обращения: звонок, чат, сайт', why: 'С чего всё начинается? Сначала обращение должно попасть в систему.' },
+  { id: 'ext', t: 'Модель извлекает факты: тема, дата, врач', why: 'Правилам нужны факты — тема, дата, полис. Кто их достаёт из текста?' },
+  { id: 'rules', t: 'Правила: срочные слова, просроченный полис', why: 'Правила проверяют факты до того, как решать, куда отправить.' },
+  { id: 'route', t: 'Маршрутизация с порогом уверенности', why: 'Решение «сам или оператор» принимается, когда факты и правила уже есть.' },
+  { id: 'log', t: 'Журнал решений: что, почему, с какой уверенностью', why: 'Записывают уже принятое решение — перед тем, как отдать его людям.' },
+  { id: 'q', t: 'Очереди операторов', why: 'Это конец пути: сюда приходят разобранные обращения.' },
+];
+const DISTRACT = [
+  { id: 'x1', t: 'Модель сразу отвечает пациенту от имени врача', why: 'Опасно: модель не врач. В этой системе она только сортирует обращения.' },
+  { id: 'x2', t: 'Презентация для совета директоров', why: 'Это не часть системы — по ней не идёт ни одно обращение.' },
+];
+const BLOCK_POOL = ['route', 'x1', 'in', 'log', 'rules', 'x2', 'q', 'ext'];
+const PATTERNS = [
+  { id: 'queue', n: 'Очередь проверки' }, { id: 'docs', n: 'Ассистент по документам' }, { id: 'sync', n: 'Синхронизация двух систем' },
+  { id: 'alert', n: 'Оповещения по событиям' }, { id: 'plan', n: 'Прогноз и планирование' },
+];
+const BANK = [
+  { id: 'bank', t: 'Банк: 3 000 заявлений о спорных списаниях в день. Сотрудники вручную решают, вернуть ли деньги, ответ ждут неделю.', p: 'queue',
+    pwhy: 'Много однотипных заявлений, по каждому человек принимает решение — это очередь проверки, как в колл-центре клиники.',
+    qs: ['Кто сейчас решает о возврате и по каким правилам?', 'Какую модель вы уже используете?', 'Можно ли возвращать деньги всем подряд?'], qok: 0 },
+  { id: 'shop', t: 'Интернет-магазин: остатки на сайте и на складе расходятся, покупатели заказывают то, чего уже нет.', p: 'sync',
+    pwhy: 'Две системы хранят одно и то же число и расходятся — это синхронизация двух систем.',
+    qs: ['Сколько стоит ваш сайт?', 'Какая система главная — где правда об остатке?', 'Хотите чат-бота для покупателей?'], qok: 1 },
+  { id: 'city', t: 'Городская служба: жители пишут обращения, а сотрудники каждый раз ищут ответ в сотнях правил и постановлений.', p: 'docs',
+    pwhy: 'Ответ уже есть в документах — нужно быстро найти нужный кусок и сослаться на него. Это ассистент по документам.',
+    qs: ['Какие документы считаются официальными и как часто они меняются?', 'Можно ли отвечать жителям без проверки человеком?', 'Сколько сотрудников можно сократить?'], qok: 0 },
+];
+const PWRONG = {
+  queue: 'Очередь проверки — когда по каждому входящему человек принимает решение. Здесь главное другое.',
+  docs: 'Ассистент по документам — когда ответ уже записан в документах и его надо найти. Здесь так?',
+  sync: 'Синхронизация — когда две системы хранят одно и то же и расходятся. Здесь так?',
+  alert: 'Оповещения — когда важно заметить событие вовремя. Тут суть не в этом.',
+  plan: 'Прогноз — когда надо заранее рассчитать спрос или ресурсы. Тут суть не в этом.',
+};
+const RUBRIC = ['Пользователь и решение: кто решает и что именно', 'Данные: что есть, чего нет, где правильные ответы', 'Объём: самый маленький полезный пилот', 'Части: правило, модель, человек, порог, журнал', 'Следующая версия и метрика: что дальше и как поймём успех'];
+
+// ---------- state ----------
+function resetState() {
+  S.sel = null; S.place = {}; S.miss = 0; S.badZone = null; S.shake = null;
+  S.iv = { filled: {}, log: [], turn: 0, asked: 0, badUsed: [] };
+  S.gold = null; S.goldOk = false;
+  S.met = []; S.calcIn = ''; S.calcOk = false; S.calcTry = 0; S.autoP = 40; S.rate = 8;
+  S.th = { mode: 'one', one: 0.8, per: { zap: 0.8, per: 0.8, an: 0.8, dms: 0.8, zh: 0.8, urg: 0.8 } };
+  S.pil = []; S.scope = {}; S.scopeBad = {};
+  S.pipe = []; S.bank = {};
+}
+function model() {
+  const id = LID();
+  if (id === 'talk') return { filled: Object.keys(S.iv.filled).length, asked: S.iv.asked, bad: S.iv.log.filter(x => !x.good).length };
+  if (id === 'data') return { placed: TAGS.filter(t => S.place[t.id]).length, total: TAGS.length, miss: S.miss, goldOk: S.goldOk };
+  if (id === 'metric') return { metricsOk: S.met.length === 4, picked: S.met.length, miss: S.miss, calcOk: S.calcOk };
+  if (id === 'thresh') { const s = evalTh(thOf); return { auto: s.auto, err: s.err, urg: s.u, a: s.a, e: s.e, mode: S.th.mode }; }
+  if (id === 'lanes') return { placed: STEPS.filter(c => S.place[c.id]).length, total: STEPS.length, miss: S.miss };
+  if (id === 'pilot') { const p = pilotStat(); return Object.assign(p, { scopeN: Object.keys(S.scope).length }); }
+  return { pipe: S.pipe.length, bankOk: BANK.filter(b => S.bank[b.id] && S.bank[b.id].p === b.p && S.bank[b.id].q === b.qok).length, miss: S.miss };
+}
+function pilotStat() {
+  const sel = PIECES.filter(p => S.pil.includes(p.id));
+  const v = sel.reduce((a, p) => a + p.v, 0), r = sel.reduce((a, p) => Math.max(a, p.r), 0), e = sel.reduce((a, p) => a + p.e, 0);
+  const hasLog = S.pil.includes('log');
+  return { v, r, e, hasLog, n: sel.length, pilotOk: v >= P_V && r <= P_R && e <= P_E && hasLog };
+}
+
+// ---------- screens ----------
+const screen = $('#screen');
+function build() {
+  const id = LID();
+  let h = '';
+  if (id === 'talk') h = `
+    <div class="box" data-part="chat"><div class="bh">Разговор · ${LEAD} <em class="qdots" id="qdots"></em></div><div class="chat" id="chat"></div></div>
+    <div class="box" data-part="opts"><div class="bh">Твой следующий вопрос</div><div class="opts" id="ivO"></div></div>
+    <div class="box" data-part="cardt"><div class="bh">Карточка задачи <em id="cardN"></em></div><div class="fields" id="fields"></div></div>
+    <div class="box" data-part="rp"><div class="bh">Хочешь живой разговор?</div><p class="small">Наставник сыграет руководителя колл-центра. Задавай свои вопросы — после восьмого он выйдет из роли и разберёт, что ты узнал.</p>
+      <div class="row"><button class="btn" data-a="rp">Сыграть с наставником</button></div></div>`;
+  if (id === 'data') h = `
+    <div class="box" data-part="map"><div class="bh">Карта данных «Медики» <em id="mapL"></em></div>${svgMap()}</div>
+    <div class="box" data-part="pool"><div class="bh">Проблемы, которые ты нашёл <em>тяни или нажми</em></div><div class="pool" id="pool"></div></div>
+    <div class="srcs" id="zones" data-part="zones"></div>
+    <div class="box" data-part="gold"><div class="bh">Правильные ответы для проверки</div><p class="small" style="margin-bottom:8px">Чтобы честно проверить модель, нужны прошлые обращения, где правильная очередь уже известна. Где их взять?</p><div class="pick6" id="goldO"></div><div id="goldFb"></div></div>`;
+  if (id === 'metric') h = `
+    <div class="box" data-part="dash"><div class="bh">Панель пилота <em id="dashL"></em></div><div class="dash" id="dash"></div></div>
+    <div class="box" data-part="mpool"><div class="bh">Метрики-кандидаты <em>нажми, чтобы взять</em></div><div class="mpool" id="mpool"></div></div>
+    <div class="box" data-part="base"><div class="bh">Как сейчас: базовая цифра</div>
+      <div class="eq">900 обращений × 4 минуты = ? часов в день</div>
+      <div class="calc"><input id="calcIn" data-in="calc" inputmode="decimal" placeholder="часов в день" aria-label="Часов в день"><button class="btn" data-a="calc">Проверить</button></div><div id="calcFb"></div></div>
+    <div class="box" data-part="save"><div class="bh">Что даст автоматика <em>прогноз</em></div>
+      <div class="ctl2"><div><label for="autoIn">Разобрано автоматически <output id="autoO"></output></label><input type="range" id="autoIn" data-in="auto" min="0" max="90" step="5"></div>
+        <div class="money"><label for="rateIn">Час оператора, $</label><input id="rateIn" data-in="rate" type="number" min="1" max="100" step="0.5"></div></div>
+      <div class="ops" id="ops" aria-hidden="true" style="margin:10px 0 8px"></div>
+      <dl class="rds" id="saveR"></dl></div>`;
+  if (id === 'thresh') h = `
+    <div class="box" data-part="readout"><dl class="rds" id="thR"></dl></div>
+    <div class="box" data-part="plot"><div class="bh">200 прошлых обращений <em id="plotL"></em></div>${svgPlot()}</div>
+    <div class="box" data-part="ctl"><div class="row" style="margin:0 0 8px"><div class="seg" id="modeSeg"><button data-a="mode:one">Один порог</button><button data-a="mode:per">Порог на очередь</button></div></div><div class="sliders" id="sliders"></div></div>
+    <div class="box" data-part="curve"><div class="bh">Цена порога <em>общий порог</em></div>${svgCurve()}<p class="small">Линия — как меняются ошибки при одном общем пороге. Зелёный угол — цель пилота.</p></div>`;
+  if (id === 'lanes') h = `
+    <div class="box" data-part="flow"><div class="bh">Путь обращения <em id="flowL"></em></div><div id="flow"></div></div>
+    <div class="box" data-part="pool"><div class="bh">Шаги работы колл-центра</div><div class="pool" id="pool"></div></div>
+    <div class="lanes3" id="zones" data-part="zones"></div>`;
+  if (id === 'pilot') h = `
+    <div class="box" data-part="meters"><div class="bh">Пилот на 2 недели <em id="pilL"></em></div><div class="pm" id="pm"></div><div id="pilFb"></div></div>
+    <div class="box" data-part="pieces"><div class="bh">Что взять в пилот <em>нажми, чтобы добавить</em></div><div class="pcs" id="pcs"></div></div>
+    <div class="box" data-part="doc"><div class="doc"><h4>Объём работ пилота · одна страница</h4><div id="docB"></div></div></div>`;
+  if (id === 'system') h = `
+    <div class="box" data-part="diagram"><div class="bh">Схема системы <em id="pipeL"></em></div><div id="pipeSvg"></div></div>
+    <div class="box" data-part="pool"><div class="bh">Блоки <em>тяни или нажми</em></div><div class="pool" id="pool"></div></div>
+    <div class="box" data-part="pipe"><div class="bh">Конвейер <em>сверху вниз</em></div><div class="pipe" id="pipe"></div></div>
+    <div class="box" data-part="bank"><div class="bh">Банк задач <em id="bankL"></em></div><div class="opts" id="bankB" style="gap:8px"></div></div>
+    <div class="box" data-part="rubric" id="rubBox" hidden><div class="bh">Самопроверка: хороший ответ FDE содержит</div><ul class="rub">${RUBRIC.map(r => `<li><b>✓</b><span>${r}</span></li>`).join('')}</ul></div>
+    <div class="ctas" data-part="cta"><a class="cta" href="/prof/fde/"><span>Карта навыков</span><span aria-hidden="true">›</span></a><a class="cta gh" href="/labs/prof-fde/"><span>Вводный курс</span><span aria-hidden="true">›</span></a></div>`;
+  screen.innerHTML = h;
+}
+
+// ---------- SVG ----------
+const MAPPOS = { crm: [62, 34], mis: [180, 22], sched: [298, 34], price: [62, 136], rec: [180, 150], hist: [298, 136] };
+function svgMap() {
+  let h = `<svg class="viz" viewBox="0 0 360 175" role="img" aria-label="Карта данных: в центре будущая модель, вокруг шесть источников данных клиники.">`;
+  SRC.forEach(s => { const [x, y] = MAPPOS[s.id]; h += `<path id="ln-${s.id}" d="M180 88L${x} ${y}" stroke="#26324a" stroke-width="2" stroke-dasharray="4 4" style="transition:stroke .4s"/>`; });
+  h += `<circle cx="180" cy="88" r="26" fill="#1d2940" stroke="#a99cff" stroke-width="1.8"/><text x="180" y="86" font-size="10" fill="#e8ecf4" text-anchor="middle" font-weight="600">будущая</text><text x="180" y="98" font-size="10" fill="#e8ecf4" text-anchor="middle" font-weight="600">модель</text>`;
+  SRC.forEach(s => { const [x, y] = MAPPOS[s.id]; h += `<g id="nd-${s.id}"><rect x="${x - 54}" y="${y - 13}" width="108" height="26" rx="8" fill="#141d2e" stroke="#3a4762" stroke-width="1.4" style="transition:stroke .4s"/><text x="${x}" y="${y + 4}" font-size="10" fill="#e8ecf4" text-anchor="middle">${s.n}</text></g>`; });
+  h += `<g id="star" opacity="0" style="transition:opacity .5s"><path d="M${MAPPOS.hist[0] + 50} ${MAPPOS.hist[1] - 24}l3 6 6.5 1-4.7 4.5 1.1 6.5-5.9-3.1-5.9 3.1 1.1-6.5-4.7-4.5 6.5-1z" fill="#ffb547"/></g>`;
+  return h + `</svg>`;
+}
+const PX0 = 70, PX1 = 350, ROWH = 32, PY0 = 10, CMIN = 0.4;
+const cx = c => PX0 + (c - CMIN) / (1 - CMIN) * (PX1 - PX0);
+function svgPlot() {
+  let h = `<svg class="viz" viewBox="0 0 360 ${PY0 + ROWH * 6 + 26}" role="img" aria-label="Точечная диаграмма: 200 обращений по шести очередям, по горизонтали уверенность модели от 0,4 до 1.">`;
+  QUEUES.forEach((q, i) => {
+    const y = PY0 + i * ROWH;
+    h += `<rect x="${PX0}" y="${y}" width="${PX1 - PX0}" height="${ROWH - 3}" rx="5" fill="${i % 2 ? '#111a29' : '#141d2e'}"/>`;
+    h += `<rect id="sh-${q.id}" x="${PX1}" y="${y}" width="0" height="${ROWH - 3}" fill="rgba(255,181,71,.10)"/>`;
+    h += `<text x="${PX0 - 6}" y="${y + ROWH / 2 + 2}" font-size="10.5" fill="${q.id === 'urg' ? '#ff8a73' : '#e8ecf4'}" text-anchor="end">${q.n}</text>`;
+    h += `<text id="hum-${q.id}" x="${(PX0 + PX1) / 2}" y="${y + ROWH / 2 + 3}" font-size="10" fill="#ffb547" text-anchor="middle" opacity="0">всегда человек</text>`;
+  });
+  DATA.forEach((d, k) => { h += `<circle class="dot" id="d${k}" cx="${cx(d.c).toFixed(1)}" cy="${(PY0 + d.qi * ROWH + (ROWH - 3) / 2 + d.jy * 10).toFixed(1)}" r="2.7" fill="${d.ok ? '#86e0a8' : '#ff8a73'}"/>`; });
+  QUEUES.forEach((q, i) => { const y = PY0 + i * ROWH; h += `<path id="tl-${q.id}" d="M0 ${y - 1}V${y + ROWH - 2}" stroke="#ffb547" stroke-width="2.2"/>`; });
+  const yb = PY0 + ROWH * 6 + 4;
+  [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1].forEach(v => { h += `<text x="${cx(v).toFixed(1)}" y="${yb + 9}" font-size="9" fill="#8b96ad" text-anchor="middle" font-family="IBM Plex Mono,monospace">${fmt(v, 1)}</text>`; });
+  h += `<text x="${PX1}" y="${yb + 21}" font-size="9" fill="#8b96ad" text-anchor="end">уверенность модели →</text><text x="${PX0}" y="${yb + 21}" font-size="9" fill="#8b96ad">← оператор · автомат →</text>`;
+  return h + `</svg>`;
+}
+const CW = { x0: 40, x1: 350, y0: 10, y1: 100, emax: 0.12 };
+const ccx = a => CW.x0 + a * (CW.x1 - CW.x0), ccy = e => CW.y1 - Math.min(e, CW.emax) / CW.emax * (CW.y1 - CW.y0);
+function svgCurve() {
+  let h = `<svg class="viz" viewBox="0 0 360 122" role="img" aria-label="Кривая: доля автоматики по горизонтали, доля ошибок по вертикали.">`;
+  h += `<rect x="${ccx(0.6).toFixed(1)}" y="${ccy(0.02).toFixed(1)}" width="${(ccx(1) - ccx(0.6)).toFixed(1)}" height="${(CW.y1 - ccy(0.02)).toFixed(1)}" fill="rgba(134,224,168,.16)" stroke="rgba(134,224,168,.6)" stroke-dasharray="3 3"/>`;
+  h += `<path d="M${CW.x0} ${CW.y0}V${CW.y1}H${CW.x1}" stroke="#3a4762" fill="none"/>`;
+  [0, 0.04, 0.08, 0.12].forEach(e => { h += `<text x="${CW.x0 - 4}" y="${(ccy(e) + 3).toFixed(1)}" font-size="9" fill="#8b96ad" text-anchor="end" font-family="IBM Plex Mono,monospace">${Math.round(e * 100)}%</text>`; });
+  [0, 0.25, 0.5, 0.75, 1].forEach(a => { h += `<text x="${ccx(a).toFixed(1)}" y="${CW.y1 + 11}" font-size="9" fill="#8b96ad" text-anchor="middle" font-family="IBM Plex Mono,monospace">${Math.round(a * 100)}%</text>`; });
+  h += `<polyline points="${CURVE.map(p => `${ccx(p[0]).toFixed(1)},${ccy(p[1]).toFixed(1)}`).join(' ')}" fill="none" stroke="#72d4e8" stroke-width="2"/>`;
+  h += `<text x="${CW.x1}" y="${CW.y1 + 21}" font-size="9" fill="#8b96ad" text-anchor="end">доля автоматики →</text><text x="${CW.x0 + 4}" y="${CW.y0 + 8}" font-size="9" fill="#8b96ad">ошибки ↑</text>`;
+  h += `<circle id="cur" r="5.5" fill="#ffb547" stroke="#0b1019" stroke-width="2" style="transition:cx .3s,cy .3s"/>`;
+  return h + `</svg>`;
+}
+function svgFlow() {
+  const order = STEPS.map(s => s.id), y0 = 8, lh = 36, x0 = 92, dx = (350 - x0) / 7;
+  let h = `<svg class="viz" viewBox="0 0 360 ${y0 + lh * 3 + 6}" role="img" aria-label="Схема-дорожки: правило, модель, человек; восемь шагов по порядку.">`;
+  LANES.forEach((ln, i) => {
+    const y = y0 + i * lh, n = STEPS.filter(s => S.place[s.id] === ln.id).length;
+    h += `<rect x="0" y="${y}" width="360" height="${lh - 4}" rx="8" fill="${n ? ln.col : '#141d2e'}" fill-opacity="${n ? 0.12 : 1}" stroke="${n ? ln.col : '#26324a'}" stroke-opacity="${n ? 0.6 : 1}"/>`;
+    h += `<text x="8" y="${y + lh / 2 + 1}" font-size="10" fill="${n ? ln.col : '#8b96ad'}" font-weight="600">${ln.name}</text>`;
+  });
+  const pts = [];
+  order.forEach((sid, i) => {
+    const li = LANES.findIndex(l => l.id === S.place[sid]), x = x0 + i * dx;
+    if (li >= 0) pts.push([x, y0 + li * lh + (lh - 4) / 2]);
+  });
+  if (pts.length > 1) h += `<polyline points="${pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="#e8ecf4" stroke-opacity=".5" stroke-width="1.6" stroke-dasharray="3 3"/>`;
+  order.forEach((sid, i) => {
+    const li = LANES.findIndex(l => l.id === S.place[sid]), x = x0 + i * dx;
+    if (li >= 0) { const y = y0 + li * lh + (lh - 4) / 2; h += `<circle cx="${x}" cy="${y}" r="9" fill="${LANES[li].col}"/><text x="${x}" y="${y + 3.5}" font-size="10" fill="#04070d" text-anchor="middle" font-weight="700">${i + 1}</text>`; }
+    else h += `<text x="${x}" y="${y0 + lh * 3 + 3}" font-size="9" fill="#56627d" text-anchor="middle">${i + 1}</text>`;
+  });
+  return h + `</svg>`;
+}
+function svgPipe() {
+  const xs = [30, 88, 146, 204, 262, 320], lab = ['вход', 'модель', 'правила', 'порог', 'журнал', 'очереди'], cols = ['#8b96ad', '#a99cff', '#72d4e8', '#ffb547', '#e8ecf4', '#86e0a8'];
+  let h = `<svg class="viz" viewBox="0 0 360 78" role="img" aria-label="Схема конвейера из шести блоков.">`;
+  for (let i = 0; i < 5; i++) { const on = S.pipe.length > i + 1; h += `<path d="M${xs[i] + 22} 30H${xs[i + 1] - 24}" stroke="${on ? '#86e0a8' : '#26324a'}" stroke-width="2.4"/>${on ? `<path d="M${xs[i + 1] - 29} 25l6 5-6 5" fill="none" stroke="#86e0a8" stroke-width="2"/>` : ''}`; }
+  xs.forEach((x, i) => { const on = S.pipe.length > i; h += `<rect x="${x - 24}" y="16" width="48" height="28" rx="8" fill="${on ? '#1d2940' : '#141d2e'}" stroke="${on ? cols[i] : '#26324a'}" stroke-width="1.6"/><text x="${x}" y="34" font-size="9.5" fill="${on ? '#e8ecf4' : '#3a4762'}" text-anchor="middle" font-weight="600">${lab[i]}</text>`; });
+  if (S.pipe.length === 6 && !reduce) for (let k = 0; k < 5; k++) h += `<circle r="3.5" fill="#86e0a8"><animateMotion path="M30 54H320" dur="3s" begin="${k * 0.6}s" repeatCount="indefinite"/></circle>`;
+  h += `<text x="180" y="72" font-size="9.5" fill="#8b96ad" text-anchor="middle">${S.pipe.length === 6 ? 'обращения идут по конвейеру' : `собрано ${S.pipe.length} из 6`}</text>`;
+  return h + `</svg>`;
+}
+const OPER = '<svg viewBox="0 0 26 34"><circle cx="13" cy="8" r="5" fill="currentColor"/><path d="M4 32V23Q4 16 13 16Q22 16 22 23V32Z" fill="currentColor"/></svg>';
+
+// ---------- paint ----------
+const cardBtn = c => `<button class="tcard ${S.sel === c.id ? 'sel' : ''} ${S.shake === c.id ? 'shake' : ''}" data-drag="${c.id}" data-a="sel:${c.id}">${esc(c.t)}</button>`;
+function paint() {
+  const id = LID(), q = s => screen.querySelector(s);
+  if (id === 'talk') paintTalk(q);
+  if (id === 'data') {
+    q('#pool').innerHTML = TAGS.filter(t => !S.place[t.id]).map(cardBtn).join('');
+    q('#zones').innerHTML = SRC.map(s => `<div class="zone ${S.sel ? 'armed' : ''} ${S.badZone === s.id ? 'bad' : ''} ${S.goldOk && s.id === 'hist' ? 'gold' : ''}" data-drop="${s.id}" data-a="zone:${s.id}" role="button" tabindex="0" aria-label="${s.n}"><div class="zh"><svg class="ic" viewBox="0 0 26 26" aria-hidden="true">${s.ic}</svg><span>${s.n}<small>${s.s}</small></span></div>` +
+      TAGS.filter(t => S.place[t.id] === s.id).map(t => `<div class="tagd">${esc(t.t)}</div>`).join('') + `</div>`).join('');
+    SRC.forEach(s => { const on = TAGS.some(t => t.g === s.id && S.place[t.id]); const ln = q('#ln-' + s.id); ln.setAttribute('stroke', on ? (s.id === 'hist' && S.goldOk ? '#ffb547' : '#a99cff') : '#26324a'); ln.setAttribute('stroke-dasharray', on ? '' : '4 4'); q('#nd-' + s.id + ' rect').setAttribute('stroke', on ? '#a99cff' : '#3a4762'); });
+    q('#star').setAttribute('opacity', S.goldOk ? 1 : 0);
+    const m = model(); q('#mapL').textContent = `проверено ${m.placed} из ${m.total}`;
+    q('#goldO').innerHTML = SRC.map(s => `<button class="opt ${S.gold === s.id ? (s.id === 'hist' ? 'ok' : 'no') : ''}" data-a="gold:${s.id}">${s.n}</button>`).join('');
+    q('#goldFb').innerHTML = S.gold === null ? '' : S.goldOk ? `<div class="fb ok">Верно. Операторы уже 3 года решали, куда отправить каждое обращение. Это готовые правильные ответы: отложи часть и сравни с ними ответы модели. Только сначала переведи старые названия очередей в новые.</div>`
+      : `<div class="fb no">Здесь нет решения человека «куда отправить». Где записано, как операторы разобрали прошлые обращения?</div>`;
+  }
+  if (id === 'metric') paintMetric(q);
+  if (id === 'thresh') paintThresh(q);
+  if (id === 'lanes') {
+    q('#pool').innerHTML = STEP_POOL.map(i => STEPS.find(s => s.id === i)).filter(c => !S.place[c.id]).map(cardBtn).join('');
+    q('#zones').innerHTML = LANES.map(z => `<div class="zone ${S.sel ? 'armed' : ''} ${S.badZone === z.id ? 'bad' : ''}" data-drop="${z.id}" data-a="zone:${z.id}" role="button" tabindex="0" aria-label="${z.name}"><div class="zh"><i style="width:10px;height:10px;border-radius:50%;background:${z.col};flex:none"></i><span>${z.name}<small>${z.sub}</small></span></div>` +
+      STEPS.filter(c => S.place[c.id] === z.id).map(c => `<div class="placed">${STEPS.indexOf(c) + 1}. ${esc(c.t)}</div>`).join('') + `</div>`).join('');
+    q('#flow').innerHTML = svgFlow();
+    const m = model(); q('#flowL').textContent = `${m.placed} из ${m.total}`;
+  }
+  if (id === 'pilot') paintPilot(q);
+  if (id === 'system') paintSystem(q);
+}
+function paintTalk(q) {
+  const iv = S.iv, m = model();
+  q('#qdots').innerHTML = Array.from({ length: MAXQ }, (_, i) => `<i class="${iv.log[i] ? (iv.log[i].good ? 'g' : 'b') : ''}"></i>`).join('');
+  const chat = q('#chat');
+  chat.innerHTML = `<div class="msg cl"><small>${LEAD}</small>Здравствуйте. Нам сказали, вы поможете с моделью. С чего начнём?</div>` +
+    iv.log.map(x => `<div class="msg me">${esc(x.q)}</div><div class="msg cl ${x.good ? '' : 'bad'}"><small>${LEAD.split(',')[0]}</small>${esc(x.a)}${x.good ? '' : `<span class="why">${x.why}</span>`}</div>`).join('');
+  chat.scrollTop = chat.scrollHeight;
+  const done = m.filled === 7, out = !done && iv.asked >= MAXQ;
+  q('#ivO').innerHTML = done ? `<div class="fb ok">Карточка задачи заполнена за ${iv.asked} ${iv.asked < 5 ? 'вопроса' : 'вопросов'}. Теперь ты знаешь, кто пользователь, какое решение, как сейчас, данные, ограничения и цифру успеха — а про модель ещё ни слова. Так и надо.</div>`
+    : out ? `<div class="fb no">Вопросы кончились, а в карточке пусто: ${FIELDS.filter(f => !iv.filled[f.id]).map(f => '«' + f.n.toLowerCase() + '»').join(', ')}. Попробуй ещё раз: меньше вопросов про модель и деньги.</div><div class="row"><button class="btn" data-a="reset">Начать разговор заново</button></div>`
+    : talkOptions().map(o => `<button class="opt" data-a="ask:${o.k}${o.id}">${esc(o.q)}</button>`).join('');
+  q('#fields').innerHTML = FIELDS.map(f => `<div class="fld ${iv.filled[f.id] ? 'on' : ''}"><b>${f.n}</b>${iv.filled[f.id] ? esc(f.c) : '—'}</div>`).join('');
+  q('#cardN').textContent = `${m.filled} из 7`;
+}
+function paintMetric(q) {
+  const good = METRICS.filter(x => x.g);
+  q('#dash').innerHTML = [0, 1, 2].map(i => { const mm = METRICS.filter(x => S.met.includes(x.id) && !x.red)[i]; return `<div class="dsl ${mm ? 'on' : ''}"><b>Польза ${i + 1}</b>${mm ? esc(mm.t) : 'пусто'}</div>`; }).join('') +
+    (() => { const r = S.met.includes('urg'); return `<div class="dsl rl ${r ? 'on' : ''}"><b style="color:var(--warn)">Красная линия</b>${r ? esc(METRICS.find(x => x.id === 'urg').t) : 'пусто'}</div>`; })();
+  q('#dashL').textContent = `${S.met.length} из ${good.length}`;
+  q('#mpool').innerHTML = METRICS.map(x => `<button class="mc ${S.met.includes(x.id) ? 'in' : ''} ${x.red ? 'red' : ''} ${S.shake === x.id ? 'shake' : ''}" data-a="met:${x.id}" ${S.met.includes(x.id) ? 'aria-pressed="true"' : ''}>${esc(x.t)}</button>`).join('');
+  const fb = q('#calcFb');
+  fb.innerHTML = S.calcOk ? `<div class="fb ok">Верно: 900 × 4 = 3 600 минут = 60 часов в день. Это 7–8 полных смен операторов только на сортировку.</div>`
+    : S.calcTry ? `<div class="fb no">Пока не сходится. Умножь 900 на 4 — получишь минуты. Потом раздели на 60.</div>` : '';
+  const ai = q('#autoIn'); if (document.activeElement !== ai) ai.value = S.autoP;
+  const ri = q('#rateIn'); if (document.activeElement !== ri) ri.value = S.rate;
+  q('#autoO').textContent = S.autoP + ' %';
+  const saved = BASE_H * S.autoP / 100, left = BASE_H - saved;
+  const shifts = BASE_H / 8, freed = saved / 8;
+  q('#ops').innerHTML = Array.from({ length: Math.ceil(shifts) }, (_, i) => `<span style="color:${i < Math.round(shifts - freed) ? '#72d4e8' : '#3a4762'}" title="${i < Math.round(shifts - freed) ? 'занят сортировкой' : 'свободен для пациентов'}">${OPER}</span>`).join('');
+  q('#saveR').innerHTML = [['часов на сортировку', fmt(left, 0)], ['освобождается в день', fmt(saved, 0) + ' ч'], ['экономия в месяц', '$' + big(saved * S.rate * 30)]].map(([a, b]) => `<div class="rd"><dt>${a}</dt><dd>${b}</dd></div>`).join('');
+}
+function paintThresh(q) {
+  const m = model(), per = S.th.mode === 'per';
+  q('#modeSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.a === 'mode:' + S.th.mode));
+  const okA = m.auto >= 0.6, okE = m.err <= 0.02, okU = m.urg === 0;
+  q('#thR').innerHTML = [['автоматически', pct(m.auto), okA], ['ошибок в автомате', pct(m.err, 1), okE], ['срочных в автомате', m.urg, okU], ['часов операторов', fmt(BASE_H * (1 - m.auto), 0) + ' ч', null], ['ошибок в день', '≈ ' + Math.round(900 * m.auto * m.err), null], ['цель', okA && okE && okU ? 'есть ✓' : '—', okA && okE && okU]]
+    .map(([a, b, ok]) => `<div class="rd"><dt>${a}</dt><dd class="${ok === null ? '' : ok ? 'ok' : 'bad'}">${b}</dd></div>`).join('');
+  q('#plotL').textContent = `в автомате ${m.a} из 200`;
+  QUEUES.forEach(qq => {
+    const t = thOf(qq.id), hum = t >= 1, x = cx(Math.max(t, CMIN));
+    const tl = q('#tl-' + qq.id); tl.setAttribute('transform', `translate(${hum ? PX1 : x.toFixed(1)} 0)`); tl.setAttribute('opacity', hum ? 0 : 1);
+    const sh = q('#sh-' + qq.id); sh.setAttribute('x', hum ? PX1 : x.toFixed(1)); sh.setAttribute('width', hum ? 0 : (PX1 - x).toFixed(1));
+    q('#hum-' + qq.id).setAttribute('opacity', hum ? 1 : 0);
+  });
+  DATA.forEach((d, k) => { const t = thOf(d.q), auto = t < 1 && d.c >= t; q('#d' + k).style.opacity = auto ? 1 : 0.22; });
+  const cur = q('#cur'); cur.setAttribute('cx', ccx(m.auto).toFixed(1)); cur.setAttribute('cy', ccy(m.err).toFixed(1));
+  const sl = q('#sliders'), want = per ? 'per' : 'one';
+  if (sl.dataset.mode !== want) {
+    sl.dataset.mode = want;
+    sl.innerHTML = per ? QUEUES.map(qq => `<div class="qs"><label for="th-${qq.id}" style="${qq.id === 'urg' ? 'color:var(--warn)' : ''}">${qq.n}</label><input type="range" id="th-${qq.id}" data-in="th:${qq.id}" min="${TMIN}" max="1" step="0.01" aria-label="Порог для очереди ${qq.n}"><output id="tho-${qq.id}"></output></div>`).join('') + `<p class="small" style="margin-top:4px">Сдвинь ползунок до конца вправо — очередь всегда разбирает человек.</p>`
+      : `<div class="qs"><label for="th-one">Общий порог</label><input type="range" id="th-one" data-in="th:one" min="${TMIN}" max="1" step="0.01"><output id="tho-one"></output></div>`;
+  }
+  (per ? QUEUES.map(x => x.id) : ['one']).forEach(k => {
+    const v = k === 'one' ? S.th.one : S.th.per[k], inp = q('#th-' + k), o = q('#tho-' + k);
+    if (document.activeElement !== inp) inp.value = v;
+    o.textContent = v >= 1 ? 'человек' : fmt(v, 2); o.classList.toggle('hum', v >= 1);
+  });
+}
+function paintPilot(q) {
+  const p = pilotStat();
+  const row = (n, val, frac, mark, txt, ok) => `<div class="pmr"><span style="text-align:left;font-family:var(--font-body)">${n}</span><div class="tr"><b style="width:${(clamp(frac, 0, 1) * 100).toFixed(1)}%;background:${ok ? 'var(--ok)' : 'var(--warn)'}"></b><i style="left:${mark}%"></i></div><span>${txt}</span></div>`;
+  q('#pm').innerHTML = row('Польза', p.v, p.v / 12, P_V / 12 * 100, `${p.v} / ≥ ${P_V}`, p.v >= P_V) +
+    row('Самый большой риск', p.r, p.r / 5, P_R / 5 * 100, `${p.r} / ≤ ${P_R}`, p.r <= P_R) +
+    row('Срок', p.e, p.e / 10, P_E / 10 * 100, `${p.e * 2} дн / ≤ 10`, p.e <= P_E);
+  q('#pilL').textContent = p.pilotOk ? 'пилот собран ✓' : `${p.n} частей`;
+  let fb = '';
+  if (p.n) {
+    if (p.pilotOk) fb = `<div class="fb ok">Отличный пилот: запись и анализы дают больше половины пользы при низком риске, журнал позволяет всё проверить. Остальное — во вторую волну.</div>`;
+    else { const why = []; if (p.r > P_R) why.push('есть часть с высоким риском — её не берут в первый пилот'); if (p.e > P_E) why.push('не успеть за 2 недели'); if (p.v < P_V) why.push('пользы пока мало'); if (!p.hasLog) why.push('нет журнала решений: пилот нельзя проверить'); fb = `<div class="fb no">Пока не так: ${why.join('; ')}.</div>`; }
+  }
+  q('#pilFb').innerHTML = fb;
+  const sq = (k, n) => `<span class="sq ${k}">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= n ? 'f' : ''}"></i>`).join('')}</span>`;
+  q('#pcs').innerHTML = PIECES.map(x => `<button class="pc ${S.pil.includes(x.id) ? 'in' : ''}" data-a="pil:${x.id}" aria-pressed="${S.pil.includes(x.id)}"><b>${esc(x.n)}</b><small>${esc(x.s)}</small><span class="vre"><span>польза</span>${sq('v', x.v)}<span>риск</span>${sq('r', x.r)}<span>работа</span>${sq('e', x.e)}</span></button>`).join('');
+  q('#docB').innerHTML = SCOPE.map((s, si) => {
+    if (S.scope[s.id] !== undefined) return `<div class="dsec"><b>${s.n}</b><span class="fillt">✓ ${esc(s.o[s.ok])}</span></div>`;
+    const ord = mix(s.o.map((_, i) => i), si + 3);
+    return `<div class="dsec"><b>${s.n}</b><div class="dopts">${ord.map(i => `<button class="${(S.scopeBad[s.id] || []).includes(i) ? 'no' : ''}" data-a="scope:${s.id}:${i}">${esc(s.o[i])}</button>`).join('')}</div></div>`;
+  }).join('');
+}
+function paintSystem(q) {
+  q('#pipeSvg').innerHTML = svgPipe();
+  q('#pipeL').textContent = S.pipe.length === 6 ? 'собрана ✓' : `${S.pipe.length} из 6`;
+  q('#pool').innerHTML = S.pipe.length === 6 ? '' : BLOCK_POOL.filter(i => !S.pipe.includes(i)).map(i => BLOCKS.find(b => b.id === i) || DISTRACT.find(b => b.id === i)).map(cardBtn).join('');
+  q('#pipe').innerHTML = BLOCKS.map((b, i) => i < S.pipe.length ? `<div class="ps fill" data-n="${i + 1}">${esc(b.t)}</div>` : i === S.pipe.length ? `<div class="ps next" data-n="${i + 1}" data-drop="pipe" data-a="zone:pipe">${S.sel ? 'Положить сюда выбранный блок' : 'Какой блок следующий?'}</div>` : `<div class="ps" data-n="${i + 1}">…</div>`).join('');
+  const m = model();
+  q('#bankL').textContent = `${m.bankOk} из 3`;
+  q('#bankB').innerHTML = BANK.map((b, bi) => {
+    const st = S.bank[b.id] || {}, pOk = st.p === b.p;
+    let h = `<div class="prob"><p><b>${bi + 1}.</b> ${esc(b.t)}</p><div class="lbl">Шаблон</div><div class="pats">${PATTERNS.map(p => `<button data-a="pat:${b.id}:${p.id}" class="${st.p === p.id ? (pOk ? 'ok' : 'no') : (st.pBad || []).includes(p.id) ? 'no' : ''}">${p.n}</button>`).join('')}</div>`;
+    if (st.p && !pOk) h += `<div class="fb no">${PWRONG[st.p]}</div>`;
+    if (pOk) {
+      h += `<div class="fb ok">${b.pwhy}</div><div class="lbl">Первый вопрос клиенту</div><div class="opts">${b.qs.map((qq, i) => `<button class="opt ${st.q === i ? (i === b.qok ? 'ok' : 'no') : (st.qBad || []).includes(i) ? 'no' : ''}" data-a="bq:${b.id}:${i}">${esc(qq)}</button>`).join('')}</div>`;
+      if (st.q !== undefined && st.q !== b.qok) h += `<div class="fb no">Это не про решение и данные клиента. Первым делом узнай, кто решает и где правда.</div>`;
+    }
+    return h + `</div>`;
+  }).join('');
+  q('#rubBox').hidden = !(S.pipe.length === 6 && m.bankOk === 3);
+}
+
+// ---------- actions ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3400); }
+function badFx(cid, zid) { S.shake = cid; S.badZone = zid || null; setTimeout(() => { if (S.shake === cid) { S.shake = null; S.badZone = null; paint(); } }, 650); }
+function place(cid, zid) {
+  const id = LID();
+  if (id === 'system') {
+    if (zid !== 'pipe' || S.pipe.length >= 6 || S.pipe.includes(cid)) return;
+    const want = BLOCKS[S.pipe.length];
+    if (cid === want.id) { S.pipe.push(cid); S.sel = null; if (S.pipe.length === 6) toast('Конвейер собран! Теперь — банк задач.'); }
+    else { S.miss++; badFx(cid); const d = DISTRACT.find(x => x.id === cid); toast(d ? d.why : `Не сюда. ${want.why}`); }
+    update(); return;
+  }
+  const list = id === 'data' ? TAGS : STEPS;
+  const c = list.find(x => x.id === cid); if (!c || S.place[cid]) return;
+  if (c.g === zid) { S.place[cid] = zid; S.sel = null; if (id === 'lanes') toast(c.why); }
+  else {
+    S.miss++; badFx(cid, zid);
+    if (id === 'data') toast(c.why);
+    else toast(zid === 'rule' ? 'Можно ли записать это одной строкой «если… то…»? Похоже, нет.' : zid === 'model' ? (c.g === 'rule' ? 'Тут не нужно понимать живой текст: хватит точного правила.' : 'Модели это доверять нельзя: цена ошибки слишком высока.') : (c.g === 'rule' ? 'Человек справится, но это можно надёжно записать правилом — зачем тратить его время?' : 'Это массовая работа с текстом — с ней справится модель, а человек проверит сомнительное.'));
+  }
+  update();
+}
+function act(a) {
+  const parts = a.split(':'), k = parts[0], v = parts[1], id = LID();
+  if (k === 'sel') { S.sel = S.sel === v ? null : v; paint(); return; }
+  if (k === 'zone') { if (S.sel) place(S.sel, v); else toast('Сначала выбери карточку.'); return; }
+  if (k === 'reset') { resetState(); build(); update(); return; }
+  if (k === 'rp') { startRolePlay(); return; }
+  if (k === 'ask') {
+    const iv = S.iv; if (iv.asked >= MAXQ || Object.keys(iv.filled).length === 7) return;
+    const kind = v[0], key = v.slice(1);
+    iv.asked++; iv.turn++;
+    if (kind === 'g') { const f = FIELDS.find(x => x.id === key); iv.filled[key] = true; iv.log.push({ q: f.q, a: f.a, good: true }); }
+    else { const b = BADQ[+key]; iv.badUsed.push(+key); iv.log.push({ q: b.q, a: b.a, good: false, why: b.why }); }
+    update(); return;
+  }
+  if (k === 'gold') { if (S.goldOk) return; S.gold = v; S.goldOk = v === 'hist'; if (!S.goldOk) S.miss++; update(); return; }
+  if (k === 'met') {
+    const x = METRICS.find(y => y.id === v);
+    if (S.met.includes(v)) { S.met = S.met.filter(y => y !== v); update(); return; }
+    if (!x.g) { S.miss++; badFx(v); toast(x.why); update(); return; }
+    S.met.push(v); toast(x.red ? 'Красная линия: если пересекли — пилот останавливаем, какими бы ни были остальные цифры.' : 'Да, это заметят пациенты и директор.'); update(); return;
+  }
+  if (k === 'calc') {
+    const n = parseFloat(String(screen.querySelector('#calcIn').value || '').replace(/[^\d,.-]/g, '').replace(',', '.'));
+    S.calcTry++; S.calcOk = Math.abs(n - 60) < 0.01;
+    if (!S.calcOk && Math.abs(n - 3600) < 1) toast('3 600 — это минуты. А в часах?');
+    update(); return;
+  }
+  if (k === 'mode') { S.th.mode = v; if (v === 'per') QUEUES.forEach(x => { S.th.per[x.id] = S.th.one; }); update(); return; }
+  if (k === 'pil') { S.pil = S.pil.includes(v) ? S.pil.filter(x => x !== v) : S.pil.concat(v); if (S.pil.includes('urg') && v === 'urg') toast('Срочные симптомы автоматизировать нельзя: ошибка опасна для жизни.'); update(); return; }
+  if (k === 'scope') {
+    const s = SCOPE.find(x => x.id === v), i = +parts[2];
+    if (S.scope[v] !== undefined) return;
+    if (i === s.ok) S.scope[v] = i; else { S.miss++; S.scopeBad[v] = (S.scopeBad[v] || []).concat(i); toast(s.why[i]); }
+    update(); return;
+  }
+  if (k === 'pat') {
+    const b = BANK.find(x => x.id === v), st = S.bank[v] = S.bank[v] || {};
+    if (st.p === b.p) return;
+    st.p = parts[2]; if (st.p !== b.p) { S.miss++; st.pBad = (st.pBad || []).concat(st.p); }
+    update(); return;
+  }
+  if (k === 'bq') {
+    const b = BANK.find(x => x.id === v), st = S.bank[v]; if (!st || st.q === b.qok) return;
+    st.q = +parts[2]; if (st.q !== b.qok) { S.miss++; st.qBad = (st.qBad || []).concat(st.q); }
+    update(); return;
+  }
+}
+function startRolePlay() {
+  S.rp = true;
+  const msg = 'Сыграй руководителя колл-центра клиники «Медика». Я FDE, задаю вопросы. Поздоровайся одной фразой и жди мой первый вопрос.';
+  if (window.LuchTutor && window.LuchTutor.ask) { try { window.LuchTutor.ask(msg); } catch (e) { toast('Открой наставника и напиши: «Сыграй руководителя колл-центра».'); } }
+  else toast('Наставник ещё загружается. Открой его и напиши: «Сыграй руководителя колл-центра, я задаю вопросы».');
+}
+let noClick = false;
+screen.addEventListener('click', e => {
+  if (noClick) return;
+  const b = e.target.closest('[data-a]'); if (b && screen.contains(b)) act(b.dataset.a);
+});
+screen.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.zone')) { e.preventDefault(); act(e.target.dataset.a); } });
+screen.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'calcIn') act('calc'); });
+screen.addEventListener('input', e => {
+  const t = e.target.closest('[data-in]'); if (!t) return;
+  const [k, v] = t.dataset.in.split(':');
+  if (k === 'auto') { S.autoP = +t.value; paint(); }
+  if (k === 'rate') { const n = parseFloat(t.value); if (n > 0) { S.rate = Math.min(n, 1000); paint(); } }
+  if (k === 'th') { const x = Math.round(+t.value * 100) / 100; if (v === 'one') S.th.one = x; else S.th.per[v] = x; update(); }
+});
+
+// ---------- drag (pointer events, works with touch) ----------
+let dg = null, ghost = null;
+const dropAt = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest('[data-drop]'); };
+screen.addEventListener('pointerdown', e => {
+  const c = e.target.closest('[data-drag]'); if (!c || e.button > 0) return;
+  dg = { id: c.dataset.drag, el: c, x: e.clientX, y: e.clientY, moved: false, pid: e.pointerId, ox: 0, oy: 0 };
+});
+addEventListener('pointermove', e => {
+  if (!dg || e.pointerId !== dg.pid) return;
+  if (!dg.moved) {
+    if (Math.hypot(e.clientX - dg.x, e.clientY - dg.y) < 6) return;
+    dg.moved = true;
+    const src = dg.el, r = src.getBoundingClientRect();
+    dg.ox = dg.x - r.left; dg.oy = dg.y - r.top;
+    ghost = src.cloneNode(true); ghost.classList.add('dghost'); ghost.style.width = r.width + 'px';
+    document.body.appendChild(ghost); src.classList.add('lift'); dg.src = src; document.body.classList.add('dragging');
+  }
+  ghost.style.transform = `translate(${e.clientX - dg.ox}px,${e.clientY - dg.oy}px) rotate(-1.5deg)`;
+  const edge = 60, v = e.clientY < edge ? -(edge - e.clientY) : e.clientY > innerHeight - edge ? e.clientY - (innerHeight - edge) : 0;
+  dg.vy = v / 4; dg.cx = e.clientX; dg.cy = e.clientY;
+  if (v && !dg.raf) { const tick = () => { if (!dg || !dg.vy) { if (dg) dg.raf = 0; return; } (screen.scrollHeight > screen.clientHeight + 4 && getComputedStyle(screen).position !== 'static' ? screen : document.scrollingElement).scrollBy(0, dg.vy); hover(dg.cx, dg.cy); dg.raf = requestAnimationFrame(tick); }; dg.raf = requestAnimationFrame(tick); }
+  hover(e.clientX, e.clientY);
+}, { passive: true });
+function hover(x, y) {
+  const z = dropAt(x, y);
+  screen.querySelectorAll('.over').forEach(el => { if (el !== z) el.classList.remove('over'); });
+  if (z) z.classList.add('over');
+}
+function endDrag(e, cancel) {
+  if (!dg || e.pointerId !== dg.pid) return;
+  const d = dg; dg = null;
+  if (d.raf) cancelAnimationFrame(d.raf);
+  if (!d.moved) return;
+  noClick = true; setTimeout(() => { noClick = false; }, 0);
+  if (ghost) ghost.remove(); ghost = null;
+  if (d.src) d.src.classList.remove('lift');
+  document.body.classList.remove('dragging');
+  screen.querySelectorAll('.over').forEach(x => x.classList.remove('over'));
+  if (cancel) return;
+  const z = dropAt(e.clientX, e.clientY);
+  if (z) place(d.id, z.dataset.drop);
+}
+addEventListener('pointerup', e => endDrag(e, false));
+addEventListener('pointercancel', e => endDrag(e, true));
+
+// ---------- tools ----------
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}" ${pressed !== undefined ? `aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    talk: B('reset', 'Начать разговор заново') + sep + B('rp', 'Сыграть с наставником'),
+    data: B('reset', 'Начать заново'),
+    metric: B('reset', 'Начать заново'),
+    thresh: B('mode:one', 'Один порог', S.th.mode === 'one') + B('mode:per', 'Порог на очередь', S.th.mode === 'per') + sep + B('reset', 'Сброс'),
+    lanes: B('reset', 'Начать заново'),
+    pilot: B('reset', 'Начать заново'),
+    system: B('reset', 'Начать заново'),
+  }[id];
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.dataset.a) { act(b.dataset.a); renderTools(); } });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- panes ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  chat: IC('<path d="M4 7h18v11H11l-5 4v-4H4z" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M14 21v3h10l5 4v-4h2V13h-6" fill="none" stroke="var(--arm)" stroke-width="1.6"/>'),
+  opts: IC('<rect x="4" y="6" width="26" height="6" rx="2" fill="var(--surface-2)" stroke="var(--fg)"/><rect x="4" y="15" width="26" height="6" rx="2" fill="none" stroke="var(--muted)"/><rect x="4" y="24" width="26" height="6" rx="2" fill="none" stroke="var(--muted)"/>'),
+  cardt: IC('<rect x="4" y="5" width="12" height="10" rx="2" fill="none" stroke="var(--ok)" stroke-width="1.6"/><rect x="18" y="5" width="12" height="10" rx="2" fill="none" stroke="var(--ok)" stroke-width="1.6"/><rect x="4" y="19" width="12" height="10" rx="2" fill="none" stroke="var(--muted)" stroke-dasharray="2 2"/><rect x="18" y="19" width="12" height="10" rx="2" fill="none" stroke="var(--muted)" stroke-dasharray="2 2"/>'),
+  rp: IC('<circle cx="12" cy="12" r="5" fill="var(--force)"/><circle cx="24" cy="14" r="4" fill="var(--arm)"/><path d="M4 30q8-12 16 0M18 30q6-9 12 0" fill="none" stroke="var(--fg)" stroke-width="1.6"/>'),
+  map: IC('<circle cx="17" cy="17" r="5" fill="var(--vio)"/><path d="M17 17L5 6M17 17L29 6M17 17L5 28M17 17L29 28" stroke="var(--muted)" stroke-width="1.4"/>'),
+  pool: IC('<rect x="3" y="8" width="28" height="8" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.6"/><rect x="3" y="19" width="28" height="8" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.6"/><circle cx="8" cy="12" r="1.6" fill="var(--arm)"/><circle cx="8" cy="23" r="1.6" fill="var(--arm)"/>'),
+  zones: IC('<rect x="3" y="6" width="12" height="22" rx="3" fill="none" stroke="var(--arm)" stroke-width="1.6" stroke-dasharray="3 2"/><rect x="19" y="6" width="12" height="22" rx="3" fill="none" stroke="var(--force)" stroke-width="1.6" stroke-dasharray="3 2"/>'),
+  gold: IC('<path d="M17 5l3.5 7 7.5 1-5.5 5 1.4 7.5L17 22l-6.9 3.5 1.4-7.5L6 13l7.5-1z" fill="var(--force)"/>'),
+  dash: IC('<rect x="3" y="8" width="6" height="18" rx="2" fill="var(--ok)"/><rect x="11" y="8" width="6" height="18" rx="2" fill="var(--ok)"/><rect x="19" y="8" width="6" height="18" rx="2" fill="var(--ok)"/><rect x="27" y="8" width="5" height="18" rx="2" fill="var(--warn)"/>'),
+  mpool: IC('<rect x="4" y="6" width="12" height="9" rx="2" fill="none" stroke="var(--fg)"/><rect x="18" y="6" width="12" height="9" rx="2" fill="none" stroke="var(--fg)"/><rect x="4" y="19" width="12" height="9" rx="2" fill="none" stroke="var(--fg)"/><rect x="18" y="19" width="12" height="9" rx="2" fill="none" stroke="var(--fg)"/>'),
+  base: IC('<text x="17" y="22" font-size="12" fill="var(--force)" text-anchor="middle" font-family="sans-serif">×÷</text>'),
+  save: IC('<path d="M4 17H30" stroke="var(--line)" stroke-width="3" stroke-linecap="round"/><path d="M4 17H18" stroke="var(--force)" stroke-width="3" stroke-linecap="round"/><circle cx="18" cy="17" r="5" fill="var(--fg)"/>'),
+  readout: IC('<rect x="3" y="9" width="8" height="16" rx="2" fill="none" stroke="var(--ok)"/><rect x="13" y="9" width="8" height="16" rx="2" fill="none" stroke="var(--warn)"/><rect x="23" y="9" width="8" height="16" rx="2" fill="none" stroke="var(--fg)"/>'),
+  plot: IC('<circle cx="8" cy="10" r="2" fill="var(--warn)"/><circle cx="14" cy="20" r="2" fill="var(--ok)"/><circle cx="22" cy="12" r="2" fill="var(--ok)"/><circle cx="27" cy="24" r="2" fill="var(--ok)"/><path d="M18 4V30" stroke="var(--force)" stroke-width="2"/>'),
+  ctl: IC('<path d="M4 12H30M4 22H30" stroke="var(--line)" stroke-width="3" stroke-linecap="round"/><circle cx="20" cy="12" r="4" fill="var(--fg)"/><circle cx="11" cy="22" r="4" fill="var(--fg)"/>'),
+  curve: IC('<path d="M4 30V4M4 30H30" stroke="var(--muted)"/><path d="M6 28Q20 26 28 8" fill="none" stroke="var(--arm)" stroke-width="2"/>'),
+  flow: IC('<rect x="2" y="4" width="30" height="7" rx="2" fill="none" stroke="var(--arm)"/><rect x="2" y="13" width="30" height="7" rx="2" fill="none" stroke="var(--vio)"/><rect x="2" y="22" width="30" height="7" rx="2" fill="none" stroke="var(--force)"/><path d="M8 7L16 16L24 25" stroke="var(--fg)" stroke-width="1.6" fill="none"/>'),
+  meters: IC('<rect x="3" y="7" width="28" height="5" rx="2" fill="var(--ok)"/><rect x="3" y="15" width="12" height="5" rx="2" fill="var(--warn)"/><rect x="3" y="23" width="20" height="5" rx="2" fill="var(--arm)"/>'),
+  pieces: IC('<rect x="4" y="6" width="12" height="9" rx="2" fill="#1f3a2f" stroke="var(--ok)"/><rect x="18" y="6" width="12" height="9" rx="2" fill="none" stroke="var(--fg)"/><rect x="4" y="19" width="12" height="9" rx="2" fill="none" stroke="var(--fg)"/>'),
+  doc: IC('<rect x="7" y="3" width="20" height="28" rx="2" fill="#f3efe6"/><path d="M11 10h12M11 15h12M11 20h8" stroke="#7a705c" stroke-width="1.6"/>'),
+  diagram: IC('<rect x="2" y="13" width="8" height="8" rx="2" fill="var(--muted)"/><rect x="13" y="13" width="8" height="8" rx="2" fill="var(--vio)"/><rect x="24" y="13" width="8" height="8" rx="2" fill="var(--ok)"/><path d="M10 17h3M21 17h3" stroke="var(--fg)"/>'),
+  pipe: IC('<rect x="6" y="3" width="22" height="6" rx="2" fill="none" stroke="var(--ok)"/><rect x="6" y="14" width="22" height="6" rx="2" fill="none" stroke="var(--ok)"/><rect x="6" y="25" width="22" height="6" rx="2" fill="none" stroke="var(--arm)" stroke-dasharray="2 2"/><path d="M17 9v5M17 20v5" stroke="var(--ok)"/>'),
+  bank: IC('<rect x="4" y="5" width="26" height="24" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M9 12h16M9 18h10M9 24h13" stroke="var(--muted)" stroke-width="1.6"/>'),
+  cta: IC('<path d="M8 17H26M20 11l6 6-6 6" fill="none" stroke="var(--force)" stroke-width="2"/>'),
+};
+function partsList() {
+  return {
+    talk: [['chat', 'Разговор', 'Твои вопросы и ответы руководителя колл-центра. Точки сверху — 8 вопросов: зелёная — полезный, красная — потрачен зря.'], ['opts', 'Варианты вопроса', 'Каждый ход — 4 варианта. Выбери тот, что даст факт для карточки.'], ['cardt', 'Карточка задачи', 'Семь полей, которые FDE заполняет в первые минуты.'], ['rp', 'Игра с наставником', 'Тот же разговор, но своими словами — наставник играет клиента.']],
+    data: [['map', 'Карта', 'Шесть источников данных вокруг будущей модели. Линия горит, когда проблема источника найдена.'], ['pool', 'Проблемы', 'Шесть ярлыков: что ты обнаружил, обходя системы клиники.'], ['zones', 'Источники', 'Сюда кладут ярлыки.'], ['gold', 'Правильные ответы', 'Где взять прошлые обращения с известным ответом для проверки модели.']],
+    metric: [['dash', 'Панель пилота', 'Три метрики пользы и одна красная линия.'], ['mpool', 'Кандидаты', 'Восемь метрик: половина полезных, половина тщеславных.'], ['base', 'Базовая цифра', 'Сколько часов операторы тратят сейчас.'], ['save', 'Прогноз', 'Сколько часов и денег освободит автоматика. Ставку оператора можно менять.']],
+    thresh: [['readout', 'Показатели', 'Доля автоматики, ошибки, срочные в автомате, часы операторов.'], ['plot', 'Диаграмма', '200 прошлых обращений по 6 очередям. Справа от оранжевой линии — автомат.'], ['ctl', 'Пороги', 'Один общий или свой для каждой очереди.'], ['curve', 'Цена порога', 'Чем больше автоматики при одном пороге, тем больше ошибок.']],
+    lanes: [['flow', 'Путь обращения', 'Три дорожки и 8 шагов по порядку.'], ['pool', 'Шаги', 'Восемь шагов работы колл-центра.'], ['zones', 'Три дорожки', 'Правило в коде, модель, человек.']],
+    pilot: [['meters', 'Шкалы пилота', 'Польза, самый большой риск и срок. Белая черта — граница.'], ['pieces', 'Части', 'Очереди и функции с оценкой пользы, риска и объёма работы.'], ['doc', 'Страница объёма работ', 'Шесть разделов договорённости с клиентом.']],
+    system: [['diagram', 'Схема', 'Конвейер загорается по мере сборки.'], ['pool', 'Блоки', 'Шесть нужных блоков и два лишних.'], ['pipe', 'Конвейер', 'Ставь блоки по порядку сверху вниз.'], ['bank', 'Банк задач', 'Три новых клиента: шаблон и первый вопрос.'], ['cta', 'Дальше', 'Карта навыков и вводный курс.']],
+  }[LID()];
+}
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+function schemeHTML(m) {
+  const id = LID(), btns = (...xs) => `<div class="row">${xs.map(([a, t]) => `<button class="ghostbtn" data-a="${a}">${t}</button>`).join('')}</div>`;
+  const R = (a, b, c) => `<dl class="reads">${[a, b, c].map(([dt, dd]) => `<div><dt>${dt}</dt><dd>${dd}</dd></div>`).join('')}</dl>`;
+  if (id === 'talk') return `<h2>Карточка задачи</h2>${R(['заполнено', `${m.filled}/7`], ['вопросов', `${m.asked}/${MAXQ}`], ['впустую', m.bad])}<div class="steps">${FIELDS.map(f => step(f.n, S.iv.filled[f.id] ? '✓' : '—')).join('')}</div>` + btns(['reset', 'Начать заново'], ['rp', 'Сыграть с наставником']);
+  if (id === 'data') return `<h2>Карта данных</h2>${R(['найдено', `${m.placed}/${m.total}`], ['промахи', m.miss], ['эталон', m.goldOk ? 'найден' : '—'])}` + btns(['reset', 'Начать заново']);
+  if (id === 'metric') return `<h2>Панель пилота</h2>${R(['метрик', `${m.picked}/4`], ['промахи', m.miss], ['база', m.calcOk ? '60 ч' : '—'])}` + btns(['reset', 'Начать заново']);
+  if (id === 'thresh') return `<h2>Порог уверенности</h2>${R(['автомат', pct(m.auto)], ['ошибки', pct(m.err, 1)], ['срочные', m.urg])}<p class="note">Цель: ≥ 60 % · ≤ 2 % · 0 срочных.</p>` + btns(['mode:one', 'Один порог'], ['mode:per', 'Порог на очередь'], ['reset', 'Сброс']);
+  if (id === 'lanes') return `<h2>Три дорожки</h2>${R(['разложено', `${m.placed}/${m.total}`], ['промахи', m.miss], ['осталось', m.total - m.placed])}<div class="steps">${LANES.map(l => step(l.name, STEPS.filter(s => S.place[s.id] === l.id).length)).join('')}</div>` + btns(['reset', 'Начать заново']);
+  if (id === 'pilot') return `<h2>Пилот</h2>${R(['польза', `${m.v}/≥${P_V}`], ['риск', `${m.r}/≤${P_R}`], ['срок', `${m.e * 2} дн`])}<div class="steps">${step('страница объёма', `${m.scopeN}/6`)}</div>` + btns(['reset', 'Начать заново']);
+  return `<h2>Система</h2>${R(['конвейер', `${m.pipe}/6`], ['задачи', `${m.bankOk}/3`], ['промахи', m.miss])}` + btns(['reset', 'Начать заново']);
+}
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'talk') return `<h2>Порядок первых 10 минут</h2><div class="steps">${step('1–2 мин', 'кто пользователь и какое решение')}${step('3–4 мин', 'как это делают сейчас')}${step('5–6 мин', 'что уже пробовали')}${step('7–8 мин', 'данные и доступы')}${step('9–10 мин', 'ограничения и цифра успеха', 'sum')}</div><p class="note" style="margin-top:10px">Вопрос про модель — последний, а часто и не нужен.</p>`;
+  if (id === 'data') return `<h2>Вопросы к каждому источнику</h2><div class="steps">${step('Что внутри?', 'поля, примеры')}${step('Насколько полно?', 'доля пустых')}${step('Как достать?', 'API, выгрузка')}${step('Как часто обновляется?', 'сутки, час')}${step('Кто даёт доступ?', 'владелец, юрист', 'sum')}</div>`;
+  if (id === 'metric') {
+    const saved = BASE_H * S.autoP / 100;
+    return `<h2>Базовая цифра</h2><div class="formula">900 × 4 мин = 3 600 мин = 60 ч</div><div class="steps">${step('часов в день сейчас', '60')}${step('× автоматика ' + S.autoP + ' %', fmt(saved, 0) + ' ч')}${step('× $' + fmt(S.rate, S.rate % 1 ? 1 : 0) + ' в час', '$' + big(saved * S.rate) + ' в день')}${step('× 30 дней', '$' + big(saved * S.rate * 30) + ' в месяц', 'sum')}</div><p class="note" style="margin-top:10px">Операторов не сокращают: освобождённые часы уходят на звонки пациентам и сложные случаи.</p>`;
+  }
+  if (id === 'thresh') return `<h2>Как считаются цифры</h2><div class="steps">${step('в автомате', `${m.a} из 200 = ${pct(m.auto)}`)}${step('ошибок среди них', `${m.e} из ${m.a} = ${pct(m.err, 1)}`)}${step('часов операторов', `60 × (1 − ${fmt(m.auto, 2)}) ≈ ${fmt(BASE_H * (1 - m.auto), 0)}`)}${step('ошибок в день', `900 × ${fmt(m.auto, 2)} × ${fmt(m.err, 3)} ≈ ${Math.round(900 * m.auto * m.err)}`, 'sum')}</div>`;
+  if (id === 'lanes') return `<h2>Тест из трёх вопросов</h2><div class="steps">${step('Можно записать «если… то…»?', 'правило')}${step('Нужно понять живой текст?', 'модель')}${step('Ошибка дорогая или нужна ответственность?', 'человек', 'sum')}</div>`;
+  if (id === 'pilot') return `<h2>Подсчёт пилота</h2><div class="steps">${PIECES.filter(p => S.pil.includes(p.id)).map(p => step(p.n, `+${p.v} · риск ${p.r} · ${p.e * 2} дн`)).join('') || '<p class="note">Пока пусто.</p>'}${step('итого', `польза ${m.v} · риск ${m.r} · ${m.e * 2} дн`, 'sum')}</div><p class="note" style="margin-top:10px">Одна единица работы ≈ 2 рабочих дня. 2 недели = 10 дней.</p>`;
+  return `<h2>Пять шаблонов</h2><div class="steps">${step('Очередь проверки', 'много входящих, решение по каждому')}${step('Ассистент по документам', 'ответ уже записан в документах')}${step('Синхронизация', 'две системы расходятся')}${step('Оповещения', 'заметить событие вовремя')}${step('Прогноз', 'спланировать заранее')}</div>`;
+}
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      (S.lesson === LESSONS.length - 1 ? `<a class="primary" href="/prof/fde/" style="text-decoration:none">Карта навыков FDE ›</a>` : `<button class="primary" id="goNext">Следующий урок ›</button>`);
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на экране</h2><p class="note">Нажми на деталь, чтобы найти её на экране.</p><div class="parts">` +
+      partsList().map(([pid, n, s]) => `<button class="part" data-id="${pid}">${ICON[pid] || ''}<div><b>${n}</b><span>${s}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => {
+      const el = screen.querySelector(`[data-part="${b.dataset.id}"]`);
+      if (el) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); el.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' }); }
+    });
+  }
+  if (S.tab === 'scheme') { $('#pane-scheme').innerHTML = schemeHTML(m); $('#pane-scheme').querySelectorAll('[data-a]').forEach(b => b.onclick = () => { act(b.dataset.a); renderTools(); }); }
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  if (id === 'talk') return `Карточка ${m.filled} из 7 · вопросов ${m.asked} из ${MAXQ}`;
+  if (id === 'data') return `Проблем на месте ${m.placed} из ${m.total} · эталон ${m.goldOk ? '✓' : '—'}`;
+  if (id === 'metric') return `Метрик ${m.picked} из 4 · база ${m.calcOk ? '✓' : '—'}`;
+  if (id === 'thresh') return `Автомат ${pct(m.auto)} · ошибки ${pct(m.err, 1)} · срочных ${m.urg}`;
+  if (id === 'lanes') return `Разложено ${m.placed} из ${m.total}` + (m.miss ? ` · промахов ${m.miss}` : '');
+  if (id === 'pilot') return `Пилот ${m.pilotOk ? '✓' : '—'} · страница ${m.scopeN} из 6`;
+  return `Конвейер ${m.pipe} из 6 · задачи ${m.bankOk} из 3`;
+}
+function renderMeter(m) {
+  const id = LID(), el = $('#meter'), ok = !!S.done[id];
+  const G = (k, v, frac, lr, col) => `<div class="k">${k}</div><div class="v ${ok ? 'ok' : ''}">${v}</div><div class="gauge"><b style="width:${(clamp(frac, 0, 1) * 100).toFixed(1)}%;${col ? 'background:' + col : ''}"></b></div><div class="lr">${lr}</div>`;
+  if (id === 'talk') el.innerHTML = G('Карточка задачи', `${m.filled} из 7`, m.filled / 7, `<span>вопросов</span><span>${m.asked} / ${MAXQ}</span>`);
+  if (id === 'data') el.innerHTML = G('Источники проверены', `${m.placed} из ${m.total}`, m.placed / m.total, `<span>эталон</span><span>${m.goldOk ? '✓' : '—'}</span>`);
+  if (id === 'metric') el.innerHTML = G('Панель пилота', `${m.picked} из 4`, (m.picked + (m.calcOk ? 1 : 0)) / 5, `<span>промахи</span><span>${m.miss}</span>`);
+  if (id === 'thresh') el.innerHTML = G('Автоматически', pct(m.auto), m.auto, `<span>ошибки</span><span>${pct(m.err, 1)}</span>`, m.auto >= 0.6 && m.err <= 0.02 && m.urg === 0 ? 'var(--ok)' : 'var(--force)');
+  if (id === 'lanes') el.innerHTML = G('Шагов на дорожках', `${m.placed} из ${m.total}`, m.placed / m.total, `<span>промахи</span><span>${m.miss}</span>`);
+  if (id === 'pilot') el.innerHTML = G('Пилот', `польза ${m.v}`, m.v / 12, `<span>страница</span><span>${m.scopeN} / 6</span>`, m.pilotOk ? 'var(--ok)' : 'var(--force)');
+  if (id === 'system') el.innerHTML = G('Система', `${m.pipe + m.bankOk} из 9`, (m.pipe + m.bankOk) / 9, `<span>промахи</span><span>${m.miss}</span>`);
+}
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Практикум пройден! Дальше — карта навыков FDE.'), 900);
+    if (window.LuchShell && window.LuchShell.prefetchQuiz) try { window.LuchShell.prefetchQuiz(); } catch (e) {}
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  paint();
+  renderPanes(m);
+  renderTools();
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+}
+
+// ---------- layout: keep the screen clear of the task card ----------
+const stage = $('#stage');
+function fit() {
+  const tb = $('#taskBox'), mt = $('#meter'), tl = $('#tools'), hint = $('#hint');
+  if (getComputedStyle(screen).position === 'static') { mt.style.cssText = ''; screen.style.cssText = ''; hint.style.cssText = ''; return; }
+  const r = stage.getBoundingClientRect(); if (!r.width || !r.height) return;
+  const tr = tb.getBoundingClientRect(), bottom = Math.round(r.bottom - tl.getBoundingClientRect().top + 8);
+  const sideW = r.right - tr.right - 12 - 14;
+  if (sideW >= 460) {
+    mt.style.cssText = `top:${Math.round(tr.bottom - r.top + 8)}px;left:14px;right:auto;width:${Math.round(tr.width)}px`;
+    const mr = mt.getBoundingClientRect();
+    hint.style.cssText = `top:${Math.round(mr.bottom - r.top + 12)}px;left:16px;width:${Math.round(tr.width) - 4}px;display:block`;
+    screen.style.cssText = `left:${Math.round(tr.right - r.left + 12)}px;top:14px;right:14px;bottom:${bottom}px`;
+  } else {
+    mt.style.cssText = '';
+    hint.style.cssText = 'display:none';
+    const mr = mt.getBoundingClientRect();
+    const top = Math.round(Math.max(tr.bottom, mr.bottom) - r.top + 8);
+    screen.style.cssText = `left:14px;top:${top}px;right:14px;bottom:${bottom}px`;
+  }
+}
+const ro = new ResizeObserver(() => fit());
+[stage, $('#taskBox'), $('#tools')].forEach(x => ro.observe(x));
+
+// ---------- lesson strip ----------
+const MINI = {
+  talk: '<path d="M4 6h26v12H14l-6 5v-5H4z" fill="none" stroke="#8b96ad" stroke-width="1.4"/><rect x="36" y="6" width="12" height="8" rx="2" fill="#86e0a8"/><rect x="50" y="6" width="12" height="8" rx="2" fill="#86e0a8"/><rect x="36" y="17" width="12" height="8" rx="2" fill="none" stroke="#56627d"/><rect x="50" y="17" width="12" height="8" rx="2" fill="none" stroke="#56627d"/>',
+  data: '<circle cx="33" cy="15" r="5" fill="#a99cff"/><path d="M33 15L8 5M33 15L58 5M33 15L8 25M33 15L58 25" stroke="#8b96ad"/><circle cx="58" cy="25" r="3" fill="#ffb547"/>',
+  metric: '<rect x="4" y="8" width="12" height="16" rx="2" fill="#86e0a8"/><rect x="18" y="8" width="12" height="16" rx="2" fill="#86e0a8"/><rect x="32" y="8" width="12" height="16" rx="2" fill="#86e0a8"/><rect x="46" y="8" width="14" height="16" rx="2" fill="#ff8a73"/>',
+  thresh: '<circle cx="10" cy="10" r="2" fill="#ff8a73"/><circle cx="18" cy="20" r="2" fill="#86e0a8"/><circle cx="30" cy="12" r="2" fill="#86e0a8"/><circle cx="46" cy="22" r="2" fill="#86e0a8"/><circle cx="56" cy="8" r="2" fill="#86e0a8"/><path d="M38 2V28" stroke="#ffb547" stroke-width="2"/>',
+  lanes: '<rect x="2" y="3" width="62" height="7" rx="2" fill="none" stroke="#72d4e8"/><rect x="2" y="12" width="62" height="7" rx="2" fill="none" stroke="#a99cff"/><rect x="2" y="21" width="62" height="7" rx="2" fill="none" stroke="#ffb547"/><path d="M10 6L26 15L42 6L56 24" fill="none" stroke="#e8ecf4" stroke-width="1.4"/>',
+  pilot: '<rect x="4" y="7" width="40" height="5" rx="2" fill="#86e0a8"/><rect x="4" y="15" width="14" height="5" rx="2" fill="#ff8a73"/><rect x="4" y="23" width="28" height="5" rx="2" fill="#72d4e8"/><rect x="50" y="4" width="13" height="23" rx="2" fill="#f3efe6"/>',
+  system: '<rect x="3" y="11" width="10" height="9" rx="2" fill="#8b96ad"/><rect x="20" y="11" width="10" height="9" rx="2" fill="#a99cff"/><rect x="37" y="11" width="10" height="9" rx="2" fill="#ffb547"/><rect x="54" y="11" width="10" height="9" rx="2" fill="#86e0a8"/><path d="M13 15.5h7M30 15.5h7M47 15.5h7" stroke="#86e0a8"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Ls, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Ls.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Ls.title}</span></span>
+      ${S.done[Ls.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.rp = false;
+  resetState();
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  build();
+  screen.scrollTop = 0;
+  renderStrip(); update();
+  requestAnimationFrame(fit);
+  const cur = $('#lessons .lesson[aria-current="true"]'), ls = $('#lessons');
+  if (cur) { const dx = cur.getBoundingClientRect().left - ls.getBoundingClientRect().left; if (dx < 0 || dx + cur.offsetWidth > ls.clientWidth) ls.scrollLeft += dx - 8; }
+}
+
+// ---------- for the AI tutor: what is on the screen right now ----------
+const CASE = 'Сквозной пример: сеть клиник «Медика» (5 клиник). Колл-центр получает около 900 обращений в день: запись, перенос, анализы, страховка, жалобы, срочные симптомы. Операторы вручную раскладывают их по 6 очередям, около 4 минут на обращение (60 часов операторов в день), ответ пациенту ждёт около суток. Клиника купила ИИ-модель, на демо она ошибалась в каждом пятом обращении и однажды отправила «боль в груди» в обычную запись — проект встал. Ученик играет FDE, которого прислали на 6 недель. Деньги — в долларах, ставка оператора около $8 в час.';
+const ROLEPLAY = `РЕЖИМ РОЛЕВОЙ ИГРЫ (ученик нажал «Сыграть с наставником»). Ты играешь роль «${LEAD}» сети клиник «Медика». Ученик — FDE, он задаёт вопросы, а ты отвечаешь от первого лица, по-разговорному, 1–3 предложения, только на то, что спросили. Не подсказывай, какие вопросы задавать, и не выходи из роли без причины.
+Факты, которые ты раскрываешь только на прямой вопрос: пользователи — операторы колл-центра, 14 человек в смене, и ты сама; решение — в какую из 6 очередей отправить обращение (запись, перенос, анализы, страховка, жалобы, срочные); сейчас оператор читает или слушает обращение, ищет пациента в CRM и выбирает очередь, около 4 минут на каждое, около 900 обращений в день, ответ пациенту — примерно через сутки; пробовали купленную модель — на демо она ошибалась в каждом пятом обращении и отправила «боль в груди» в обычную запись, проект остановили; данные — CRM колл-центра (поле «симптомы» часто пустое), медицинская система с картами пациентов (доступ только через главврача и юриста), расписание врачей в отдельной программе, Excel с прайсом, записи звонков, история, куда операторы отправляли обращения за 3 года; ограничения — срочное не должно потеряться, медданные не выходят за пределы клиники, операторов не сокращают; успех — ответ пациенту в тот же день, меньше часов операторов, ни одного срочного не туда.
+Если первым спрашивают про модель или бюджет — отвечай, что не разбираешься и это к финансовому директору. На наводящие вопросы («вы же согласны, что…») — отвечай с лёгким раздражением. Если ученик сразу предлагает решение — скажи, что вы это уже слышали от продавцов.
+После 8 вопросов ученика или если он напишет «стоп» — выйди из роли и коротко разбери: какие из 7 полей карточки задачи (кто пользователь, какое решение, как сейчас, что пробовали, данные и доступы, ограничения, как поймём успех) он заполнил и какой один вопрос стоило задать.`;
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '', guide = '';
+  if (id === 'talk') {
+    const iv = S.iv;
+    now = `Симулятор первого разговора с руководителем колл-центра. Ученик выбирает следующий вопрос из 4 вариантов, всего не больше 8 вопросов; ответы заполняют карточку задачи из 7 полей. Заполнено ${m.filled} из 7 (${FIELDS.filter(f => iv.filled[f.id]).map(f => f.n).join(', ') || 'ничего'}), задано вопросов ${m.asked}, из них впустую ${m.bad}. ${m.filled < 7 && iv.asked < MAXQ ? `Сейчас на выбор: ${talkOptions().map(o => '«' + o.q + '»').join('; ')}.` : ''}`;
+    guide = 'Для наставника: не называй, какой вариант выбрать. Спроси, какой вопрос даст факт о людях, решении, процессе, данных или цифре успеха, а какой — о модели или деньгах.';
+  }
+  if (id === 'data') {
+    now = `Карта данных клиники: 6 источников (${SRC.map(s => s.n).join(', ')}) и 6 ярлыков-проблем, которые нужно разложить по источникам. Разложено верно ${m.placed} из ${m.total}: ${TAGS.filter(t => S.place[t.id]).map(t => `«${t.t}» → ${SRC.find(s => s.id === t.g).n}`).join('; ') || 'ничего'}. Вопрос «где взять известные правильные ответы для проверки модели»: ${m.goldOk ? 'решён (история разбора обращений операторами)' : S.gold ? 'был неверный выбор' : 'не отвечен'}. Промахов: ${m.miss}.`;
+    guide = 'Для наставника: не называй источник для ярлыка. Спроси, где эта проблема живёт: кто заполняет поле, где лежат медданные, какая система отдельная, что приходит файлом, что не текст.';
+  }
+  if (id === 'metric') {
+    now = `Ученик собирает панель пилота: 3 метрики пользы и 1 красную линию из 8 кандидатов (4 полезных: доля автоматически разобранных, время до ответа пациенту, часы операторов, срочные в автомате ровно 0; 4 тщеславных: точность на демо, строки кода, число встреч, число функций). Выбрано: ${S.met.map(x => '«' + METRICS.find(y => y.id === x).t + '»').join(', ') || 'ничего'}. Базовый расчёт «900 обращений × 4 минуты = ? часов в день»: ${m.calcOk ? 'решён' : S.calcTry ? 'были неверные попытки' : 'не начат'}. Ползунок автоматики ${S.autoP} %, ставка оператора $${S.rate} в час.`;
+    guide = 'Для наставника: не называй метрики и не говори ответ 60. Спроси, заметит ли эту цифру пациент или директор, и подскажи шаги: умножить, потом перевести минуты в часы.';
+  }
+  if (id === 'thresh') {
+    now = `Диаграмма 200 прошлых обращений с известным правильным ответом по 6 очередям; по горизонтали уверенность модели. Режим: ${S.th.mode === 'one' ? `один общий порог ${fmt(S.th.one, 2)}` : 'порог на очередь: ' + QUEUES.map(q => `${q.n} ${S.th.per[q.id] >= 1 ? 'всегда человек' : fmt(S.th.per[q.id], 2)}`).join(', ')}. Сейчас автоматически ${pct(m.auto)} (${m.a} из 200), ошибок среди автоматических ${pct(m.err, 1)}, срочных в автомате ${m.urg}. Цель: ≥ 60 % автоматически, ≤ 2 % ошибок, 0 срочных. Одним общим порогом цели не достичь: срочные обращения имеют высокую уверенность.`;
+    guide = 'Для наставника: не называй конкретные значения порогов. Спроси, в какой очереди цена ошибки самая высокая и где модель надёжна даже при пороге пониже.';
+  }
+  if (id === 'lanes') {
+    now = `Ученик раскладывает 8 шагов работы колл-центра на три дорожки: «Правило в коде», «Модель», «Человек». Разложено ${m.placed} из ${m.total}: ${STEPS.filter(s => S.place[s.id]).map(s => `«${s.t}» → ${LANES.find(l => l.id === S.place[s.id]).name}`).join('; ') || 'ничего'}. Осталось: ${STEPS.filter(s => !S.place[s.id]).map(s => '«' + s.t + '»').join(', ') || 'ничего'}. Промахов: ${m.miss}.`;
+    guide = 'Для наставника: не называй дорожку. Задай три вопроса: можно ли записать это как «если… то…»; нужно ли понимать живой текст; дорогая ли ошибка и нужна ли ответственность.';
+  }
+  if (id === 'pilot') {
+    now = `Ученик собирает двухнедельный пилот: польза ≥ ${P_V}, риск каждой части ≤ ${P_R}, работы ≤ ${P_E} единиц (10 дней). Части (польза/риск/работа): ${PIECES.map(p => `${p.n} ${p.v}/${p.r}/${p.e}`).join('; ')}. Выбрано: ${PIECES.filter(p => S.pil.includes(p.id)).map(p => p.n).join(', ') || 'ничего'} → польза ${m.v}, макс. риск ${m.r}, работа ${m.e}; пилот ${m.pilotOk ? 'верный' : 'пока не подходит'}. Страница объёма работ (цель, метрика, входит, не входит, сроки, риски): заполнено ${m.scopeN} из 6.`;
+    guide = 'Для наставника: не называй состав пилота. Спроси, какая очередь самая частая и безопасная и как без журнала решений проверить результат.';
+  }
+  if (id === 'system') {
+    now = `Ученик собирает конвейер из 6 блоков по порядку (есть 2 лишних блока). Собрано ${m.pipe} из 6: ${S.pipe.map(x => '«' + BLOCKS.find(b => b.id === x).t + '»').join(' → ') || 'ничего'}. Затем банк задач: 3 новых клиента (банк — спорные списания; интернет-магазин — расходятся остатки; городская служба — обращения жителей и поиск по правилам), для каждого выбрать шаблон (${PATTERNS.map(p => p.n).join(', ')}) и первый вопрос клиенту. Решено ${m.bankOk} из 3. Промахов: ${m.miss}.`;
+    guide = 'Для наставника: не называй следующий блок и шаблон. Спроси, что системе нужно знать перед этим шагом, и что в задаче клиента главное: решение по каждому входящему, ответ в документах, расхождение двух систем.';
+  }
+  const lines = [
+    `Раздел: Профессии, «Практикум FDE: первые недели у клиента» (уровень 1, почти без кода). Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    CASE,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    S.done[id] ? 'Задание уже выполнено — можно обсуждать свободно.' : guide,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ];
+  if (id === 'talk' && S.rp) lines.push(ROLEPLAY);
+  else if (id === 'talk') lines.push(`Если ученик просит сыграть руководителя колл-центра — играй по правилам: ${ROLEPLAY}`);
+  return lines.join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = {
+    talk: 'Сыграй руководителя колл-центра, я задаю вопросы',
+    data: 'Зачем нужны «правильные ответы» для проверки модели?',
+    metric: 'Чем метрика пользы отличается от тщеславной?',
+    thresh: 'Что такое уверенность модели простыми словами?',
+    lanes: 'Почему не отдать модели вообще всё?',
+    pilot: 'Почему пилот должен быть маленьким?',
+    system: 'Как разложить задачу клиента за 30 минут?',
+  }[Ls.id];
+  return Ls.id === 'talk' ? [q, done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', 'Какие вопросы задать клиенту первыми?'] : [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где FDE берёт такие навыки?'];
+};
+
+resetState();
+setLesson(S.lesson);
+fit();
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

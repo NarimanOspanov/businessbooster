@@ -33,7 +33,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px 20
 h1{font:700 clamp(28px,5vw,50px)/1.08 var(--fd);margin:0 0 10px;letter-spacing:-.01em;text-wrap:balance}
 .sub{font-size:18px;color:var(--m);margin:0 0 16px}.lead{font-size:17px;max-width:68ch;margin:0 0 18px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 22px}.chips span{border:1px solid var(--l);background:var(--s);border-radius:999px;padding:6px 12px;font-size:13.5px}
-.cta{display:flex;flex-direction:column;gap:4px;max-width:560px;margin:0 0 22px;padding:14px 18px;border-radius:14px;background:var(--a);color:#1b1305;text-decoration:none}.cta b{font:700 17px/1.2 var(--fd)}.cta span{font-size:14px;opacity:.8}.cta:hover{filter:brightness(1.06)}
+.cta{display:flex;flex-direction:column;gap:4px;max-width:560px;margin:0 0 22px;padding:14px 18px;border-radius:14px;background:var(--a);color:#1b1305;text-decoration:none}.cta b{font:700 17px/1.2 var(--fd)}.cta span{font-size:14px;opacity:.8}.cta:hover{filter:brightness(1.06)}.cta.c2{background:var(--s);color:var(--fg);border:1.5px solid var(--a);margin-top:-12px}.cta.c2 b{color:var(--a)}
 .stats{display:flex;flex-wrap:wrap;gap:10px 28px;margin:0 0 20px}.stats div{font-size:13px;color:var(--m)}.stats b{display:block;font:600 22px/1.2 var(--fd);color:var(--fg)}
 .bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px;background:var(--s);border:1px solid var(--l);border-radius:14px;margin:0 0 8px;position:sticky;top:8px;z-index:5}
 .bar .pg{flex:1;min-width:160px;height:8px;border-radius:9px;background:var(--s2);overflow:hidden}.bar .pg i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ok),#c7f0d6);transition:width .3s}
@@ -128,7 +128,7 @@ ${s.topics.map(topicDoc).join("\n")}</section>`).join("\n");
   const desc = `Как стать Forward Deployed Engineer: ${P.stages.length} этапов и ${all.length} тем — от Python и SQL до ИИ-агентов, RAG и работы с клиентом. Практика, сквозной проект, бесплатно.`;
   const ld = [{ "@context": "https://schema.org", "@type": "Course", name: `${P.title}: карта навыков`, description: P.short, inLanguage: "ru", url: SITE + p, provider: ORG, isAccessibleForFree: true,
     educationalCredentialAwarded: "Портфолио из сквозного проекта", timeRequired: "PT" + H + "H", teaches: all.filter((t) => t.k === "core").map((t) => t.t),
-    hasCourseInstance: { "@type": "CourseInstance", courseMode: "online", courseWorkload: "PT" + H + "H" }, offers: { "@type": "Offer", price: 0, priceCurrency: "KZT", category: "Free" },
+    hasCourseInstance: { "@type": "CourseInstance", courseMode: "online", courseWorkload: "PT" + H + "H" }, offers: { "@type": "Offer", price: 0, priceCurrency: "USD", category: "Free" },
     syllabusSections: P.stages.map((s) => ({ "@type": "Syllabus", name: s.title, description: s.why })) },
     { "@context": "https://schema.org", "@type": "Occupation", name: P.title, alternateName: P.ru, description: P.intro, skills: all.map((t) => t.t).join(", ") },
     { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: "Профессии", item: SITE + "/prof/" }, { "@type": "ListItem", position: 2, name: P.title, item: SITE + p }] }];
@@ -137,7 +137,8 @@ ${s.topics.map(topicDoc).join("\n")}</section>`).join("\n");
 <div class="kick"><a href="/prof/" style="color:inherit;text-decoration:none">Атлас профессий</a> · новая профессия</div>
 <h1>${esc(P.title)}</h1><p class="sub">${esc(P.ru)}</p>
 <p class="lead">${esc(P.short)}</p>
-${P.course ? `<a class="cta" href="${P.course}"><b>▶ Начни с вводного курса</b><span>7 коротких уроков: кто такой FDE, сколько платят, плюсы и минусы, день у клиента, первый код</span></a>` : ""}
+${P.course ? `<a class="cta" href="${P.course}"><b>▶ Начни с вводного курса</b><span>7 коротких уроков: кто такой FDE, как устроена работа, деньги, плюсы и минусы, первый код</span></a>` : ""}
+${P.practice ? `<a class="cta c2" href="${P.practice}"><b>Практикум: первые недели у клиента</b><span>Один кейс от начала до конца: разговор с клиентом, данные, метрики, порог уверенности, пилот, архитектура</span></a>` : ""}
 <div class="chips">${P.traits.map((x) => `<span>${esc(x)}</span>`).join("")}</div>
 <div class="stats"><div><b>${P.stages.length}</b>этапов</div><div><b>${all.length}</b>тем</div><div><b>${esc(P.hours)}</b>учёбы и практики</div><div><b>${esc(P.months.split(" при ")[0])}</b>${esc("при " + P.months.split(" при ")[1])}</div></div>
 <div class="bar" id="bar"><span class="pt" id="pt">Пройдено 0 из ${all.length}</span><span class="pg"><i id="pg"></i></span><button type="button" class="rst" id="rst" hidden>Сбросить</button></div>
