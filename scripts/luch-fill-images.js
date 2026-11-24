@@ -3,6 +3,7 @@
 // Медиа в базе не храним. Берём разделы без формул и без схемы (как на сайте), уже готовые не трогаем.
 //   node scripts/luch-fill-images.js            — все недостающие
 //   LIMIT=50 node scripts/luch-fill-images.js   — первые 50
+//   ONLY=/labs/prof-fde/ node scripts/luch-fill-images.js — только одна лаборатория (в Git Bash — с MSYS_NO_PATHCONV=1)
 // Ключ OpenAI: OPENAI_API_KEY или ~/.openaikey; хранилище: AZURE_STORAGE_CONNECTION или ~/.azure-storage.
 const fs = require("fs"), path = require("path"), os = require("os"), crypto = require("crypto"), { spawn } = require("child_process");
 const db = require("./db.js"), sql = require("mssql"), blob = require("./azure-blob.js");
@@ -41,7 +42,7 @@ async function gen(prompt) {
     if (s.formulas || (s.scheme && r.story_key.startsWith("/labs/")) || i > 7 || have.has(r.story_key + "#" + i)) return; // схема опыта есть только в лабораториях; на страницах разделов — картинка
     todo.push({ k: r.story_key, i, scene: s.img || (s.title + ". " + s.text) });
   });
-  const list = todo.slice(0, LIMIT);
+  const list = todo.filter((t) => !process.env.ONLY || t.k.startsWith(process.env.ONLY)).slice(0, LIMIT); // ONLY=/labs/prof-fde/ — только одна лаборатория
   console.log("нужно картинок", todo.length, "делаю", list.length);
   let ok = 0, fail = 0, n = 0;
   const worker = async () => {

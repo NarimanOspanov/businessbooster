@@ -33,6 +33,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px 20
 h1{font:700 clamp(28px,5vw,50px)/1.08 var(--fd);margin:0 0 10px;letter-spacing:-.01em;text-wrap:balance}
 .sub{font-size:18px;color:var(--m);margin:0 0 16px}.lead{font-size:17px;max-width:68ch;margin:0 0 18px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 22px}.chips span{border:1px solid var(--l);background:var(--s);border-radius:999px;padding:6px 12px;font-size:13.5px}
+.cta{display:flex;flex-direction:column;gap:4px;max-width:560px;margin:0 0 22px;padding:14px 18px;border-radius:14px;background:var(--a);color:#1b1305;text-decoration:none}.cta b{font:700 17px/1.2 var(--fd)}.cta span{font-size:14px;opacity:.8}.cta:hover{filter:brightness(1.06)}
 .stats{display:flex;flex-wrap:wrap;gap:10px 28px;margin:0 0 20px}.stats div{font-size:13px;color:var(--m)}.stats b{display:block;font:600 22px/1.2 var(--fd);color:var(--fg)}
 .bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px;background:var(--s);border:1px solid var(--l);border-radius:14px;margin:0 0 8px;position:sticky;top:8px;z-index:5}
 .bar .pg{flex:1;min-width:160px;height:8px;border-radius:9px;background:var(--s2);overflow:hidden}.bar .pg i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ok),#c7f0d6);transition:width .3s}
@@ -77,7 +78,7 @@ h1{font:700 clamp(28px,5vw,50px)/1.08 var(--fd);margin:0 0 10px;letter-spacing:-
 @media (max-width:600px){.dw{align-items:flex-end}.dw .pn{height:88%;border-left:0;border-top:1px solid var(--l);border-radius:18px 18px 0 0;transform:translateY(30px)}}
 /* конспект карты — тот же текст, что в панели */
 .doc{max-width:780px;margin:50px auto 0;border-top:1px solid var(--l);padding-top:10px}
-.doc>h2{font:700 26px/1.2 var(--fd);margin:30px 0 6px}.doc .sg{margin:30px 0}.doc .sg>h3{font:700 20px/1.25 var(--fd);margin:0 0 6px}
+.doc>summary{cursor:pointer;list-style:none}.doc>summary::-webkit-details-marker{display:none}.doc>summary h2::after{content:" ›";color:var(--m)}.doc[open]>summary h2::after{content:" ⌄"}.doc>summary h2,.doc>h2{font:700 26px/1.2 var(--fd);margin:30px 0 6px}.doc .sg{margin:30px 0}.doc .sg>h3{font:700 20px/1.25 var(--fd);margin:0 0 6px}
 .doc article{padding:16px 0;border-bottom:1px solid #26324a88}.doc h4{font-size:17px;margin:0 0 6px}
 .why{color:var(--m)}.lb{font:600 11.5px/1 var(--fm);letter-spacing:.1em;text-transform:uppercase;color:var(--m);margin:16px 0 6px}
 .bx{background:var(--s2);border-left:3px solid var(--ok);border-radius:0 10px 10px 0;padding:10px 14px}.bx.pj{border-left-color:var(--a)}
@@ -135,17 +136,18 @@ ${s.topics.map(topicDoc).join("\n")}</section>`).join("\n");
 <body><div class="wrap">${top}
 <div class="kick"><a href="/prof/" style="color:inherit;text-decoration:none">Атлас профессий</a> · новая профессия</div>
 <h1>${esc(P.title)}</h1><p class="sub">${esc(P.ru)}</p>
-<p class="lead">${esc(P.intro)}</p>
+<p class="lead">${esc(P.short)}</p>
+${P.course ? `<a class="cta" href="${P.course}"><b>▶ Начни с вводного курса</b><span>7 коротких уроков: кто такой FDE, сколько платят, плюсы и минусы, день у клиента, первый код</span></a>` : ""}
 <div class="chips">${P.traits.map((x) => `<span>${esc(x)}</span>`).join("")}</div>
 <div class="stats"><div><b>${P.stages.length}</b>этапов</div><div><b>${all.length}</b>тем</div><div><b>${esc(P.hours)}</b>учёбы и практики</div><div><b>${esc(P.months.split(" при ")[0])}</b>${esc("при " + P.months.split(" при ")[1])}</div></div>
 <div class="bar" id="bar"><span class="pt" id="pt">Пройдено 0 из ${all.length}</span><span class="pg"><i id="pg"></i></span><button type="button" class="rst" id="rst" hidden>Сбросить</button></div>
-<div class="legend"><span><i></i>Обязательно</span><span class="x"><i></i>Полезно, можно позже</span><span class="dg"><i></i>Изучаю</span><span class="dn"><i></i>Готово</span><span>Нажмите на тему — откроется, что учить и как практиковаться. Отметки сохраняются в этом браузере.</span></div>
+<div class="legend"><span><i></i>Обязательно</span><span class="x"><i></i>Полезно, можно позже</span><span class="dg"><i></i>Изучаю</span><span class="dn"><i></i>Готово</span><span>Нажми на тему — что учить и как практиковаться</span></div>
 <div class="map" id="map">
 ${stages}
 <div class="end">Готовы к собеседованию на FDE</div>
 </div>
-<div class="doc" id="doc"><h2>Вся карта текстом</h2><p class="why">Те же этапы и темы подряд — удобно читать, распечатать или отправить другу. Через все этапы идёт один сквозной проект: к концу у вас будет работающая система для «клиента» и история для собеседования.</p>
-${doc}</div>
+<details class="doc" id="doc"><summary><h2>Вся карта текстом</h2></summary><p class="why">Те же этапы и темы подряд — удобно читать, распечатать или отправить другу. Через все этапы идёт один сквозной проект: к концу у вас будет работающая система для «клиента» и история для собеседования.</p>
+${doc}</details>
 ${foot}</div>
 <div class="dw" id="dw" aria-hidden="true"><div class="pn" role="dialog" aria-modal="true" aria-labelledby="dwh"><div class="top"><small id="dwk"></small><button type="button" class="cl" id="dwx" aria-label="Закрыть">✕</button></div><h2 id="dwh"></h2><div class="st" id="dwst" role="group" aria-label="Статус темы"><button type="button" class="b-doing" data-v="doing" aria-pressed="false">Изучаю</button><button type="button" class="b-done" data-v="done" aria-pressed="false">✓ Готово</button><button type="button" class="b-skip" data-v="skip" aria-pressed="false">Пропустить</button></div><div id="dwb"></div><div class="nv"><button type="button" id="dwp">‹ Предыдущая</button><button type="button" id="dwn">Следующая ›</button></div></div></div>
 <script>window.PROF=${JSON.stringify({ slug: P.slug, order: all.map((t) => t.id), stages: P.stages.map((s) => ({ id: s.id, title: s.title, t: s.topics.map((t) => t.id) })) })};</script>
@@ -156,7 +158,7 @@ ${foot}</div>
 function atlas(list) {
   const p = "/prof/";
   const cards = list.map((P) => { const n = P.stages.flatMap((s) => s.topics).length;
-    return `<a class="card" href="/prof/${P.slug}/"><em>Карта готова</em><b>${esc(P.title)}</b><span>${esc(P.short)}</span><span>${P.stages.length} этапов · ${n} ${pl(n, "тема", "темы", "тем")} · ${esc(P.months.split(" при ")[0])}</span></a>`; }).join("")
+    return `<a class="card" href="/prof/${P.slug}/"><em>Карта и вводный курс</em><b>${esc(P.title)}</b><span>${esc(P.short)}</span><span>${P.stages.length} этапов · ${n} ${pl(n, "тема", "темы", "тем")} · ${esc(P.months.split(" при ")[0])}</span></a>`; }).join("")
     + SOON.map(([n, d]) => `<div class="card soon"><em>Скоро</em><b>${esc(n)}</b><span>${esc(d)}</span></div>`).join("");
   const title = "Атлас новых профессий: карты навыков по шагам | Open School AI";
   const desc = "Новые профессии в IT и ИИ: что выучить, в каком порядке и как практиковаться. Бесплатные карты навыков со сквозным проектом.";
