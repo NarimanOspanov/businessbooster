@@ -43,18 +43,31 @@ async function images() {
   imgs = new Set(r.recordset.map((x) => x.k)); imgsAt = Date.now(); return imgs;
 }
 
+// вопросы ЕНТ (ent.mobi) по урокам: ключ «/labs/x/|N|lang» → [{u, q, w}]; сайт ЕНТ недоступен — блок просто не показывается
+let ENT = null, entAt = 0, entP = null;
+async function entMap() {
+  if (ENT && Date.now() - entAt < 6 * 3600e3) return ENT;
+  if (!entP) entP = fetch(process.env.ENT_MAP_URL || "https://ent.mobi/seo/os-map.json", { signal: AbortSignal.timeout(4000) }).then((r) => (r.ok ? r.json() : null))
+    .then((j) => { if (j && j.map) { ENT = j.map; entAt = Date.now(); } }).catch(() => { entAt = Date.now() - 5.5 * 3600e3; }).finally(() => { entP = null; });
+  if (!ENT) await Promise.race([entP, new Promise((r) => setTimeout(r, 2500))]);
+  return ENT || {};
+}
+const entHtml = (lang, qs) => !qs || !qs.length ? "" : `<h2>${esc(UI[lang].ent)}</h2><ul class="ls">${qs.map((x) => `<li><a href="${esc(x.u)}">${esc(x.q)}</a>${x.w ? `<small>${esc(UI[lang].entWalk)}</small>` : ""}</li>`).join("")}</ul><p class="meta"><a href="https://ent.mobi/${lang === "kk" ? "kk/" : ""}ent/">${esc(UI[lang].entAll)} ›</a></p>`;
+
 // ---------- подписи страниц ----------
 const UI = {
   ru: { notes: "Конспекты уроков", home: "Главная", all: "Все предметы", grade: (g) => g + " класс", grades: (a, b) => `${a}–${b} классы`, lesson: "Урок", of: "из",
     open: "Открыть интерактивный урок", openSub: "Опыт своими руками, лекция голосом, ИИ-наставник и тест. Бесплатно.", task: "Задание в опыте", lessons: "Уроки темы",
     prev: "Предыдущий урок", next: "Следующий урок", inTopic: "Что изучают в теме", before: "Что пройти до этой темы", topics: "Темы", lessonsN: (n) => n + " " + pl(n, "урок", "урока", "уроков"),
     topicsN: (n) => n + " " + pl(n, "тема", "темы", "тем"), siteDesc: "Бесплатная школьная программа: интерактивные опыты, лекции с картинками и голосом, ИИ-наставник. Физика, математика, химия, биология, информатика, 5–11 классы.",
-    learnTitle: "Конспекты уроков по физике, математике, химии, биологии и информатике", openLab: "Интерактивные уроки темы", formulas: "Формулы" },
+    learnTitle: "Конспекты уроков по физике, математике, химии, биологии и информатике", openLab: "Интерактивные уроки темы", formulas: "Формулы",
+    ent: "Вопросы ЕНТ по этой теме", entWalk: "▶ с видеоразбором", entAll: "Все вопросы ЕНТ с разборами" },
   kk: { notes: "Сабақ конспектілері", home: "Басты бет", all: "Барлық пәндер", grade: (g) => g + "-сынып", grades: (a, b) => `${a}–${b} сыныптар`, lesson: "Сабақ", of: "/",
     open: "Интерактивті сабақты ашу", openSub: "Өз қолыңмен тәжірибе, дауыспен дәріс, ЖИ-тәлімгер және тест. Тегін.", task: "Тәжірибедегі тапсырма", lessons: "Тақырып сабақтары",
     prev: "Алдыңғы сабақ", next: "Келесі сабақ", inTopic: "Тақырыпта не оқытылады", before: "Бұл тақырыптан бұрын не өту керек", topics: "Тақырыптар", lessonsN: (n) => n + " сабақ",
     topicsN: (n) => n + " тақырып", siteDesc: "Тегін мектеп бағдарламасы: интерактивті тәжірибелер, суреттері мен дауысы бар дәрістер, ЖИ-тәлімгер. Физика, математика, химия, биология, информатика, 5–11 сыныптар.",
-    learnTitle: "Физика, математика, химия, биология және информатика бойынша сабақ конспектілері", openLab: "Тақырыптың интерактивті сабақтары", formulas: "Формулалар" },
+    learnTitle: "Физика, математика, химия, биология және информатика бойынша сабақ конспектілері", openLab: "Тақырыптың интерактивті сабақтары", formulas: "Формулалар",
+    ent: "Осы тақырып бойынша ҰБТ сұрақтары", entWalk: "▶ бейнеталдауы бар", entAll: "Талдауы бар барлық ҰБТ сұрақтары" },
 };
 function pl(n, a, b, c) { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; }
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -122,10 +135,12 @@ async function topicPage(lang, s, t) {
   const firsts = await Promise.all(t.lessons.map((l) => lecture(t.lab, l.n, lang).catch(() => null)));
   const items = t[lang] && t[lang].items && t[lang].items.every(Boolean) ? t[lang].items : t.ru.items;
   const req = t.req.map((id) => s.byId.get(id)).filter(Boolean);
+  const em = await entMap(), seen = new Set(), entQs = [];
+  for (let k = 0; k < 3; k++) for (const l of t.lessons) { const x = (em[t.lab + "|" + (l.n - 1) + "|" + lang] || [])[k]; if (x && !seen.has(x.u) && entQs.length < 8) { seen.add(x.u); entQs.push(x); } }
   const lessonsHtml = `<h2>${esc(u.lessons)}</h2><ol class="ls">${t.lessons.map((l, i) => `<li><a href="${url(lang, s.slug, t.slug, l.n)}">${esc(T(l, lang, "title"))}</a>${firsts[i] && firsts[i][0] ? `<small>${esc(clip(firsts[i][0].text, 190))}</small>` : ""}</li>`).join("")}</ol>`;
   const body = `<p class="meta">${esc(name)} · ${esc(u.grade(t.g))} · ${esc(u.lessonsN(t.lessons.length))}</p>
 ${items.length ? `<h2>${esc(u.inTopic)}</h2><ul class="ls">${items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
-<a class="cta" href="${labUrl(t, 0, lang)}"><b>${esc(u.open)} ›</b><span>${esc(u.openSub)}</span></a>${lessonsHtml}
+<a class="cta" href="${labUrl(t, 0, lang)}"><b>${esc(u.open)} ›</b><span>${esc(u.openSub)}</span></a>${lessonsHtml}${entHtml(lang, entQs)}
 ${req.length ? `<h2>${esc(u.before)}</h2><ul class="ls">${req.map((r) => `<li><a href="${url(lang, s.slug, r.slug)}">${esc(T(r, lang, "title"))}</a></li>`).join("")}</ul>` : ""}`;
   const crumbs = [[u.home, "/"], [u.notes, url(lang)], [name, url(lang, s.slug)], [title, null]];
   const desc = clip(`${title}: ${items.join(", ")}. ${(firsts[0] && firsts[0][0] && firsts[0][0].text) || ""}`, 160);
@@ -145,11 +160,12 @@ async function lessonPage(lang, s, t, l) {
   const fml = (sec) => Array.isArray(sec.formulas) && sec.formulas.length ? `<ul class="f">${sec.formulas.map((f) => `<li><code>${esc(f.f || f)}</code>${f.name ? `<small>${esc(f.name)}</small>` : ""}${Array.isArray(f.vars) && f.vars.length ? `<small>${f.vars.map((v) => `${esc(v[0])} — ${esc(v[1])}${v[2] ? ", " + esc(v[2]) : ""}`).join("<br>")}</small>` : ""}</li>`).join("")}</ul>` : "";
   const article = secs.map((sec, i) => `<section>${sec.title ? `<h2>${esc(sec.title)}</h2>` : ""}${String(sec.text || "").split(/\n{2,}/).map((p) => `<p>${esc(p)}</p>`).join("")}${fml(sec)}${img(i, sec)}</section>`).join("\n");
   const task = T(l, lang, "task"), prev = t.lessons[l.n - 2], next = t.lessons[l.n];
+  const ent = entHtml(lang, (await entMap())[t.lab + "|" + (l.n - 1) + "|" + lang]);
   const body = `<p class="meta">${esc(name)} · ${esc(u.grade(t.g))} · <a href="${url(lang, s.slug, t.slug)}">${esc(topic)}</a> · ${esc(u.lesson)} ${l.n} ${u.of} ${t.lessons.length}</p>
 <a class="cta" href="${labUrl(t, l.n, lang)}"><b>${esc(u.open)} ›</b><span>${esc(u.openSub)}</span></a>
 <article>${article}</article>
 ${task ? `<h2>${esc(u.task)}</h2><div class="task">${esc(task)}</div><a class="cta" href="${labUrl(t, l.n, lang)}"><b>${esc(u.open)} ›</b><span>${esc(u.openSub)}</span></a>` : ""}
-<div class="pn">${prev ? `<a href="${url(lang, s.slug, t.slug, prev.n)}"><small>‹ ${esc(u.prev)}</small>${esc(T(prev, lang, "title"))}</a>` : ""}${next ? `<a class="nx" href="${url(lang, s.slug, t.slug, next.n)}"><small>${esc(u.next)} ›</small>${esc(T(next, lang, "title"))}</a>` : ""}</div>
+${ent}<div class="pn">${prev ? `<a href="${url(lang, s.slug, t.slug, prev.n)}"><small>‹ ${esc(u.prev)}</small>${esc(T(prev, lang, "title"))}</a>` : ""}${next ? `<a class="nx" href="${url(lang, s.slug, t.slug, next.n)}"><small>${esc(u.next)} ›</small>${esc(T(next, lang, "title"))}</a>` : ""}</div>
 <h2>${esc(u.lessons)}: ${esc(topic)}</h2><ol class="ls">${t.lessons.map((x) => x.n === l.n ? `<li class="cur">${esc(T(x, lang, "title"))}</li>` : `<li><a href="${url(lang, s.slug, t.slug, x.n)}">${esc(T(x, lang, "title"))}</a></li>`).join("")}</ol>`;
   const crumbs = [[u.home, "/"], [u.notes, url(lang)], [name, url(lang, s.slug)], [topic, url(lang, s.slug, t.slug)], [title, null]];
   const desc = clip((secs[0] && secs[0].text) || `${title}. ${topic}`, 160);
