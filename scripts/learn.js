@@ -184,6 +184,7 @@ function robots() {
     "# ИИ-поисковики и ассистенты — добро пожаловать\nUser-agent: GPTBot\nAllow: /\nUser-agent: OAI-SearchBot\nAllow: /\nUser-agent: ChatGPT-User\nAllow: /\nUser-agent: ClaudeBot\nAllow: /\nUser-agent: Claude-SearchBot\nAllow: /\nUser-agent: PerplexityBot\nAllow: /\nUser-agent: Google-Extended\nAllow: /\n\n" +
     "Sitemap: " + SITE + "/sitemap.xml\n";
 }
+const profSlugs = () => { const fs = require("fs"), d = path.join(__dirname, "..", "prof"); try { return fs.readdirSync(d).filter((x) => x !== "data" && fs.existsSync(path.join(d, x, "index.html"))); } catch (e) { return []; } };
 function sitemap() {
   const c = catalog(), day = c.built.slice(0, 10), out = [];
   const pair = (ru, kk, pr) => { for (const [lang, p] of [["ru", ru], ["kk", kk]]) out.push(`<url><loc>${SITE}${p}</loc><lastmod>${day}</lastmod><priority>${pr}</priority><xhtml:link rel="alternate" hreflang="ru" href="${SITE}${ru}"/><xhtml:link rel="alternate" hreflang="kk" href="${SITE}${kk}"/><xhtml:link rel="alternate" hreflang="x-default" href="${SITE}${ru}"/></url>`); };
@@ -197,6 +198,9 @@ function sitemap() {
       for (const l of t.lessons) pair(url("ru", s.slug, t.slug, l.n), url("kk", s.slug, t.slug, l.n), "0.6");
     }
   }
+  // раздел «Профессии»: атлас и готовые карты (prof/<slug>/index.html, scripts/prof-build.js)
+  out.push(`<url><loc>${SITE}/prof/</loc><priority>0.8</priority></url>`);
+  for (const d of profSlugs()) out.push(`<url><loc>${SITE}/prof/${d}/</loc><priority>0.8</priority></url>`);
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${out.join("\n")}\n</urlset>\n`;
 }
 function llms() {
@@ -204,6 +208,7 @@ function llms() {
   return `# Open School AI\n\n> Бесплатная онлайн-школа для 5–11 классов (Казахстан и все русско- и казахскоязычные): физика, математика, химия, биология и информатика. ` +
     `Каждый урок — лекция с картинками и голосом, интерактивный опыт своими руками, ИИ-наставник, который видит экран ученика, и тест. Помогает готовиться к ЕНТ (ҰБТ). Языки: русский и казахский.\n\n` +
     `Конспекты всех уроков открыты без регистрации: ${SITE}/learn/ (русский) и ${SITE}/kk/learn/ (қазақша). У каждого конспекта есть ссылка на интерактивный урок.\n\n` +
+    `Атлас новых профессий — карты навыков по шагам с практикой и сквозным проектом: ${SITE}/prof/` + profSlugs().map((d) => ` · ${SITE}/prof/${d}/`).join("") + `\n\n` +
     c.subjects.map((s) => `## ${s.ru.name} (${s.grades[0]}–${s.grades[1]} классы)\n\n${s.ru.intro}\n\n- [${s.ru.title}](${SITE}${url("ru", s.slug)})\n` +
       s.topics.map((t) => `- [${t.ru.title}](${SITE}${url("ru", s.slug, t.slug)}): ${t.g} класс, ${t.lessons.length} ${pl(t.lessons.length, "урок", "урока", "уроков")} — ${t.lessons.map((l) => l.ru.title).join("; ")}`).join("\n")).join("\n\n") + "\n";
 }
