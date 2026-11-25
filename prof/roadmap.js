@@ -28,6 +28,9 @@
       const ul = document.createElement("div"); ul.innerHTML = '<div class="lb">Темы этапа</div>' + P.stages[i].t.map((t) => '<button type="button" class="tp' + (document.querySelector('.tp[data-t="' + t + '"]').classList.contains("x") ? " x" : "") + '" data-t="' + t + '" style="margin:6px 0;max-width:none">' + document.querySelector('.tp[data-t="' + t + '"]').innerHTML + "</button>").join(""); c.appendChild(ul); }
     $("#dwk").textContent = k; $("#dwb").replaceChildren(c);
     $("#dwst").hidden = kind !== "t";
+    // «Научи меня»: ИИ-курс по теме (/prof/learn/ → /prof/course/)
+    const tb = $("#dwteach");
+    if (tb) { tb.hidden = kind !== "t"; if (kind === "t") tb.href = "/prof/learn/?roadmap=" + encodeURIComponent(P.slug) + "&topic=" + encodeURIComponent(id) + "&term=" + encodeURIComponent($("#dwh").textContent); }
     $("#dwst").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(kind === "t" && S[id] === b.dataset.v)));
     const seq = kind === "t" ? P.order : P.stages.map((s) => s.id), i = seq.indexOf(id);
     $("#dwp").disabled = i <= 0; $("#dwn").disabled = i >= seq.length - 1;

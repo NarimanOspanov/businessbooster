@@ -89,6 +89,10 @@ footer{margin:50px 0 0;padding-top:18px;border-top:1px solid var(--l);color:var(
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin:22px 0}
 .card{display:flex;flex-direction:column;gap:8px;padding:18px;border:1px solid var(--l);border-radius:16px;background:var(--s);text-decoration:none;color:var(--fg)}
 a.card:hover{border-color:var(--a)}.card b{font:700 18px/1.25 var(--fd)}.card span{color:var(--m);font-size:14px}.card em{font:500 11px/1 var(--fm);font-style:normal;text-transform:uppercase;letter-spacing:.12em;color:var(--a)}.card.soon{opacity:.6}.card.soon em{color:var(--m)}
+/* «Научи меня»: кнопка в панели темы и поиск в атласе */
+.teach{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 16px;padding:12px 16px;border-radius:12px;background:var(--a);color:#1b1305;text-decoration:none;font:700 15px/1.2 var(--fb)}.teach:hover{filter:brightness(1.06)}.teach small{font-weight:500;opacity:.75}
+.ask-ai{max-width:760px;margin:6px 0 8px;padding:16px 18px;border:1.5px solid var(--a);border-radius:16px;background:var(--s)}.ask-ai b{display:block;font:700 18px/1.25 var(--fd);margin-bottom:4px}.ask-ai>span{color:var(--m);font-size:14px}
+.ask-ai form{display:flex;gap:8px;margin:12px 0 0;flex-wrap:wrap}.ask-ai input{flex:1 1 220px;min-width:0;background:var(--bg);border:1.5px solid var(--l);border-radius:12px;padding:12px 14px;font:16px/1.3 var(--fb);color:var(--fg)}.ask-ai input:focus{outline:none;border-color:var(--a)}.ask-ai button{border:0;border-radius:12px;padding:12px 18px;background:var(--a);color:#1b1305;font:700 15px/1.2 var(--fb);cursor:pointer}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}`;
 
 const head = (title, desc, p, ld) => `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -150,7 +154,7 @@ ${stages}
 <details class="doc" id="doc"><summary><h2>Вся карта текстом</h2></summary><p class="why">Те же этапы и темы подряд — удобно читать, распечатать или отправить другу. Через все этапы идёт один сквозной проект: к концу у вас будет работающая система для «клиента» и история для собеседования.</p>
 ${doc}</details>
 ${foot}</div>
-<div class="dw" id="dw" aria-hidden="true"><div class="pn" role="dialog" aria-modal="true" aria-labelledby="dwh"><div class="top"><small id="dwk"></small><button type="button" class="cl" id="dwx" aria-label="Закрыть">✕</button></div><h2 id="dwh"></h2><div class="st" id="dwst" role="group" aria-label="Статус темы"><button type="button" class="b-doing" data-v="doing" aria-pressed="false">Изучаю</button><button type="button" class="b-done" data-v="done" aria-pressed="false">✓ Готово</button><button type="button" class="b-skip" data-v="skip" aria-pressed="false">Пропустить</button></div><div id="dwb"></div><div class="nv"><button type="button" id="dwp">‹ Предыдущая</button><button type="button" id="dwn">Следующая ›</button></div></div></div>
+<div class="dw" id="dw" aria-hidden="true"><div class="pn" role="dialog" aria-modal="true" aria-labelledby="dwh"><div class="top"><small id="dwk"></small><button type="button" class="cl" id="dwx" aria-label="Закрыть">✕</button></div><h2 id="dwh"></h2><a class="teach" id="dwteach" href="/prof/learn/" hidden>✦ Научи меня <small>— ИИ-курс по этой теме</small></a><div class="st" id="dwst" role="group" aria-label="Статус темы"><button type="button" class="b-doing" data-v="doing" aria-pressed="false">Изучаю</button><button type="button" class="b-done" data-v="done" aria-pressed="false">✓ Готово</button><button type="button" class="b-skip" data-v="skip" aria-pressed="false">Пропустить</button></div><div id="dwb"></div><div class="nv"><button type="button" id="dwp">‹ Предыдущая</button><button type="button" id="dwn">Следующая ›</button></div></div></div>
 <script>window.PROF=${JSON.stringify({ slug: P.slug, order: all.map((t) => t.id), stages: P.stages.map((s) => ({ id: s.id, title: s.title, t: s.topics.map((t) => t.id) })) })};</script>
 <script src="/prof/roadmap.js"></script>
 </body></html>`;
@@ -167,9 +171,46 @@ function atlas(list) {
 <body><div class="wrap">${top}
 <div class="kick">Open School · профессии</div><h1>Атлас новых профессий</h1>
 <p class="lead">Школа даёт основу, а здесь — путь дальше: профессии, которых ещё недавно не было. Для каждой — карта навыков по шагам, практические задания и сквозной проект, который к концу пути становится портфолио.</p>
+<div class="ask-ai"><b>✦ Научи меня</b><span>Не нашёл нужное? Напиши любую тему — ИИ составит короткий курс с уроками, схемами, упражнениями и тестом.</span><form action="/prof/learn/" method="get"><input name="term" placeholder="Чему тебя научить? Например, SQL для аналитики" aria-label="Тема курса" maxlength="120" required><button type="submit">Составить курс</button></form></div>
 <div class="grid">${cards}</div>
 ${foot}</div></body></html>`;
 }
+
+// «Научи меня»: страница темы и ИИ-курс — оболочки, всё остальное делает prof/teach.js
+const EXAMPLES = ["SQL для аналитики", "Python для автоматизации", "Как устроены LLM-агенты", "Промпт-инженерия", "Docker с нуля", "Переговоры с клиентом", "Статистика для A/B-тестов", "Git для команды"];
+const teachHead = (title, desc, p, robots) => head(title, desc, p, []).replace("</head>", `${robots ? '<meta name="robots" content="noindex">' : ""}<link rel="stylesheet" href="/prof/teach.css"></head>`);
+function learnPage() {
+  return `${teachHead("Научи меня: ИИ составит курс по любой теме | Open School AI", "Напиши тему — ИИ составит короткий практический курс: модули, уроки с примерами, схемами и упражнениями, тест и наставник. Бесплатно.", "/prof/learn/")}
+<body data-page="learn"><div class="wrap">${top}
+<div class="kick"><a href="/prof/">Атлас профессий</a> · научи меня</div>
+<div id="home"><h1>Научи меня</h1>
+<p class="lead">Напиши тему — ИИ составит короткий практический курс: модули и уроки со сквозным примером, схемами, таблицами и упражнениями. В каждом уроке — проверка себя, тест и наставник, которого можно спросить.</p>
+<form class="tf" id="tf" action="/prof/learn/" method="get"><input id="tq" name="term" placeholder="Чему тебя научить?" aria-label="Тема курса" maxlength="120" autocomplete="off" required><button type="submit" class="btn">Составить курс</button></form>
+<div class="ex-chips" aria-label="Примеры тем">${EXAMPLES.map((x) => `<button type="button">${esc(x)}</button>`).join("")}</div>
+<div id="rcw" hidden><h2 style="font:700 20px/1.25 var(--fd);margin:0 0 10px">Твои курсы</h2><div class="rc" id="rc"></div></div>
+<div class="teach-box" style="margin-top:22px"><h2>Как это устроено</h2><p>Курс — 3–5 модулей по 3–4 урока. Урок пишется, когда ты его открываешь, и сохраняется: в следующий раз откроется сразу. Отметки «пройдено» хранятся в этом браузере. Темы из карт профессий — кнопка «Научи меня» в панели темы.</p></div>
+</div>
+<div class="wait" id="wait" hidden><h2 id="wt">Составляю курс</h2><p id="wp">Обычно это 10–30 секунд.</p>
+<ul class="steps"><li><i></i><span>Разбираюсь, чему учить</span></li><li><i></i><span>Составляю модули и уроки</span></li><li><i></i><span>Придумываю сквозной пример</span></li><li><i></i><span>Проверяю программу</span></li></ul>
+<div id="wb" hidden style="margin-top:14px"><a class="btn g" href="/prof/learn/">← Назад</a></div></div>
+${foot}</div><script src="/prof/teach.js" defer></script></body></html>`;
+}
+function coursePage() {
+  return `${teachHead("ИИ-курс | Open School AI", "Курс, который ИИ составил по запросу ученика: уроки с примерами, схемами, упражнениями и тестом.", "/prof/course/", true)}
+<body data-page="course"><div class="wrap">${top}
+<div class="wait" id="load"><ul class="steps"><li class="on"><i></i><span>Открываю курс…</span></li></ul></div>
+<div class="tc" id="app" hidden data-noi18n>
+<button type="button" class="btn g tocb" id="tocb" aria-expanded="false" aria-controls="side"><span>☰ Содержание</span><span id="tocn"></span></button>
+<nav class="side" id="side" aria-label="Содержание курса"></nav>
+<main class="mn" id="main"></main>
+</div>
+${foot}</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js" defer></script>
+<script src="/prof/teach.js" defer></script>
+<script src="/luch/tutor.js" defer></script>
+</body></html>`;
+}
+for (const [d, h] of [["learn", learnPage()], ["course", coursePage()]]) { fs.mkdirSync(path.join(ROOT, d), { recursive: true }); fs.writeFileSync(path.join(ROOT, d, "index.html"), h); }
 
 const live = LIVE.map((s) => { delete require.cache[require.resolve(path.join(ROOT, "data", s + ".js"))]; return require(path.join(ROOT, "data", s + ".js")); });
 for (const P of live) { fs.mkdirSync(path.join(ROOT, P.slug), { recursive: true }); fs.writeFileSync(path.join(ROOT, P.slug, "index.html"), roadmap(P)); }

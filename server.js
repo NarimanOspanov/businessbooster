@@ -8814,6 +8814,11 @@ http
       require("./scripts/tutor.js").handle(req, res, { readBody, clientIp, verifyToken: verifyClerkToken });
       return;
     }
+    // «Научи меня» в разделе «Профессии»: ИИ-курсы по любой теме (/prof/learn/, /prof/course/)
+    if (urlPath === "/api/prof/course" || urlPath === "/api/prof/lesson" || urlPath === "/api/prof/quiz") {
+      require("./scripts/prof-teach.js").handle(req, res, { readBody, clientIp });
+      return;
+    }
     // Квизрум переехал в отдельный продукт — старые ссылки ведут туда
     if (urlPath === "/quiz" || urlPath.startsWith("/quiz/")) {
       // старые ссылки вида /quiz/#КОД: браузер сохраняет #КОД при переходе, новый сайт откроет по нему комнату
