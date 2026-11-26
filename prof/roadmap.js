@@ -1,6 +1,7 @@
 // Карта профессии: панель с видеолекцией и содержанием темы, отметки «Изучаю / Готово / Пропустить» (в этом браузере).
 // Содержание тем уже есть на странице в разделе «Вся карта текстом» — панель показывает его копию.
 // Видеолекция: разделы лекции (POST /api/tutor/story) — картинка с медленным наездом, голос (/api/tutor/tts), субтитры.
+// Один файл на ru/kk/en: язык — <html lang>, подписи — window.PROF.ui; отметки прогресса общие для всех языков (ключ prof:<slug>).
 (() => {
   const P = window.PROF; if (!P) return;
   const $ = (s) => document.querySelector(s);
@@ -9,21 +10,29 @@
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* приватный режим — без сохранения */ } };
   const stageOf = (id) => P.stages.find((s) => s.t.includes(id));
   const LEC = P.lec || {};
+  // язык страницы (/prof/ — ru, /kk/prof/ — kk, /en/prof/ — en); подписи — из window.PROF.ui (scripts/prof-build.js), по умолчанию русские
+  const LANG = document.documentElement.lang || P.lang || "ru";
+  const T = Object.assign({ stage: "Этап {n}", stageOf: "Этап {i} из {n}", more: "Подробнее: что выучить и как практиковаться", stageTopics: "Темы этапа",
+    aDone: ", готово", aDoing: ", изучаю", aSkip: ", пропущено", aVideo: ", есть видеолекция", done: "Пройдено {d} из {n}", resetQ: "Сбросить все отметки на этой карте?",
+    prevPart: "Предыдущая часть", nextPart: "Следующая часть", pause: "Пауза", play: "Смотреть", speed: "Скорость", mute: "Выключить звук", unmute: "Включить звук", volume: "Громкость", fs: "Во весь экран",
+    video: "Видеолекция", parts: ["часть", "части", "частей"], min: "мин", err: "Лекция пока не готова. Загляни позже — текст темы ниже.", again: "Посмотреть ещё раз", dec: "," }, P.ui || {});
+  const fmt = (k, o) => String(T[k]).replace(/\{(\w+)\}/g, (_, x) => o[x]);
 
   function paint() {
     document.querySelectorAll(".tp").forEach((b) => { const v = S[b.dataset.t]; b.classList.toggle("done", v === "done"); b.classList.toggle("doing", v === "doing"); b.classList.toggle("skip", v === "skip");
-      b.setAttribute("aria-label", b.querySelector(".tt").textContent + (v === "done" ? ", готово" : v === "doing" ? ", изучаю" : v === "skip" ? ", пропущено" : "") + (b.querySelector(".pv") ? ", есть видеолекция" : "")); });
+      b.setAttribute("aria-label", b.querySelector(".tt").textContent + (v === "done" ? T.aDone : v === "doing" ? T.aDoing : v === "skip" ? T.aSkip : "") + (b.querySelector(".pv") ? T.aVideo : "")); });
     const n = P.order.length, d = P.order.filter((id) => S[id] === "done" || S[id] === "skip").length;
-    $("#pt").textContent = "Пройдено " + d + " из " + n; $("#pg").style.width = (100 * d / n) + "%"; $("#rst").hidden = !Object.keys(S).length;
+    $("#pt").textContent = fmt("done", { d, n }); $("#pg").style.width = (100 * d / n) + "%"; $("#rst").hidden = !Object.keys(S).length;
     P.stages.forEach((s) => { const k = s.t.filter((id) => S[id] === "done" || S[id] === "skip").length, i = document.querySelector('.hub[data-g="' + s.id + '"] .hp i'); if (i) i.style.width = (100 * k / s.t.length) + "%"; });
   }
 
   // ---------- видеолекция ----------
   const box = $("#dwv");
   const storyCache = {};
-  const fetchStory = (key, context) => storyCache[key] || (storyCache[key] = fetch("/api/tutor/story", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key, lang: "ru", context }) })
+  const fetchStory = (key, context) => storyCache[key] || (storyCache[key] = fetch("/api/tutor/story", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key, lang: LANG, context }) })
     .then((r) => r.json().then((j) => { if (!r.ok || !j.sections) throw new Error(j.error || "story"); return j; })).catch((e) => { delete storyCache[key]; throw e; }));
   const imgUrl = (key, i) => "/api/tutor/story/img?k=" + encodeURIComponent(key + "|ru") + "&i=" + i;
+  // картинки лекции общие для всех языков — всегда с ключом «|ru»
   // у разделов с формулами и у схемы опыта в лабораториях своей картинки нет — показываем предыдущую
   const imgOf = (V, i) => { for (let k = i; k >= 0; k--) { const x = V.secs && V.secs[k]; if (x && !x.formulas && !(x.scheme && V.key.startsWith("/labs/"))) return k; } return 0; };
   // субтитры: по предложению, длинные — делим по запятой/двоеточию/тире ближе к середине, чтобы строка не закрывала картинку
@@ -39,7 +48,7 @@
   const pref = (k, d) => { try { const v = parseFloat(localStorage.getItem(k)); return isFinite(v) ? v : d; } catch (e) { return d; } };
   const keep = (k, v) => { try { localStorage.setItem(k, String(v)); } catch (e) { /* приватный режим */ } };
   let RATE = pref("prof-rate", 1.5), VOL = pref("prof-vol", 1);
-  const rateTxt = (r) => String(r).replace(".", ",") + "×";
+  const rateTxt = (r) => String(r).replace(".", T.dec) + "×";
   const applyAudio = (V) => { V.audio.defaultPlaybackRate = RATE; V.audio.playbackRate = RATE; V.audio.volume = VOL; V.audio.muted = V.muted || VOL === 0; };
   const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
   function fsToggle(el) {
@@ -63,8 +72,8 @@
     vpStop();
     const el = document.createElement("div"); el.className = "vp";
     el.innerHTML = '<div class="frs"></div><div class="stage-c" aria-hidden="true"></div><div class="bars"></div><div class="sub" aria-live="polite"></div>' +
-      '<div class="ctl"><button type="button" class="b-prev" aria-label="Предыдущая часть">⏮</button><button type="button" class="b-play" aria-label="Пауза">❚❚</button><button type="button" class="b-next" aria-label="Следующая часть">⏭</button><span class="n"></span><span class="sp"></span><button type="button" class="b-rate" aria-label="Скорость">1,5×</button><span class="vol"><button type="button" class="b-mute" aria-label="Выключить звук">🔊</button><input type="range" class="vr" min="0" max="1" step="0.05" aria-label="Громкость"></span><button type="button" class="b-fs" aria-label="Во весь экран">⛶</button></div>' +
-      '<button type="button" class="big"><i>▶</i><span>Видеолекция</span></button>';
+      '<div class="ctl"><button type="button" class="b-prev" aria-label="' + T.prevPart + '">⏮</button><button type="button" class="b-play" aria-label="' + T.pause + '">❚❚</button><button type="button" class="b-next" aria-label="' + T.nextPart + '">⏭</button><span class="n"></span><span class="sp"></span><button type="button" class="b-rate" aria-label="' + T.speed + '">' + rateTxt(1.5) + '</button><span class="vol"><button type="button" class="b-mute" aria-label="' + T.mute + '">🔊</button><input type="range" class="vr" min="0" max="1" step="0.05" aria-label="' + T.volume + '"></span><button type="button" class="b-fs" aria-label="' + T.fs + '">⛶</button></div>' +
+      '<button type="button" class="big"><i>▶</i><span>' + T.video + '</span></button>';
     box.replaceChildren(el); box.hidden = false;
     const audio = new Audio(); audio.preload = "auto";
     V = { node, key, context, el, audio, secs: null, i: 0, playing: false, started: false, run: 0, voice: {}, urls: [], fb: false, elapsed: 0, last: 0, est: 0, frame: null, kb: 0, subIdx: -1, muted: false };
@@ -74,9 +83,9 @@
       if (my.dead) return; my.secs = j.sections;
       el.querySelector(".bars").innerHTML = my.secs.map(() => "<i><b></b></i>").join("");
       const words = my.secs.reduce((a, x) => a + String(x.text || "").split(/\s+/).length, 0), min = Math.max(1, Math.round(words / 130));
-      el.querySelector(".big span").textContent = "Видеолекция · " + my.secs.length + " " + pl(my.secs.length, "часть", "части", "частей") + " · ≈ " + min + " мин";
+      el.querySelector(".big span").textContent = T.video + " · " + my.secs.length + " " + pl(my.secs.length, T.parts[0], T.parts[1], T.parts[2]) + " · ≈ " + min + " " + T.min;
       counter(my); new Image().src = imgUrl(key, imgOf(my, 1));
-    }).catch(() => { if (my.dead) return; el.querySelector(".big").remove(); el.querySelector(".ctl").hidden = true; const e = document.createElement("div"); e.className = "err"; e.textContent = "Лекция пока не готова. Загляни позже — текст темы ниже."; el.appendChild(e); });
+    }).catch(() => { if (my.dead) return; el.querySelector(".big").remove(); el.querySelector(".ctl").hidden = true; const e = document.createElement("div"); e.className = "err"; e.textContent = T.err; el.appendChild(e); });
     el.querySelector(".big").onclick = () => { if (!my.secs) return; my.playing = true; my.started = true; el.querySelector(".big").hidden = true; if (my.i >= my.secs.length) my.i = 0; show(my, my.i); loop(my); };
     el.querySelector(".stage-c").onclick = () => toggle(my);
     el.querySelector(".b-play").onclick = () => toggle(my);
@@ -86,11 +95,11 @@
       rb.onclick = () => { RATE = RATES[(RATES.indexOf(RATE) + 1) % RATES.length] || 1.5; keep("prof-rate", RATE); rb.textContent = rateTxt(RATE); applyAudio(my); };
       vr.oninput = () => { VOL = +vr.value; keep("prof-vol", VOL); if (VOL > 0 && my.muted) { my.muted = false; } applyAudio(my); el.querySelector(".b-mute").textContent = VOL === 0 || my.muted ? "🔇" : "🔊"; };
       el.querySelector(".b-fs").onclick = () => fsToggle(el); }
-    el.querySelector(".b-mute").onclick = (e) => { my.muted = !my.muted; audio.muted = my.muted; e.currentTarget.textContent = my.muted ? "🔇" : "🔊"; e.currentTarget.setAttribute("aria-label", my.muted ? "Включить звук" : "Выключить звук"); };
+    el.querySelector(".b-mute").onclick = (e) => { my.muted = !my.muted; audio.muted = my.muted; e.currentTarget.textContent = my.muted ? "🔇" : "🔊"; e.currentTarget.setAttribute("aria-label", my.muted ? T.unmute : T.mute); };
     audio.onended = () => { if (my.playing && !my.fb) next(my); };
     audio.onerror = () => { if (my.playing && !my.fb && audio.getAttribute("src")) fallback(my); };
   }
-  const pl = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+  const pl = (n, a, b, c) => { if (LANG !== "ru") return n === 1 ? a : b; const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
   function frame(V, i) {
     const f = document.createElement("div"); f.className = "fr";
     const im = new Image(); im.alt = ""; im.decoding = "async"; im.src = imgUrl(V.key, imgOf(V, i));
@@ -101,7 +110,7 @@
   function counter(V) {
     const el = V.el; el.querySelector(".n").textContent = (V.secs ? Math.min(V.i + 1, V.secs.length) : 1) + "/" + (V.secs ? V.secs.length : "…");
     el.querySelector(".b-prev").disabled = !V.secs || V.i <= 0; el.querySelector(".b-next").disabled = !V.secs || V.i >= V.secs.length - 1;
-    const b = el.querySelector(".b-play"); b.textContent = V.playing ? "❚❚" : "▶"; b.setAttribute("aria-label", V.playing ? "Пауза" : "Смотреть");
+    const b = el.querySelector(".b-play"); b.textContent = V.playing ? "❚❚" : "▶"; b.setAttribute("aria-label", V.playing ? T.pause : T.play);
     el.querySelectorAll(".bars b").forEach((x, k) => { if (k !== V.i) x.style.width = k < V.i ? "100%" : "0"; });
   }
   function voice(V, i) {
@@ -138,7 +147,7 @@
     // конец лекции
     V.playing = false; V.i = V.secs.length; counter(V);
     V.el.querySelectorAll(".bars b").forEach((x) => { x.style.width = "100%"; });
-    const b = V.el.querySelector(".big"); b.classList.add("re"); b.querySelector("i").textContent = "↻"; b.querySelector("span").textContent = "Посмотреть ещё раз"; b.hidden = false;
+    const b = V.el.querySelector(".big"); b.classList.add("re"); b.querySelector("i").textContent = "↻"; b.querySelector("span").textContent = T.again; b.hidden = false;
     V.el.querySelector(".n").textContent = V.secs.length + "/" + V.secs.length;
   }
   function toggle(V) {
@@ -181,14 +190,14 @@
     const src = document.getElementById(node); if (!src) return;
     const c = src.cloneNode(true); c.removeAttribute("id");
     let k = "", ctx = "";
-    if (kind === "t") { const s = stageOf(id); k = "Этап " + (P.stages.indexOf(s) + 1) + " · " + s.title; $("#dwh").textContent = c.querySelector("h4").textContent; c.querySelector("h4").remove();
+    if (kind === "t") { const s = stageOf(id); k = fmt("stage", { n: P.stages.indexOf(s) + 1 }) + " · " + s.title; $("#dwh").textContent = c.querySelector("h4").textContent; c.querySelector("h4").remove();
       const w = c.querySelector("p"); ctx = "Тема карты навыков «" + P.slug.toUpperCase() + "»: " + $("#dwh").textContent + "\n" + (w ? w.textContent : "");
       // видео — главное, текст — вторым планом: «что выучить / практика / проверь себя» свёрнуты
-      if (w && LEC[node]) { const more = document.createElement("details"); more.className = "more"; more.innerHTML = "<summary>Подробнее: что выучить и как практиковаться</summary>";
+      if (w && LEC[node]) { const more = document.createElement("details"); more.className = "more"; more.innerHTML = "<summary></summary>"; more.firstChild.textContent = T.more;
         let n = w.nextElementSibling; while (n) { const nn = n.nextElementSibling; more.appendChild(n); n = nn; } c.appendChild(more); } }
-    else { const i = P.stages.findIndex((s) => s.id === id); k = "Этап " + (i + 1) + " из " + P.stages.length; $("#dwh").textContent = P.stages[i].title; c.querySelector("h3").remove(); c.querySelectorAll("article").forEach((a) => a.remove());
+    else { const i = P.stages.findIndex((s) => s.id === id); k = fmt("stageOf", { i: i + 1, n: P.stages.length }); $("#dwh").textContent = P.stages[i].title; c.querySelector("h3").remove(); c.querySelectorAll("article").forEach((a) => a.remove());
       const w = c.querySelector(".why"); ctx = "Этап карты навыков: " + P.stages[i].title + "\n" + (w ? w.textContent : "");
-      const ul = document.createElement("div"); ul.innerHTML = '<div class="lb">Темы этапа</div>' + P.stages[i].t.map((t) => '<button type="button" class="tp' + (document.querySelector('.tp[data-t="' + t + '"]').classList.contains("x") ? " x" : "") + '" data-t="' + t + '" style="margin:6px 0;max-width:none">' + document.querySelector('.tp[data-t="' + t + '"]').innerHTML + "</button>").join(""); c.appendChild(ul); }
+      const ul = document.createElement("div"); ul.innerHTML = '<div class="lb">' + T.stageTopics + '</div>' + P.stages[i].t.map((t) => '<button type="button" class="tp' + (document.querySelector('.tp[data-t="' + t + '"]').classList.contains("x") ? " x" : "") + '" data-t="' + t + '" style="margin:6px 0;max-width:none">' + document.querySelector('.tp[data-t="' + t + '"]').innerHTML + "</button>").join(""); c.appendChild(ul); }
     $("#dwk").textContent = k; $("#dwb").replaceChildren(c);
     // видеолекция: при повторном открытии той же темы (смена статуса) плеер не трогаем
     if (!V || V.node !== node) { if (LEC[node]) vpMount(node, LEC[node], ctx); else vpStop(); }
@@ -215,7 +224,7 @@
   $("#dwx").onclick = close; $("#dwp").onclick = () => step(-1); $("#dwn").onclick = () => step(1);
   $("#dwst").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b || !cur || cur.kind !== "t") return;
     if (S[cur.id] === b.dataset.v) delete S[cur.id]; else S[cur.id] = b.dataset.v; save(); open("t", cur.id); });
-  $("#rst").onclick = () => { if (confirm("Сбросить все отметки на этой карте?")) { S = {}; save(); paint(); } };
+  $("#rst").onclick = () => { if (confirm(T.resetQ)) { S = {}; save(); paint(); } };
   document.addEventListener("keydown", (e) => { if (!cur) return; if (e.key === "Escape") close(); else if (e.key === "ArrowRight") step(1); else if (e.key === "ArrowLeft") step(-1); });
 
   paint();

@@ -184,6 +184,9 @@ function robots() {
     "# ИИ-поисковики и ассистенты — добро пожаловать\nUser-agent: GPTBot\nAllow: /\nUser-agent: OAI-SearchBot\nAllow: /\nUser-agent: ChatGPT-User\nAllow: /\nUser-agent: ClaudeBot\nAllow: /\nUser-agent: Claude-SearchBot\nAllow: /\nUser-agent: PerplexityBot\nAllow: /\nUser-agent: Google-Extended\nAllow: /\n\n" +
     "Sitemap: " + SITE + "/sitemap.xml\n";
 }
+// карты профессий, у которых есть kk и en версии (kk/prof/<slug>/, en/prof/<slug>/ — scripts/prof-build.js)
+const PROF_LANGS = ["ru", "kk", "en"], profAt = (l, rest) => (l === "ru" ? "" : "/" + l) + "/prof/" + rest;
+const profTri = (rest) => PROF_LANGS.every((l) => require("fs").existsSync(path.join(__dirname, "..", profAt(l, rest), "index.html")));
 const profSlugs = () => { const fs = require("fs"), d = path.join(__dirname, "..", "prof"); try { return fs.readdirSync(d).filter((x) => x !== "data" && fs.existsSync(path.join(d, x, "index.html"))); } catch (e) { return []; } };
 function sitemap() {
   const c = catalog(), day = c.built.slice(0, 10), out = [];
@@ -199,8 +202,10 @@ function sitemap() {
     }
   }
   // раздел «Профессии»: атлас и готовые карты (prof/<slug>/index.html, scripts/prof-build.js)
-  out.push(`<url><loc>${SITE}/prof/</loc><priority>0.8</priority></url>`);
-  for (const d of profSlugs()) out.push(`<url><loc>${SITE}/prof/${d}/</loc><priority>0.8</priority></url>`);
+  // атлас и карты — на трёх языках с hreflang (x-default — русский), «Научи меня» — только русский
+  const tri = (rest) => { for (const l of PROF_LANGS) out.push(`<url><loc>${SITE}${profAt(l, rest)}</loc><priority>0.8</priority>${PROF_LANGS.map((a) => `<xhtml:link rel="alternate" hreflang="${a}" href="${SITE}${profAt(a, rest)}"/>`).join("")}<xhtml:link rel="alternate" hreflang="x-default" href="${SITE}${profAt("ru", rest)}"/></url>`); };
+  if (profTri("")) tri(""); else out.push(`<url><loc>${SITE}/prof/</loc><priority>0.8</priority></url>`);
+  for (const d of profSlugs()) { if (profTri(d + "/")) tri(d + "/"); else out.push(`<url><loc>${SITE}/prof/${d}/</loc><priority>0.8</priority></url>`); }
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${out.join("\n")}\n</urlset>\n`;
 }
 function llms() {
@@ -208,7 +213,9 @@ function llms() {
   return `# Open School AI\n\n> Бесплатная онлайн-школа для 5–11 классов (Казахстан и все русско- и казахскоязычные): физика, математика, химия, биология и информатика. ` +
     `Каждый урок — лекция с картинками и голосом, интерактивный опыт своими руками, ИИ-наставник, который видит экран ученика, и тест. Помогает готовиться к ЕНТ (ҰБТ). Языки: русский и казахский.\n\n` +
     `Конспекты всех уроков открыты без регистрации: ${SITE}/learn/ (русский) и ${SITE}/kk/learn/ (қазақша). У каждого конспекта есть ссылка на интерактивный урок.\n\n` +
-    `Атлас новых профессий — карты навыков по шагам с практикой и сквозным проектом: ${SITE}/prof/` + profSlugs().map((d) => ` · ${SITE}/prof/${d}/`).join("") + `\n\n` +
+    `Атлас новых профессий — карты навыков по шагам с практикой и сквозным проектом: ${SITE}/prof/` + profSlugs().map((d) => ` · ${SITE}/prof/${d}/`).join("") +
+    (profTri("") ? `. Қазақша: ${SITE}/kk/prof/` + profSlugs().filter((d) => profTri(d + "/")).map((d) => ` · ${SITE}/kk/prof/${d}/`).join("") +
+      `. In English: ${SITE}/en/prof/` + profSlugs().filter((d) => profTri(d + "/")).map((d) => ` · ${SITE}/en/prof/${d}/`).join("") : "") + `\n\n` +
     c.subjects.map((s) => `## ${s.ru.name} (${s.grades[0]}–${s.grades[1]} классы)\n\n${s.ru.intro}\n\n- [${s.ru.title}](${SITE}${url("ru", s.slug)})\n` +
       s.topics.map((t) => `- [${t.ru.title}](${SITE}${url("ru", s.slug, t.slug)}): ${t.g} класс, ${t.lessons.length} ${pl(t.lessons.length, "урок", "урока", "уроков")} — ${t.lessons.map((l) => l.ru.title).join("; ")}`).join("\n")).join("\n\n") + "\n";
 }

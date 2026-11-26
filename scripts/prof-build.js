@@ -1,22 +1,170 @@
 // Раздел «Профессии» Open School: атлас профессий и карта навыков каждой профессии.
 // Данные — prof/data/<slug>.js, результат — статичный HTML (всё содержимое в разметке — для поисковиков и ИИ),
 // интерактив (панель темы, отметки прогресса) — prof/roadmap.js.
-//   node scripts/prof-build.js   → prof/index.html, prof/<slug>/index.html
+//   node scripts/prof-build.js   → prof/index.html, prof/<slug>/index.html (ru), kk/prof/…, en/prof/… (переводы)
+// Три языка: ru — оригинал (prof/data/<slug>.js), kk и en — переводы текстов из prof/data/<slug>.<lang>.json
+// (id, числа, ссылки, ключи лекций берутся из .js; чего нет в переводе — остаётся по-русски, сборка не падает).
+// Папку с переводами можно подменить для проверки: PROF_I18N_DIR=… node scripts/prof-build.js
 const fs = require("fs"), path = require("path");
 const ROOT = path.join(__dirname, "..", "prof");
+const BASE = path.join(__dirname, "..");
+const I18N_DIR = process.env.PROF_I18N_DIR || path.join(ROOT, "data");
 const SITE = "https://openschool.work";
 const LIVE = ["fde"];
-// профессии в планах — карточки в атласе
-const SOON = [
-  ["AI-инженер", "Строит продукты на языковых моделях: агенты, поиск по знаниям, оценка качества."],
-  ["Инженер данных", "Собирает данные компании в надёжные пайплайны и хранилища."],
-  ["Продакт-менеджер ИИ-продуктов", "Решает, что делать с ИИ в продукте и как измерить пользу."],
-  ["Платформенный инженер (DevOps)", "Делает так, чтобы код сам проверялся, выкатывался и не падал."],
-  ["Инженер по безопасности ИИ", "Защищает ИИ-системы от атак, утечек и злоупотреблений."],
-];
+const LANGS = ["ru", "kk", "en"];
+// адрес страницы раздела на языке: ru — /prof/…, kk — /kk/prof/…, en — /en/prof/…
+const at = (lang, rest = "") => (lang === "ru" ? "" : "/" + lang) + "/prof/" + rest;
+const outDir = (lang) => (lang === "ru" ? ROOT : path.join(BASE, lang, "prof"));
 
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const pl = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+const en1 = (n, a, b) => n + " " + (n === 1 ? a : b);
+
+// ---------- подписи интерфейса ----------
+const UI = {
+  ru: {
+    locale: "ru_RU", name: "Рус", home: "/", tagline: "Доступное образование для всех", nav: "Разделы", school: "Школа", prof: "Профессии",
+    foot: `Open School AI — бесплатная школьная программа и карты новых профессий. Формат карты навыков вдохновлён проектом <a href="https://roadmap.sh" rel="noopener">roadmap.sh</a>; содержание написано для Open School.`,
+    atlasLink: "Атлас профессий", notes: ["Конспекты уроков", "/learn/"],
+    atlasTitle: "Атлас новых профессий: карты навыков по шагам | Open School AI",
+    atlasDesc: "Новые профессии в IT и ИИ: что выучить, в каком порядке и как практиковаться. Бесплатные карты навыков со сквозным проектом.",
+    atlasKick: "Open School · профессии", atlasH1: "Атлас новых профессий",
+    atlasLead: "Школа даёт основу, а здесь — путь дальше: профессии, которых ещё недавно не было. Для каждой — карта навыков по шагам, практические задания и сквозной проект, который к концу пути становится портфолио.",
+    cardLive: "Карта и вводный курс", cardSoon: "Скоро",
+    stagesN: (n) => n + " " + pl(n, "этап", "этапа", "этапов"), topicsN: (n) => n + " " + pl(n, "тема", "темы", "тем"),
+    soon: [
+      ["AI-инженер", "Строит продукты на языковых моделях: агенты, поиск по знаниям, оценка качества."],
+      ["Инженер данных", "Собирает данные компании в надёжные пайплайны и хранилища."],
+      ["Продакт-менеджер ИИ-продуктов", "Решает, что делать с ИИ в продукте и как измерить пользу."],
+      ["Платформенный инженер (DevOps)", "Делает так, чтобы код сам проверялся, выкатывался и не падал."],
+      ["Инженер по безопасности ИИ", "Защищает ИИ-системы от атак, утечек и злоупотреблений."],
+    ],
+    mapTitle: (P) => `${P.title} — карта навыков: что выучить по шагам | Open School AI`,
+    mapDesc: (P, s, t) => `Как стать ${P.title}: ${s} этапов и ${t} тем — от Python и SQL до ИИ-агентов, RAG и работы с клиентом. Практика, сквозной проект, бесплатно.`,
+    course: "карта навыков", credential: "Портфолио из сквозного проекта", newProf: "новая профессия",
+    statStages: "этапов", statTopics: "тем", statHours: "учёбы и практики", months: (m) => { const [a, b] = m.split(" при "); return b ? [a, "при " + b] : null; },
+    done: (d, n) => `Пройдено ${d} из ${n}`, reset: "Сбросить",
+    lgCore: "Обязательно", lgExtra: "Полезно, можно позже", lgDoing: "Изучаю", lgDone: "Готово", lgHint: "▶ Нажми на тему — короткая видеолекция и что учить",
+    end: "Готовы к собеседованию на FDE", docTitle: "Вся карта текстом",
+    docLead: "Те же этапы и темы подряд — удобно читать, распечатать или отправить другу. Через все этапы идёт один сквозной проект: к концу у вас будет работающая система для «клиента» и история для собеседования.",
+    stage: (n) => "Этап " + n, docStage: (n, t) => `Этап ${n}. ${t}`, projStep: (n) => "Сквозной проект — шаг " + n,
+    core: "Обязательно", extra: "Полезно", h: "ч", learn: "Что выучить", practice: "Практика", check: "Проверь себя", os: "Основа в Open School", links: "Материалы",
+    close: "Закрыть", teach: "✦ Научи меня <small>— ИИ-курс по этой теме</small>", status: "Статус темы", doing: "Изучаю", doneBtn: "✓ Готово", skip: "Пропустить", prev: "‹ Предыдущая", next: "Следующая ›",
+  },
+  kk: {
+    locale: "kk_KZ", name: "Қаз", home: "/?lang=kk", tagline: "Баршаға қолжетімді білім", nav: "Бөлімдер", school: "Мектеп", prof: "Мамандықтар",
+    foot: `Open School AI — тегін мектеп бағдарламасы және жаңа мамандықтардың карталары. Дағдылар картасының пішімі <a href="https://roadmap.sh" rel="noopener">roadmap.sh</a> жобасынан шабыт алған; мазмұны Open School үшін жазылған.`,
+    atlasLink: "Мамандықтар атласы", notes: ["Сабақ конспектілері", "/kk/learn/"],
+    atlasTitle: "Жаңа мамандықтар атласы: қадам-қадаммен дағдылар картасы | Open School AI",
+    atlasDesc: "IT және ЖИ саласындағы жаңа мамандықтар: не үйрену керек, қандай ретпен және қалай жаттығу керек. Бір тұтас жобасы бар тегін дағдылар карталары.",
+    atlasKick: "Open School · мамандықтар", atlasH1: "Жаңа мамандықтар атласы",
+    atlasLead: "Мектеп негіз береді, ал мұнда — одан әрі жол: жақында ғана пайда болған мамандықтар. Әрқайсысында — қадам-қадаммен дағдылар картасы, практикалық тапсырмалар және жолдың соңында портфолиоға айналатын тұтас жоба.",
+    cardLive: "Карта және кіріспе курс", cardSoon: "Жақында",
+    stagesN: (n) => n + " кезең", topicsN: (n) => n + " тақырып",
+    soon: [
+      ["AI-инженер", "Тілдік модельдер негізінде өнім жасайды: агенттер, білім қорынан іздеу, сапаны бағалау."],
+      ["Деректер инженері", "Компания деректерін сенімді пайплайндар мен қоймаларға жинайды."],
+      ["ЖИ-өнімдерінің продакт-менеджері", "Өнімде ЖИ-ді не үшін қолдану керегін және пайдасын қалай өлшеуді шешеді."],
+      ["Платформа инженері (DevOps)", "Код өзі тексеріліп, өзі шығарылып, құламай жұмыс істейтіндей етеді."],
+      ["ЖИ қауіпсіздігі инженері", "ЖИ жүйелерін шабуылдан, деректердің жылыстауынан және теріс пайдаланудан қорғайды."],
+    ],
+    mapTitle: (P) => `${P.title} — дағдылар картасы: не үйрену керек, қадам-қадаммен | Open School AI`,
+    mapDesc: (P, s, t) => `${P.title} қалай болуға болады: ${s} кезең және ${t} тақырып — Python мен SQL-ден ЖИ-агенттерге, RAG-қа және клиентпен жұмысқа дейін. Практика, тұтас жоба, тегін.`,
+    course: "дағдылар картасы", credential: "Тұтас жобадан құралған портфолио", newProf: "жаңа мамандық",
+    statStages: "кезең", statTopics: "тақырып", statHours: "оқу және практика", months: null,
+    done: (d, n) => `Өтілді: ${d} / ${n}`, reset: "Тазалау",
+    lgCore: "Міндетті", lgExtra: "Пайдалы, кейінге қалдыруға болады", lgDoing: "Оқып жатырмын", lgDone: "Дайын", lgHint: "▶ Тақырыпты бас — қысқа бейнедәріс және не оқу керегі",
+    end: "FDE сұхбатына дайынсың", docTitle: "Бүкіл карта мәтінмен",
+    docLead: "Сол кезеңдер мен тақырыптар қатарынан — оқуға, басып шығаруға немесе досыңа жіберуге ыңғайлы. Барлық кезеңді бір тұтас жоба біріктіреді: соңында сенде «клиентке» арналған жұмыс істейтін жүйе және сұхбатта айтатын тарих болады.",
+    stage: (n) => n + "-кезең", docStage: (n, t) => `${n}-кезең. ${t}`, projStep: (n) => "Тұтас жоба — " + n + "-қадам",
+    core: "Міндетті", extra: "Пайдалы", h: "сағ", learn: "Не үйрену керек", practice: "Практика", check: "Өзіңді тексер", os: "Open School-дағы негіз", links: "Материалдар",
+    close: "Жабу", teach: "✦ Мені үйрет <small>— осы тақырып бойынша ЖИ-курс</small>", status: "Тақырып күйі", doing: "Оқып жатырмын", doneBtn: "✓ Дайын", skip: "Өткізіп жіберу", prev: "‹ Алдыңғы", next: "Келесі ›",
+  },
+  en: {
+    locale: "en_US", name: "Eng", home: "/?lang=en", tagline: "Education within everyone's reach", nav: "Sections", school: "School", prof: "Professions",
+    foot: `Open School AI is a free school curriculum plus maps of new professions. The skill-map format is inspired by <a href="https://roadmap.sh" rel="noopener">roadmap.sh</a>; the content was written for Open School.`,
+    atlasLink: "Atlas of professions", notes: null,
+    atlasTitle: "Atlas of New Professions: Step-by-Step Skill Maps | Open School AI",
+    atlasDesc: "New careers in tech and AI: what to learn, in what order, and how to practice. Free skill maps with an end-to-end project.",
+    atlasKick: "Open School · professions", atlasH1: "Atlas of New Professions",
+    atlasLead: "School gives you the foundation; this is the road beyond it: professions that barely existed a few years ago. Each one comes with a step-by-step skill map, hands-on assignments and an end-to-end project that turns into your portfolio by the end.",
+    cardLive: "Map and intro course", cardSoon: "Coming soon",
+    stagesN: (n) => en1(n, "stage", "stages"), topicsN: (n) => en1(n, "topic", "topics"),
+    soon: [
+      ["AI Engineer", "Builds products on top of language models: agents, knowledge search, quality evaluation."],
+      ["Data Engineer", "Turns a company's data into reliable pipelines and warehouses."],
+      ["AI Product Manager", "Decides what AI should do in a product and how to measure the value."],
+      ["Platform Engineer (DevOps)", "Makes code test itself, ship itself and stay up."],
+      ["AI Security Engineer", "Protects AI systems from attacks, data leaks and abuse."],
+    ],
+    mapTitle: (P) => `${P.title} Skill Map: What to Learn, Step by Step | Open School AI`,
+    mapDesc: (P, s, t) => `How to become a ${P.title}: ${s} stages and ${t} topics, from Python and SQL to AI agents, RAG and working with clients. Hands-on practice, an end-to-end project, free.`,
+    course: "skill map", credential: "Portfolio built from an end-to-end project", newProf: "new profession",
+    statStages: "stages", statTopics: "topics", statHours: "of study and practice", months: null,
+    done: (d, n) => `Done: ${d} of ${n}`, reset: "Reset",
+    lgCore: "Core", lgExtra: "Useful, can wait", lgDoing: "Learning", lgDone: "Done", lgHint: "▶ Tap a topic for a short video lecture and what to learn",
+    end: "Ready for an FDE interview", docTitle: "The whole map as text",
+    docLead: "The same stages and topics in one list: easy to read, print or send to a friend. One end-to-end project runs through every stage, so by the end you'll have a working system for a \"client\" and a story to tell in interviews.",
+    stage: (n) => "Stage " + n, docStage: (n, t) => `Stage ${n}. ${t}`, projStep: (n) => "End-to-end project, step " + n,
+    core: "Core", extra: "Optional", h: "h", learn: "What to learn", practice: "Practice", check: "Check yourself", os: "Foundations at Open School", links: "Resources",
+    close: "Close", teach: "✦ Teach me <small>— an AI course on this topic</small>", status: "Topic status", doing: "Learning", doneBtn: "✓ Done", skip: "Skip", prev: "‹ Previous", next: "Next ›",
+  },
+};
+// строки для prof/roadmap.js (панель темы и плеер видеолекции) — уходят на страницу в window.PROF.ui
+const RUI = {
+  ru: { stage: "Этап {n}", stageOf: "Этап {i} из {n}", more: "Подробнее: что выучить и как практиковаться", stageTopics: "Темы этапа",
+    aDone: ", готово", aDoing: ", изучаю", aSkip: ", пропущено", aVideo: ", есть видеолекция", done: "Пройдено {d} из {n}", resetQ: "Сбросить все отметки на этой карте?",
+    prevPart: "Предыдущая часть", nextPart: "Следующая часть", pause: "Пауза", play: "Смотреть", speed: "Скорость", mute: "Выключить звук", unmute: "Включить звук", volume: "Громкость", fs: "Во весь экран",
+    video: "Видеолекция", parts: ["часть", "части", "частей"], min: "мин", err: "Лекция пока не готова. Загляни позже — текст темы ниже.", again: "Посмотреть ещё раз", dec: "," },
+  kk: { stage: "{n}-кезең", stageOf: "{i}-кезең, барлығы {n}", more: "Толығырақ: не үйрену және қалай жаттығу керек", stageTopics: "Кезең тақырыптары",
+    aDone: ", дайын", aDoing: ", оқып жатырмын", aSkip: ", өткізілді", aVideo: ", бейнедәріс бар", done: "Өтілді: {d} / {n}", resetQ: "Осы картадағы барлық белгіні өшіру керек пе?",
+    prevPart: "Алдыңғы бөлім", nextPart: "Келесі бөлім", pause: "Кідірту", play: "Көру", speed: "Жылдамдық", mute: "Дыбысты өшіру", unmute: "Дыбысты қосу", volume: "Дыбыс деңгейі", fs: "Толық экран",
+    video: "Бейнедәріс", parts: ["бөлім", "бөлім", "бөлім"], min: "мин", err: "Дәріс әлі дайын емес. Кейінірек кіріп көр — тақырып мәтіні төменде.", again: "Қайта көру", dec: "," },
+  en: { stage: "Stage {n}", stageOf: "Stage {i} of {n}", more: "More: what to learn and how to practice", stageTopics: "Topics in this stage",
+    aDone: ", done", aDoing: ", learning", aSkip: ", skipped", aVideo: ", has a video lecture", done: "Done: {d} of {n}", resetQ: "Reset all marks on this map?",
+    prevPart: "Previous part", nextPart: "Next part", pause: "Pause", play: "Play", speed: "Speed", mute: "Mute", unmute: "Unmute", volume: "Volume", fs: "Full screen",
+    video: "Video lecture", parts: ["part", "parts", "parts"], min: "min", err: "This lecture isn't ready yet. Check back later; the topic text is below.", again: "Watch again", dec: "." },
+};
+// «8–12 месяцев при 15–20 часах в неделю» → крупно «8–12 месяцев», мелко остальное; для переводов — по первому «число–число слово»
+function splitMonths(lang, m) {
+  const r = UI[lang].months && UI[lang].months(m); if (r) return r;
+  const x = /^(\d+\s*[–-]\s*\d+\s+[^\s,;(]+)[,;]?\s+(.+)$/.exec(m);
+  if (x) return [x[1], x[2]];
+  const y = /^(.+?),\s*(\d+\s*[–-]\s*\d+\s+[^\s,;(]+)\.?$/.exec(m); // «аптасына 15–20 сағат оқысаң, 8–12 ай»
+  return y ? [y[2], y[1]] : [m, ""];
+}
+
+// ---------- данные профессии на языке: fde.js + перевод fde.<lang>.json ----------
+function readTr(slug, lang) {
+  const f = path.join(I18N_DIR, slug + "." + lang + ".json");
+  if (!fs.existsSync(f)) return null;
+  try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch (e) { console.warn("! " + f + ": " + e.message + " — беру русский текст"); return null; }
+}
+const miss = {};
+function localize(P0, lang) {
+  const P = JSON.parse(JSON.stringify(P0)); P.sub = P0.ru; P.lang = lang;
+  if (lang === "ru") return P;
+  const tr = readTr(P0.slug, lang) || {}, cnt = (miss[lang] = { total: 0, missing: 0 });
+  const pick = (v, d) => { if (d == null) return d; cnt.total++; if (typeof v === "string" && v.trim()) return v; cnt.missing++; return d; };
+  const arr = (a, d) => (Array.isArray(d) ? d.map((x, i) => pick(Array.isArray(a) ? a[i] : undefined, x)) : d);
+  const m = tr.meta || {};
+  P.title = pick(m.title, P0.title); P.sub = pick(m.sub, P0.ru); P.short = pick(m.short, P0.short); P.intro = pick(m.intro, P0.intro);
+  P.hours = pick(m.hours, P0.hours); P.months = pick(m.months, P0.months); P.traits = arr(m.traits, P0.traits);
+  for (const s of P.stages) {
+    const ts = (tr.stages || {})[s.id] || {};
+    s.title = pick(ts.title, s.title); s.why = pick(ts.why, s.why); s.project = pick(ts.project, s.project);
+    for (const t of s.topics) {
+      const tt = (tr.topics || {})[t.id] || {};
+      t.t = pick(tt.t, t.t); t.what = pick(tt.what, t.what); t.learn = arr(tt.learn, t.learn);
+      if (t.practice) t.practice = pick(tt.practice, t.practice);
+      if (t.check) t.check = arr(tt.check, t.check);
+      if (t.links) t.links = t.links.map(([n, h], i) => [pick((tt.links || [])[i], n), h]);
+      // уроки Open School — на языке страницы (?lang= запоминается на сайте)
+      if (t.os) t.os = t.os.map(([n, h], i) => [pick((tt.os || [])[i], n), h + (h.includes("?") ? "&" : "?") + "lang=" + lang]);
+    }
+  }
+  return P;
+}
 // логотип — тот же, что на главной школы
 const OWL = (fs.readFileSync(path.join(__dirname, "..", "physics", "index.html"), "utf8").match(/<a class="brand" href="\/">\s*(<svg[\s\S]*?<\/svg>)/) || [, ""])[1];
 
@@ -29,6 +177,11 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px 20
 .brand small{display:block;font:500 11px/1 var(--fm);color:var(--m);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
 .sections{display:flex;gap:4px;background:var(--s);border:1px solid var(--l);border-radius:11px;padding:4px}
 .sections a{color:var(--m);text-decoration:none;font:600 11.5px/1 var(--fb);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}.sections a:hover{color:var(--fg)}.sections a[aria-current=page]{background:var(--s2);color:var(--fg)}
+/* языки — как переключатель на главной школы (luch/tutor.js), только ссылками на ту же страницу */
+.li-lang{display:flex;gap:2px;background:var(--s);border:1px solid var(--l);border-radius:10px;padding:3px;flex:none}
+.li-lang a{border-radius:7px;padding:6px 9px;font:600 12px/1 var(--fb);color:var(--m);text-decoration:none}.li-lang a:hover{color:var(--fg)}.li-lang a[aria-current=true]{background:var(--fg);color:var(--bg)}
+header>.brand+.li-lang{margin-left:12px;margin-right:auto}
+@media (max-width:600px){header>.brand+.li-lang{margin-left:auto;margin-right:0}.li-lang a{padding:6px 7px}.brand b{font-size:17px}.brand svg{width:34px;height:34px}}
 .kick{font:500 11.5px/1 var(--fm);letter-spacing:.14em;text-transform:uppercase;color:var(--a);margin:34px 0 12px}
 h1{font:700 clamp(28px,5vw,50px)/1.08 var(--fd);margin:0 0 10px;letter-spacing:-.01em;text-wrap:balance}
 .sub{font-size:18px;color:var(--m);margin:0 0 16px}.lead{font-size:17px;max-width:68ch;margin:0 0 18px}
@@ -116,92 +269,108 @@ a.card:hover{border-color:var(--a)}.card b{font:700 18px/1.25 var(--fd)}.card sp
 .ask-ai form{display:flex;gap:8px;margin:12px 0 0;flex-wrap:wrap}.ask-ai input{flex:1 1 220px;min-width:0;background:var(--bg);border:1.5px solid var(--l);border-radius:12px;padding:12px 14px;font:16px/1.3 var(--fb);color:var(--fg)}.ask-ai input:focus{outline:none;border-color:var(--a)}.ask-ai button{border:0;border-radius:12px;padding:12px 18px;background:var(--a);color:#1b1305;font:700 15px/1.2 var(--fb);cursor:pointer}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}`;
 
-const head = (title, desc, p, ld) => `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><link rel="canonical" href="${SITE}${p}">
-<meta property="og:type" content="article"><meta property="og:site_name" content="Open School AI"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}"><meta property="og:url" content="${SITE}${p}"><meta property="og:locale" content="ru_RU">
+// ---------- общие куски страницы ----------
+const BOT_RE = "bot|crawl|spider|slurp|yandex|google|bing|lighthouse|headless";
+// alts: у страницы есть версии на всех трёх языках — hreflang, переключатель языка
+const head = (lang, title, desc, rest, ld, alts) => {
+  const href = alts ? LANGS.map((l) => `<link rel="alternate" hreflang="${l}" href="${SITE}${at(l, rest)}">`).join("") + `<link rel="alternate" hreflang="x-default" href="${SITE}${at("ru", rest)}">` : "";
+  const ogAlt = alts ? LANGS.filter((l) => l !== lang).map((l) => `<meta property="og:locale:alternate" content="${UI[l].locale}">`).join("") : "";
+  // русская версия: кто выбрал на сайте казахский или английский — сразу на свою (роботы и новые посетители остаются здесь)
+  const go = alts && lang === "ru" ? `<script>try{var l=localStorage.getItem("luch-lang");if((l==="kk"||l==="en")&&!/${BOT_RE}/i.test(navigator.userAgent))location.replace("/"+l+location.pathname+location.hash)}catch(e){}</script>` : "";
+  return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">${go}
+<title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><link rel="canonical" href="${SITE}${at(lang, rest)}">${href}
+<meta property="og:type" content="article"><meta property="og:site_name" content="Open School AI"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}"><meta property="og:url" content="${SITE}${at(lang, rest)}"><meta property="og:locale" content="${UI[lang].locale}">${ogAlt}
 <link rel="icon" href="/luch/owl.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@500&family=Unbounded:wght@700&display=swap">
 <style>${CSS}</style>${ld.map((x) => `<script type="application/ld+json">${JSON.stringify(x).replace(/</g, "\\u003c")}</script>`).join("")}</head>`;
-const top = `<header><a class="brand" href="/">${OWL}<div><b>OPEN SCHOOL AI</b><small>Доступное образование для всех</small></div></a>
-<nav class="sections" aria-label="Разделы"><a href="/">Школа</a><a href="/prof/" aria-current="page">Профессии</a></nav></header>`;
-const foot = `<footer>Open School AI — бесплатная школьная программа и карты новых профессий. Формат карты навыков вдохновлён проектом <a href="https://roadmap.sh" rel="noopener">roadmap.sh</a>; содержание написано для Open School.<br><a href="/">Школа</a> · <a href="/prof/">Атлас профессий</a> · <a href="/learn/">Конспекты уроков</a></footer>`;
+};
+const top = (lang, rest, alts) => {
+  const u = UI[lang];
+  const sw = alts ? `<div class="li-lang" role="group" aria-label="Language">${LANGS.map((l) => `<a href="${at(l, rest)}" hreflang="${l}" lang="${l}" data-l="${l}"${l === lang ? ' aria-current="true"' : ""}>${UI[l].name}</a>`).join("")}</div>` : "";
+  return `<header><a class="brand" href="${u.home}">${OWL}<div><b>OPEN SCHOOL AI</b><small>${esc(u.tagline)}</small></div></a>${sw}
+<nav class="sections" aria-label="${esc(u.nav)}"><a href="${u.home}">${esc(u.school)}</a><a href="${at(lang)}" aria-current="page">${esc(u.prof)}</a></nav></header>`;
+};
+// выбор языка запоминаем для всего сайта (тот же ключ, что у переключателя на главной), открытую тему (#t-…) сохраняем
+const SW_JS = `<script>document.querySelectorAll(".li-lang a").forEach(function(a){a.addEventListener("click",function(){try{localStorage.setItem("luch-lang",a.dataset.l)}catch(e){}if(location.hash)a.href=a.getAttribute("href").split("#")[0]+location.hash})})</script>`;
+const foot = (lang) => { const u = UI[lang]; return `<footer>${u.foot}<br><a href="${u.home}">${esc(u.school)}</a> · <a href="${at(lang)}">${esc(u.atlasLink)}</a>${u.notes ? ` · <a href="${u.notes[1]}">${esc(u.notes[0])}</a>` : ""}</footer>`; };
 const ORG = { "@type": "Organization", name: "Open School AI", url: SITE + "/" };
 
-function topicDoc(t) {
-  return `<article id="t-${t.id}" data-k="${t.k}"><h4>${esc(t.t)}</h4><div class="meta">${t.k === "core" ? "Обязательно" : "Полезно"} · ≈ ${t.h} ч</div>
+function topicDoc(t, u) {
+  return `<article id="t-${t.id}" data-k="${t.k}"><h4>${esc(t.t)}</h4><div class="meta">${t.k === "core" ? u.core : u.extra} · ≈ ${t.h} ${u.h}</div>
 <p>${esc(t.what)}</p>
-<div class="lb">Что выучить</div><ul class="li">${t.learn.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
-${t.practice ? `<div class="lb">Практика</div><div class="bx">${esc(t.practice)}</div>` : ""}
-${t.check && t.check.length ? `<div class="lb">Проверь себя</div><ul class="li">${t.check.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
-${t.os && t.os.length ? `<div class="lb">Основа в Open School</div><div class="os">${t.os.map(([n, h]) => `<a href="${h}">${esc(n)} ›</a>`).join("")}</div>` : ""}
-${t.links && t.links.length ? `<div class="lb">Материалы</div><ul class="li">${t.links.map(([n, h]) => `<li><a href="${h}" target="_blank" rel="noopener">${esc(n)}</a></li>`).join("")}</ul>` : ""}</article>`;
+<div class="lb">${esc(u.learn)}</div><ul class="li">${t.learn.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+${t.practice ? `<div class="lb">${esc(u.practice)}</div><div class="bx">${esc(t.practice)}</div>` : ""}
+${t.check && t.check.length ? `<div class="lb">${esc(u.check)}</div><ul class="li">${t.check.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+${t.os && t.os.length ? `<div class="lb">${esc(u.os)}</div><div class="os">${t.os.map(([n, h]) => `<a href="${esc(h)}">${esc(n)} ›</a>`).join("")}</div>` : ""}
+${t.links && t.links.length ? `<div class="lb">${esc(u.links)}</div><ul class="li">${t.links.map(([n, h]) => `<li><a href="${esc(h)}" target="_blank" rel="noopener">${esc(n)}</a></li>`).join("")}</ul>` : ""}</article>`;
 }
 
 function roadmap(P) {
+  const lang = P.lang, u = UI[lang];
   const all = P.stages.flatMap((s) => s.topics), H = all.reduce((a, t) => a + t.h, 0);
-  const p = `/prof/${P.slug}/`;
+  const rest = P.slug + "/", p = at(lang, rest);
   const stages = P.stages.map((s, i) => {
     const half = Math.ceil(s.topics.length / 2), L = s.topics.slice(0, half), R = s.topics.slice(half);
-    const box = (t) => `<button type="button" class="tp${t.k === "extra" ? " x" : ""}" data-t="${t.id}"><span class="tt">${esc(t.t)}</span><span class="hh">${t.lec ? '<i class="pv" aria-hidden="true">▶</i>' : ""}${t.h} ч</span><span class="ck" aria-hidden="true"></span></button>`;
-    return `<section class="stage" data-s="${s.id}"><button type="button" class="hub" data-g="${s.id}"><small>Этап ${i + 1}${s.lec ? '<i class="pv" aria-hidden="true">▶</i>' : ""}</small><b>${esc(s.title)}</b><span class="hp"><i></i></span></button>
+    const box = (t) => `<button type="button" class="tp${t.k === "extra" ? " x" : ""}" data-t="${t.id}"><span class="tt">${esc(t.t)}</span><span class="hh">${t.lec ? '<i class="pv" aria-hidden="true">▶</i>' : ""}${t.h} ${u.h}</span><span class="ck" aria-hidden="true"></span></button>`;
+    return `<section class="stage" data-s="${s.id}"><button type="button" class="hub" data-g="${s.id}"><small>${esc(u.stage(i + 1))}${s.lec ? '<i class="pv" aria-hidden="true">▶</i>' : ""}</small><b>${esc(s.title)}</b><span class="hp"><i></i></span></button>
 <div class="col l">${L.map(box).join("")}</div><div class="col r">${R.map(box).join("")}</div></section>`;
   }).join("\n");
-  const doc = P.stages.map((s, i) => `<section class="sg" id="g-${s.id}"><h3>Этап ${i + 1}. ${esc(s.title)}</h3><p class="why">${esc(s.why)}</p>
-<div class="lb">Сквозной проект — шаг ${i + 1}</div><div class="bx pj">${esc(s.project)}</div>
-${s.topics.map(topicDoc).join("\n")}</section>`).join("\n");
-  const title = `${P.title} — карта навыков: что выучить по шагам | Open School AI`;
-  const desc = `Как стать Forward Deployed Engineer: ${P.stages.length} этапов и ${all.length} тем — от Python и SQL до ИИ-агентов, RAG и работы с клиентом. Практика, сквозной проект, бесплатно.`;
-  const ld = [{ "@context": "https://schema.org", "@type": "Course", name: `${P.title}: карта навыков`, description: P.short, inLanguage: "ru", url: SITE + p, provider: ORG, isAccessibleForFree: true,
-    educationalCredentialAwarded: "Портфолио из сквозного проекта", timeRequired: "PT" + H + "H", teaches: all.filter((t) => t.k === "core").map((t) => t.t),
+  const doc = P.stages.map((s, i) => `<section class="sg" id="g-${s.id}"><h3>${esc(u.docStage(i + 1, s.title))}</h3><p class="why">${esc(s.why)}</p>
+<div class="lb">${esc(u.projStep(i + 1))}</div><div class="bx pj">${esc(s.project)}</div>
+${s.topics.map((t) => topicDoc(t, u)).join("\n")}</section>`).join("\n");
+  const title = u.mapTitle(P), desc = u.mapDesc(P, P.stages.length, all.length);
+  const ld = [{ "@context": "https://schema.org", "@type": "Course", name: `${P.title}: ${u.course}`, description: P.short, inLanguage: lang, url: SITE + p, provider: ORG, isAccessibleForFree: true,
+    educationalCredentialAwarded: u.credential, timeRequired: "PT" + H + "H", teaches: all.filter((t) => t.k === "core").map((t) => t.t),
     hasCourseInstance: { "@type": "CourseInstance", courseMode: "online", courseWorkload: "PT" + H + "H" }, offers: { "@type": "Offer", price: 0, priceCurrency: "USD", category: "Free" },
     syllabusSections: P.stages.map((s) => ({ "@type": "Syllabus", name: s.title, description: s.why })) },
-    { "@context": "https://schema.org", "@type": "Occupation", name: P.title, alternateName: P.ru, description: P.intro, skills: all.map((t) => t.t).join(", ") },
-    { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: "Профессии", item: SITE + "/prof/" }, { "@type": "ListItem", position: 2, name: P.title, item: SITE + p }] }];
-  return `${head(title, desc, p, ld)}
-<body><div class="wrap">${top}
-<div class="kick"><a href="/prof/" style="color:inherit;text-decoration:none">Атлас профессий</a> · новая профессия</div>
-<h1>${esc(P.title)}</h1><p class="sub">${esc(P.ru)}</p>
+    { "@context": "https://schema.org", "@type": "Occupation", name: P.title, alternateName: P.sub, description: P.intro, skills: all.map((t) => t.t).join(", ") },
+    { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: u.prof, item: SITE + at(lang) }, { "@type": "ListItem", position: 2, name: P.title, item: SITE + p }] }];
+  const [mBig, mSmall] = splitMonths(lang, P.months);
+  return `${head(lang, title, desc, rest, ld, true)}
+<body><div class="wrap">${top(lang, rest, true)}
+<div class="kick"><a href="${at(lang)}" style="color:inherit;text-decoration:none">${esc(u.atlasLink)}</a> · ${esc(u.newProf)}</div>
+<h1>${esc(P.title)}</h1><p class="sub">${esc(P.sub)}</p>
 <p class="lead">${esc(P.short)}</p>
 <div class="chips">${P.traits.map((x) => `<span>${esc(x)}</span>`).join("")}</div>
-<div class="stats"><div><b>${P.stages.length}</b>этапов</div><div><b>${all.length}</b>тем</div><div><b>${esc(P.hours)}</b>учёбы и практики</div><div><b>${esc(P.months.split(" при ")[0])}</b>${esc("при " + P.months.split(" при ")[1])}</div></div>
-<div class="bar" id="bar"><span class="pt" id="pt">Пройдено 0 из ${all.length}</span><span class="pg"><i id="pg"></i></span><button type="button" class="rst" id="rst" hidden>Сбросить</button></div>
-<div class="legend"><span><i></i>Обязательно</span><span class="x"><i></i>Полезно, можно позже</span><span class="dg"><i></i>Изучаю</span><span class="dn"><i></i>Готово</span><span>▶ Нажми на тему — короткая видеолекция и что учить</span></div>
+<div class="stats"><div><b>${P.stages.length}</b>${esc(u.statStages)}</div><div><b>${all.length}</b>${esc(u.statTopics)}</div><div><b>${esc(P.hours)}</b>${esc(u.statHours)}</div><div><b>${esc(mBig)}</b>${esc(mSmall)}</div></div>
+<div class="bar" id="bar"><span class="pt" id="pt">${esc(u.done(0, all.length))}</span><span class="pg"><i id="pg"></i></span><button type="button" class="rst" id="rst" hidden>${esc(u.reset)}</button></div>
+<div class="legend"><span><i></i>${esc(u.lgCore)}</span><span class="x"><i></i>${esc(u.lgExtra)}</span><span class="dg"><i></i>${esc(u.lgDoing)}</span><span class="dn"><i></i>${esc(u.lgDone)}</span><span>${esc(u.lgHint)}</span></div>
 <div class="map" id="map">
 ${stages}
-<div class="end">Готовы к собеседованию на FDE</div>
+<div class="end">${esc(u.end)}</div>
 </div>
-<details class="doc" id="doc"><summary><h2>Вся карта текстом</h2></summary><p class="why">Те же этапы и темы подряд — удобно читать, распечатать или отправить другу. Через все этапы идёт один сквозной проект: к концу у вас будет работающая система для «клиента» и история для собеседования.</p>
+<details class="doc" id="doc"><summary><h2>${esc(u.docTitle)}</h2></summary><p class="why">${esc(u.docLead)}</p>
 ${doc}</details>
-${foot}</div>
-<div class="dw" id="dw" aria-hidden="true"><div class="pn" role="dialog" aria-modal="true" aria-labelledby="dwh"><div class="top"><small id="dwk"></small><button type="button" class="cl" id="dwx" aria-label="Закрыть">✕</button></div><div id="dwv" hidden></div><h2 id="dwh"></h2><a class="teach" id="dwteach" href="/prof/learn/" hidden>✦ Научи меня <small>— ИИ-курс по этой теме</small></a><div class="st" id="dwst" role="group" aria-label="Статус темы"><button type="button" class="b-doing" data-v="doing" aria-pressed="false">Изучаю</button><button type="button" class="b-done" data-v="done" aria-pressed="false">✓ Готово</button><button type="button" class="b-skip" data-v="skip" aria-pressed="false">Пропустить</button></div><div id="dwb"></div><div class="nv"><button type="button" id="dwp">‹ Предыдущая</button><button type="button" id="dwn">Следующая ›</button></div></div></div>
-<script>window.PROF=${JSON.stringify({ slug: P.slug, order: all.map((t) => t.id), stages: P.stages.map((s) => ({ id: s.id, title: s.title, t: s.topics.map((t) => t.id) })),
-  lec: Object.fromEntries(P.stages.flatMap((s) => [s.lec ? ["g-" + s.id, s.lec] : null, ...s.topics.map((t) => (t.lec ? ["t-" + t.id, t.lec] : null))]).filter(Boolean)) })};</script>
+${foot(lang)}</div>
+<div class="dw" id="dw" aria-hidden="true"><div class="pn" role="dialog" aria-modal="true" aria-labelledby="dwh"><div class="top"><small id="dwk"></small><button type="button" class="cl" id="dwx" aria-label="${esc(u.close)}">✕</button></div><div id="dwv" hidden></div><h2 id="dwh"></h2><a class="teach" id="dwteach" href="/prof/learn/" hidden>${u.teach}</a><div class="st" id="dwst" role="group" aria-label="${esc(u.status)}"><button type="button" class="b-doing" data-v="doing" aria-pressed="false">${esc(u.doing)}</button><button type="button" class="b-done" data-v="done" aria-pressed="false">${esc(u.doneBtn)}</button><button type="button" class="b-skip" data-v="skip" aria-pressed="false">${esc(u.skip)}</button></div><div id="dwb"></div><div class="nv"><button type="button" id="dwp">${esc(u.prev)}</button><button type="button" id="dwn">${esc(u.next)}</button></div></div></div>
+<script>window.PROF=${JSON.stringify({ slug: P.slug, lang, ui: RUI[lang], order: all.map((t) => t.id), stages: P.stages.map((s) => ({ id: s.id, title: s.title, t: s.topics.map((t) => t.id) })),
+  lec: Object.fromEntries(P.stages.flatMap((s) => [s.lec ? ["g-" + s.id, s.lec] : null, ...s.topics.map((t) => (t.lec ? ["t-" + t.id, t.lec] : null))]).filter(Boolean)) }).replace(/</g, "\\u003c")};</script>
 <script src="/prof/roadmap.js"></script>
+${SW_JS}
 </body></html>`;
 }
 
-function atlas(list) {
-  const p = "/prof/";
+function atlas(lang, list) {
+  const u = UI[lang];
   const cards = list.map((P) => { const n = P.stages.flatMap((s) => s.topics).length;
-    return `<a class="card" href="/prof/${P.slug}/"><em>Карта и вводный курс</em><b>${esc(P.title)}</b><span>${esc(P.short)}</span><span>${P.stages.length} этапов · ${n} ${pl(n, "тема", "темы", "тем")} · ${esc(P.months.split(" при ")[0])}</span></a>`; }).join("")
-    + SOON.map(([n, d]) => `<div class="card soon"><em>Скоро</em><b>${esc(n)}</b><span>${esc(d)}</span></div>`).join("");
-  const title = "Атлас новых профессий: карты навыков по шагам | Open School AI";
-  const desc = "Новые профессии в IT и ИИ: что выучить, в каком порядке и как практиковаться. Бесплатные карты навыков со сквозным проектом.";
-  return `${head(title, desc, p, [{ "@context": "https://schema.org", "@type": "CollectionPage", name: "Атлас новых профессий", inLanguage: "ru", url: SITE + p, publisher: ORG }])}
-<body><div class="wrap">${top}
-<div class="kick">Open School · профессии</div><h1>Атлас новых профессий</h1>
-<p class="lead">Школа даёт основу, а здесь — путь дальше: профессии, которых ещё недавно не было. Для каждой — карта навыков по шагам, практические задания и сквозной проект, который к концу пути становится портфолио.</p>
+    return `<a class="card" href="${at(lang, P.slug + "/")}"><em>${esc(u.cardLive)}</em><b>${esc(P.title)}</b><span>${esc(P.short)}</span><span>${esc(u.stagesN(P.stages.length))} · ${esc(u.topicsN(n))} · ${esc(splitMonths(lang, P.months)[0])}</span></a>`; }).join("")
+    + u.soon.map(([n, d]) => `<div class="card soon"><em>${esc(u.cardSoon)}</em><b>${esc(n)}</b><span>${esc(d)}</span></div>`).join("");
+  return `${head(lang, u.atlasTitle, u.atlasDesc, "", [{ "@context": "https://schema.org", "@type": "CollectionPage", name: u.atlasH1, inLanguage: lang, url: SITE + at(lang), publisher: ORG }], true)}
+<body><div class="wrap">${top(lang, "", true)}
+<div class="kick">${esc(u.atlasKick)}</div><h1>${esc(u.atlasH1)}</h1>
+<p class="lead">${esc(u.atlasLead)}</p>
 ${"" /* поиск «Научи меня» по любой теме скрыт, пока генерация курсов не работает (нет баланса у моделей) */}
 <div class="grid">${cards}</div>
-${foot}</div></body></html>`;
+${foot(lang)}</div>${SW_JS}</body></html>`;
 }
 
-// «Научи меня»: страница темы и ИИ-курс — оболочки, всё остальное делает prof/teach.js
+// «Научи меня»: страница темы и ИИ-курс — оболочки, всё остальное делает prof/teach.js.
+// Только по-русски (курсы ИИ пишет на русском); кнопка «Научи меня» на kk/en-картах ведёт сюда же.
 const EXAMPLES = ["SQL для аналитики", "Python для автоматизации", "Как устроены LLM-агенты", "Промпт-инженерия", "Docker с нуля", "Переговоры с клиентом", "Статистика для A/B-тестов", "Git для команды"];
-const teachHead = (title, desc, p, robots) => head(title, desc, p, []).replace("</head>", `${robots ? '<meta name="robots" content="noindex">' : ""}<link rel="stylesheet" href="/prof/teach.css"></head>`);
+const teachHead = (title, desc, rest, robots) => head("ru", title, desc, rest, [], false).replace("</head>", `${robots ? '<meta name="robots" content="noindex">' : ""}<link rel="stylesheet" href="/prof/teach.css"></head>`);
 function learnPage() {
-  return `${teachHead("Научи меня: ИИ составит курс по любой теме | Open School AI", "Напиши тему — ИИ составит короткий практический курс: модули, уроки с примерами, схемами и упражнениями, тест и наставник. Бесплатно.", "/prof/learn/")}
-<body data-page="learn"><div class="wrap">${top}
+  return `${teachHead("Научи меня: ИИ составит курс по любой теме | Open School AI", "Напиши тему — ИИ составит короткий практический курс: модули, уроки с примерами, схемами и упражнениями, тест и наставник. Бесплатно.", "learn/")}
+<body data-page="learn"><div class="wrap">${top("ru", "learn/", false)}
 <div class="kick"><a href="/prof/">Атлас профессий</a> · научи меня</div>
 <div id="home"><h1>Научи меня</h1>
 <p class="lead">Напиши тему — ИИ составит короткий практический курс: модули и уроки со сквозным примером, схемами, таблицами и упражнениями. В каждом уроке — проверка себя, тест и наставник, которого можно спросить.</p>
@@ -213,18 +382,18 @@ function learnPage() {
 <div class="wait" id="wait" hidden><h2 id="wt">Составляю курс</h2><p id="wp">Обычно это 10–30 секунд.</p>
 <ul class="steps"><li><i></i><span>Разбираюсь, чему учить</span></li><li><i></i><span>Составляю модули и уроки</span></li><li><i></i><span>Придумываю сквозной пример</span></li><li><i></i><span>Проверяю программу</span></li></ul>
 <div id="wb" hidden style="margin-top:14px"><a class="btn g" href="/prof/learn/">← Назад</a></div></div>
-${foot}</div><script src="/prof/teach.js" defer></script></body></html>`;
+${foot("ru")}</div><script src="/prof/teach.js" defer></script></body></html>`;
 }
 function coursePage() {
-  return `${teachHead("ИИ-курс | Open School AI", "Курс, который ИИ составил по запросу ученика: уроки с примерами, схемами, упражнениями и тестом.", "/prof/course/", true)}
-<body data-page="course"><div class="wrap">${top}
+  return `${teachHead("ИИ-курс | Open School AI", "Курс, который ИИ составил по запросу ученика: уроки с примерами, схемами, упражнениями и тестом.", "course/", true)}
+<body data-page="course"><div class="wrap">${top("ru", "course/", false)}
 <div class="wait" id="load"><ul class="steps"><li class="on"><i></i><span>Открываю курс…</span></li></ul></div>
 <div class="tc" id="app" hidden data-noi18n>
 <button type="button" class="btn g tocb" id="tocb" aria-expanded="false" aria-controls="side"><span>☰ Содержание</span><span id="tocn"></span></button>
 <nav class="side" id="side" aria-label="Содержание курса"></nav>
 <main class="mn" id="main"></main>
 </div>
-${foot}</div>
+${foot("ru")}</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js" defer></script>
 <script src="/prof/teach.js" defer></script>
 <script src="/luch/tutor.js" defer></script>
@@ -232,7 +401,11 @@ ${foot}</div>
 }
 for (const [d, h] of [["learn", learnPage()], ["course", coursePage()]]) { fs.mkdirSync(path.join(ROOT, d), { recursive: true }); fs.writeFileSync(path.join(ROOT, d, "index.html"), h); }
 
-const live = LIVE.map((s) => { delete require.cache[require.resolve(path.join(ROOT, "data", s + ".js"))]; return require(path.join(ROOT, "data", s + ".js")); });
-for (const P of live) { fs.mkdirSync(path.join(ROOT, P.slug), { recursive: true }); fs.writeFileSync(path.join(ROOT, P.slug, "index.html"), roadmap(P)); }
-fs.writeFileSync(path.join(ROOT, "index.html"), atlas(live));
-console.log("ok:", live.map((P) => P.slug + " " + P.stages.flatMap((s) => s.topics).length + " тем").join(", "));
+const live = LIVE.map((s) => { const f = path.join(ROOT, "data", s + ".js"); delete require.cache[require.resolve(f)]; return require(f); });
+for (const lang of LANGS) {
+  const list = live.map((P) => localize(P, lang)), dir = outDir(lang);
+  for (const P of list) { fs.mkdirSync(path.join(dir, P.slug), { recursive: true }); fs.writeFileSync(path.join(dir, P.slug, "index.html"), roadmap(P)); }
+  fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, "index.html"), atlas(lang, list));
+}
+console.log("ok:", live.map((P) => P.slug + " " + P.stages.flatMap((s) => s.topics).length + " тем").join(", "), "· языки:", LANGS.join(", "),
+  Object.entries(miss).map(([l, c]) => `· ${l}: без перевода ${c.missing} из ${c.total} строк`).join(" "));
