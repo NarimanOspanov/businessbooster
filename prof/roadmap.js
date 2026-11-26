@@ -34,19 +34,36 @@
   const KB = [[1.04, 1.16, -3, -2], [1.16, 1.04, 2, 1.5], [1.05, 1.17, 3, -2], [1.06, 1.16, -2, 2]]; // наезд: масштаб от → до, сдвиг по x/y в %
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let V = null;
+  // скорость и громкость — как в уроках: по умолчанию 1,5×, выбор помним
+  const RATES = [1, 1.25, 1.5, 1.75, 2];
+  const pref = (k, d) => { try { const v = parseFloat(localStorage.getItem(k)); return isFinite(v) ? v : d; } catch (e) { return d; } };
+  const keep = (k, v) => { try { localStorage.setItem(k, String(v)); } catch (e) { /* приватный режим */ } };
+  let RATE = pref("prof-rate", 1.5), VOL = pref("prof-vol", 1);
+  const rateTxt = (r) => String(r).replace(".", ",") + "×";
+  const applyAudio = (V) => { V.audio.defaultPlaybackRate = RATE; V.audio.playbackRate = RATE; V.audio.volume = VOL; V.audio.muted = V.muted || VOL === 0; };
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+  function fsToggle(el) {
+    if (fsEl() === el) return (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    if (el.classList.contains("full")) { el.classList.remove("full"); document.body.style.overflow = ""; return; }
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (req) Promise.resolve(req.call(el)).catch(() => { el.classList.add("full"); document.body.style.overflow = "hidden"; });
+    else { el.classList.add("full"); document.body.style.overflow = "hidden"; } // iPhone: div во весь экран не разворачивается — растягиваем сами
+  }
 
   function vpStop() {
     if (!V) return;
     V.run++; V.dead = true; cancelAnimationFrame(V.raf);
     try { V.audio.pause(); V.audio.removeAttribute("src"); V.audio.load(); } catch (e) { /* уже остановлен */ }
     V.urls.forEach((u) => URL.revokeObjectURL(u));
+    if (fsEl() === V.el) try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) { /* уже */ }
+    document.body.style.overflow = "";
     V = null; box.replaceChildren(); box.hidden = true;
   }
   function vpMount(node, key, context) {
     vpStop();
     const el = document.createElement("div"); el.className = "vp";
     el.innerHTML = '<div class="frs"></div><div class="stage-c" aria-hidden="true"></div><div class="bars"></div><div class="sub" aria-live="polite"></div>' +
-      '<div class="ctl"><button type="button" class="b-prev" aria-label="Предыдущая часть">⏮</button><button type="button" class="b-play" aria-label="Пауза">❚❚</button><button type="button" class="b-next" aria-label="Следующая часть">⏭</button><span class="n"></span><span class="sp"></span><button type="button" class="b-mute" aria-label="Выключить звук">🔊</button></div>' +
+      '<div class="ctl"><button type="button" class="b-prev" aria-label="Предыдущая часть">⏮</button><button type="button" class="b-play" aria-label="Пауза">❚❚</button><button type="button" class="b-next" aria-label="Следующая часть">⏭</button><span class="n"></span><span class="sp"></span><button type="button" class="b-rate" aria-label="Скорость">1,5×</button><span class="vol"><button type="button" class="b-mute" aria-label="Выключить звук">🔊</button><input type="range" class="vr" min="0" max="1" step="0.05" aria-label="Громкость"></span><button type="button" class="b-fs" aria-label="Во весь экран">⛶</button></div>' +
       '<button type="button" class="big"><i>▶</i><span>Видеолекция</span></button>';
     box.replaceChildren(el); box.hidden = false;
     const audio = new Audio(); audio.preload = "auto";
@@ -65,6 +82,10 @@
     el.querySelector(".b-play").onclick = () => toggle(my);
     el.querySelector(".b-prev").onclick = () => { if (my.secs) show(my, Math.max(0, my.i - 1)); };
     el.querySelector(".b-next").onclick = () => { if (my.secs && my.i < my.secs.length - 1) show(my, my.i + 1); };
+    { const rb = el.querySelector(".b-rate"), vr = el.querySelector(".vr"); rb.textContent = rateTxt(RATE); vr.value = VOL;
+      rb.onclick = () => { RATE = RATES[(RATES.indexOf(RATE) + 1) % RATES.length] || 1.5; keep("prof-rate", RATE); rb.textContent = rateTxt(RATE); applyAudio(my); };
+      vr.oninput = () => { VOL = +vr.value; keep("prof-vol", VOL); if (VOL > 0 && my.muted) { my.muted = false; } applyAudio(my); el.querySelector(".b-mute").textContent = VOL === 0 || my.muted ? "🔇" : "🔊"; };
+      el.querySelector(".b-fs").onclick = () => fsToggle(el); }
     el.querySelector(".b-mute").onclick = (e) => { my.muted = !my.muted; audio.muted = my.muted; e.currentTarget.textContent = my.muted ? "🔇" : "🔊"; e.currentTarget.setAttribute("aria-label", my.muted ? "Включить звук" : "Выключить звук"); };
     audio.onended = () => { if (my.playing && !my.fb) next(my); };
     audio.onerror = () => { if (my.playing && !my.fb && audio.getAttribute("src")) fallback(my); };
@@ -90,7 +111,7 @@
   }
   // показать раздел i; если идёт показ — сразу озвучить
   function show(V, i) {
-    const run = ++V.run; V.i = i; V.fb = false; V.elapsed = 0; V.est = Math.max(2500, String(V.secs[i].text || "").length * 70); V.subIdx = -1; V.kb = i % KB.length; V.loaded = false;
+    const run = ++V.run; V.i = i; V.fb = false; V.elapsed = 0; V.est = Math.max(2500, String(V.secs[i].text || "").length * 70 / RATE); V.subIdx = -1; V.kb = i % KB.length; V.loaded = false;
     try { V.audio.pause(); } catch (e) { /* ничего */ }
     const frs = V.el.querySelector(".frs"), old = [...frs.children];
     const f = frame(V, i); frs.appendChild(f); V.frame = f; // новый кадр поверх старого — плавная смена
@@ -107,7 +128,7 @@
       if (run !== V.run || V.dead) return;
       voice(V, V.i + 1); // следующий раздел — заранее
       if (!u) return fallback(V);
-      V.audio.src = u; V.audio.muted = V.muted; V.loaded = true;
+      V.audio.src = u; applyAudio(V); V.loaded = true;
       if (V.playing) V.audio.play().catch(() => fallback(V));
     });
   }
