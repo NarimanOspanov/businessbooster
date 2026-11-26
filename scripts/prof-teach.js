@@ -206,7 +206,7 @@ function outlineText(C, m, l) {
 function anchorText(C) {
   if (!C.roadmap) return "";
   const x = roadmapTopic(C.roadmap, C.topic); if (!x) return "";
-  return `\nКурс для будущего специалиста «${x.P.title}» (${x.P.ru}): ${x.P.short}\nТема карты навыков: «${x.t.t}». ${x.t.what}\nЧто выучить: ${x.t.learn.join("; ")}.\nПрактика из карты: ${x.t.practice}\nПримеры связывай с работой этой профессии.`;
+  return `\nКурс для будущего специалиста «${x.P.title}» (${x.P.ru}): ${x.P.short}\nТема карты навыков: «${x.t.t}». ${x.t.what}\nЧто выучить: ${x.t.learn.join("; ")}.${x.t.practice ? "\nПрактика из карты: " + x.t.practice : ""}\nПримеры связывай с работой этой профессии.`;
 }
 function lessonCtx(C, m, l) {
   const flat = C.modules.flatMap((M, i) => M.lessons.map((L, j) => ({ i, j, t: L.title })));
@@ -231,7 +231,7 @@ function cleanCourse(j) {
 
 async function makeCourse(term, x) {
   let user = `Тема, которую попросил ученик: «${term}».`;
-  if (x) user += `\nЭто тема из карты навыков профессии «${x.P.title}» (${x.P.ru}): ${x.P.short}\nТема: «${x.t.t}». ${x.t.what}\nЧто выучить: ${x.t.learn.join("; ")}.\nПрактика: ${x.t.practice}\nСоставь курс для будущего ${x.P.title}: те же навыки, примеры из работы этой профессии. Обязательно покрой все пункты «Что выучить».`;
+  if (x) user += `\nЭто тема из карты навыков профессии «${x.P.title}» (${x.P.ru}): ${x.P.short}\nТема: «${x.t.t}». ${x.t.what}\nЧто выучить: ${x.t.learn.join("; ")}.${x.t.practice ? "\nПрактика: " + x.t.practice : ""}\nСоставь курс для будущего ${x.P.title}: те же навыки, примеры из работы этой профессии. Обязательно покрой все пункты «Что выучить».`;
   const j = jsonOf(await complete({ system: COURSE_SYS, user, tier: "main", json: true, max: 2500, ms: 90000 }));
   const C = cleanCourse(j); if (!C.title) C.title = term;
   let base = slugify(C.title), slug = base;

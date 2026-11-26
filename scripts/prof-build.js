@@ -33,7 +33,6 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px 20
 h1{font:700 clamp(28px,5vw,50px)/1.08 var(--fd);margin:0 0 10px;letter-spacing:-.01em;text-wrap:balance}
 .sub{font-size:18px;color:var(--m);margin:0 0 16px}.lead{font-size:17px;max-width:68ch;margin:0 0 18px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 22px}.chips span{border:1px solid var(--l);background:var(--s);border-radius:999px;padding:6px 12px;font-size:13.5px}
-.cta{display:flex;flex-direction:column;gap:4px;max-width:560px;margin:0 0 22px;padding:14px 18px;border-radius:14px;background:var(--a);color:#1b1305;text-decoration:none}.cta b{font:700 17px/1.2 var(--fd)}.cta span{font-size:14px;opacity:.8}.cta:hover{filter:brightness(1.06)}.cta.c2{background:var(--s);color:var(--fg);border:1.5px solid var(--a);margin-top:-12px}.cta.c2 b{color:var(--a)}
 .stats{display:flex;flex-wrap:wrap;gap:10px 28px;margin:0 0 20px}.stats div{font-size:13px;color:var(--m)}.stats b{display:block;font:600 22px/1.2 var(--fd);color:var(--fg)}
 .bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px;background:var(--s);border:1px solid var(--l);border-radius:14px;margin:0 0 8px;position:sticky;top:8px;z-index:5}
 .bar .pg{flex:1;min-width:160px;height:8px;border-radius:9px;background:var(--s2);overflow:hidden}.bar .pg i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ok),#c7f0d6);transition:width .3s}
@@ -76,6 +75,24 @@ h1{font:700 clamp(28px,5vw,50px)/1.08 var(--fd);margin:0 0 10px;letter-spacing:-
 .st button[aria-pressed=true]{color:var(--bg);font-weight:600}.st .b-doing[aria-pressed=true]{background:var(--doing);border-color:var(--doing)}.st .b-done[aria-pressed=true]{background:var(--ok);border-color:var(--ok)}.st .b-skip[aria-pressed=true]{background:var(--m);border-color:var(--m)}
 .dw .nv{display:flex;gap:8px;margin-top:24px}.dw .nv button{flex:1;background:var(--s2);border:1px solid var(--l);border-radius:10px;padding:10px;cursor:pointer;font-size:13.5px}
 @media (max-width:600px){.dw{align-items:flex-end}.dw .pn{height:88%;border-left:0;border-top:1px solid var(--l);border-radius:18px 18px 0 0;transform:translateY(30px)}}
+/* видеолекция в панели: картинки разделов с медленным наездом, голос, субтитры */
+.tp .pv,.hub .pv{font-style:normal;font-size:8px;vertical-align:1px;margin-right:4px;opacity:.65}.hub .pv{margin:0 0 0 6px}
+.vp{position:relative;aspect-ratio:16/9;width:100%;margin:2px 0 14px;border-radius:14px;overflow:hidden;background:radial-gradient(circle at 30% 30%,#22314d,#0a0f18);user-select:none;-webkit-user-select:none;isolation:isolate}
+.vp .fr{position:absolute;inset:0;opacity:0;transition:opacity .7s ease}.vp .fr.on{opacity:1}.vp .fr img{width:100%;height:100%;object-fit:cover;display:block;transform-origin:50% 50%;will-change:transform}
+.vp .stage-c{position:absolute;inset:0;cursor:pointer}
+.vp .bars{position:absolute;left:10px;right:10px;top:9px;display:flex;gap:4px;z-index:2}.vp .bars i{flex:1;height:3px;border-radius:3px;background:#ffffff4d;overflow:hidden}.vp .bars b{display:block;height:100%;width:0;background:#fff}
+.vp .sub{position:absolute;left:12px;right:12px;bottom:46px;z-index:2;text-align:center;pointer-events:none}.vp .sub span{display:inline;padding:3px 8px;border-radius:6px;background:#05080dcc;color:#fff;font:500 15px/1.6 var(--fb);-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.vp .ctl{position:absolute;left:0;right:0;bottom:0;z-index:3;display:flex;align-items:center;gap:4px;padding:18px 8px 6px;background:linear-gradient(#05080d00,#05080dd9)}
+.vp .ctl button{width:34px;height:34px;border:0;border-radius:9px;background:#ffffff1a;color:#fff;cursor:pointer;font-size:14px;line-height:1;display:grid;place-items:center}.vp .ctl button:hover{background:#ffffff33}.vp .ctl button:disabled{opacity:.35;cursor:default}
+.vp .ctl .n{font:500 12px/1 var(--fm);color:#fff;opacity:.85;margin:0 4px;min-width:30px}.vp .ctl .sp{flex:1}
+.vp .big{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#05080d8c;border:0;width:100%;cursor:pointer;color:#fff;padding:0}
+.vp .big i{font-style:normal;width:68px;height:68px;border-radius:50%;background:var(--a);color:#1b1305;display:grid;place-items:center;font-size:26px;padding-left:5px;box-shadow:0 8px 30px #0008;transition:transform .15s}.vp .big:hover i{transform:scale(1.07)}.vp .big.re i{padding-left:0}
+.vp .big span{font:600 13.5px/1.3 var(--fb);background:#05080daa;padding:5px 10px;border-radius:8px}
+.vp .ld{position:absolute;right:12px;top:20px;z-index:2;width:18px;height:18px;border-radius:50%;border:2px solid #fff6;border-top-color:#fff;animation:vpspin .8s linear infinite}@keyframes vpspin{to{transform:rotate(360deg)}}
+.vp .err{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:20px;color:var(--m);font-size:14px}
+details.more{margin:14px 0 0;border-top:1px solid var(--l);padding-top:4px}details.more>summary{cursor:pointer;list-style:none;padding:10px 0;font:600 14px/1.2 var(--fb);color:var(--fg)}details.more>summary::-webkit-details-marker{display:none}details.more>summary::after{content:" ›";color:var(--m)}details.more[open]>summary::after{content:" ⌄"}
+@media (max-width:600px){.dw .pn{padding:14px 14px 34px}.vp{border-radius:12px;margin-bottom:12px}.vp .sub{bottom:42px;left:8px;right:8px}.vp .sub span{font-size:13px;line-height:1.55}.vp .ctl{padding:14px 6px 5px}.vp .ctl button{width:32px;height:32px}.vp .big i{width:58px;height:58px;font-size:22px}.dw h2{font-size:20px}}
+@media (prefers-reduced-motion:reduce){.vp .fr img{transform:none!important}}
 /* конспект карты — тот же текст, что в панели */
 .doc{max-width:780px;margin:50px auto 0;border-top:1px solid var(--l);padding-top:10px}
 .doc>summary{cursor:pointer;list-style:none}.doc>summary::-webkit-details-marker{display:none}.doc>summary h2::after{content:" ›";color:var(--m)}.doc[open]>summary h2::after{content:" ⌄"}.doc>summary h2,.doc>h2{font:700 26px/1.2 var(--fd);margin:30px 0 6px}.doc .sg{margin:30px 0}.doc .sg>h3{font:700 20px/1.25 var(--fd);margin:0 0 6px}
@@ -110,7 +127,7 @@ function topicDoc(t) {
   return `<article id="t-${t.id}" data-k="${t.k}"><h4>${esc(t.t)}</h4><div class="meta">${t.k === "core" ? "Обязательно" : "Полезно"} · ≈ ${t.h} ч</div>
 <p>${esc(t.what)}</p>
 <div class="lb">Что выучить</div><ul class="li">${t.learn.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
-<div class="lb">Практика</div><div class="bx">${esc(t.practice)}</div>
+${t.practice ? `<div class="lb">Практика</div><div class="bx">${esc(t.practice)}</div>` : ""}
 ${t.check && t.check.length ? `<div class="lb">Проверь себя</div><ul class="li">${t.check.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
 ${t.os && t.os.length ? `<div class="lb">Основа в Open School</div><div class="os">${t.os.map(([n, h]) => `<a href="${h}">${esc(n)} ›</a>`).join("")}</div>` : ""}
 ${t.links && t.links.length ? `<div class="lb">Материалы</div><ul class="li">${t.links.map(([n, h]) => `<li><a href="${h}" target="_blank" rel="noopener">${esc(n)}</a></li>`).join("")}</ul>` : ""}</article>`;
@@ -121,8 +138,8 @@ function roadmap(P) {
   const p = `/prof/${P.slug}/`;
   const stages = P.stages.map((s, i) => {
     const half = Math.ceil(s.topics.length / 2), L = s.topics.slice(0, half), R = s.topics.slice(half);
-    const box = (t) => `<button type="button" class="tp${t.k === "extra" ? " x" : ""}" data-t="${t.id}"><span class="tt">${esc(t.t)}</span><span class="hh">${t.h} ч</span><span class="ck" aria-hidden="true"></span></button>`;
-    return `<section class="stage" data-s="${s.id}"><button type="button" class="hub" data-g="${s.id}"><small>Этап ${i + 1}</small><b>${esc(s.title)}</b><span class="hp"><i></i></span></button>
+    const box = (t) => `<button type="button" class="tp${t.k === "extra" ? " x" : ""}" data-t="${t.id}"><span class="tt">${esc(t.t)}</span><span class="hh">${t.lec ? '<i class="pv" aria-hidden="true">▶</i>' : ""}${t.h} ч</span><span class="ck" aria-hidden="true"></span></button>`;
+    return `<section class="stage" data-s="${s.id}"><button type="button" class="hub" data-g="${s.id}"><small>Этап ${i + 1}${s.lec ? '<i class="pv" aria-hidden="true">▶</i>' : ""}</small><b>${esc(s.title)}</b><span class="hp"><i></i></span></button>
 <div class="col l">${L.map(box).join("")}</div><div class="col r">${R.map(box).join("")}</div></section>`;
   }).join("\n");
   const doc = P.stages.map((s, i) => `<section class="sg" id="g-${s.id}"><h3>Этап ${i + 1}. ${esc(s.title)}</h3><p class="why">${esc(s.why)}</p>
@@ -141,12 +158,10 @@ ${s.topics.map(topicDoc).join("\n")}</section>`).join("\n");
 <div class="kick"><a href="/prof/" style="color:inherit;text-decoration:none">Атлас профессий</a> · новая профессия</div>
 <h1>${esc(P.title)}</h1><p class="sub">${esc(P.ru)}</p>
 <p class="lead">${esc(P.short)}</p>
-${P.course ? `<a class="cta" href="${P.course}"><b>▶ Начни с вводного курса</b><span>7 коротких уроков: кто такой FDE, как устроена работа, деньги, плюсы и минусы, первый код</span></a>` : ""}
-${P.practice ? `<a class="cta c2" href="${P.practice}"><b>Практикум: первые недели у клиента</b><span>Один кейс от начала до конца: разговор с клиентом, данные, метрики, порог уверенности, пилот, архитектура</span></a>` : ""}
 <div class="chips">${P.traits.map((x) => `<span>${esc(x)}</span>`).join("")}</div>
 <div class="stats"><div><b>${P.stages.length}</b>этапов</div><div><b>${all.length}</b>тем</div><div><b>${esc(P.hours)}</b>учёбы и практики</div><div><b>${esc(P.months.split(" при ")[0])}</b>${esc("при " + P.months.split(" при ")[1])}</div></div>
 <div class="bar" id="bar"><span class="pt" id="pt">Пройдено 0 из ${all.length}</span><span class="pg"><i id="pg"></i></span><button type="button" class="rst" id="rst" hidden>Сбросить</button></div>
-<div class="legend"><span><i></i>Обязательно</span><span class="x"><i></i>Полезно, можно позже</span><span class="dg"><i></i>Изучаю</span><span class="dn"><i></i>Готово</span><span>Нажми на тему — что учить и как практиковаться</span></div>
+<div class="legend"><span><i></i>Обязательно</span><span class="x"><i></i>Полезно, можно позже</span><span class="dg"><i></i>Изучаю</span><span class="dn"><i></i>Готово</span><span>▶ Нажми на тему — короткая видеолекция и что учить</span></div>
 <div class="map" id="map">
 ${stages}
 <div class="end">Готовы к собеседованию на FDE</div>
@@ -154,8 +169,9 @@ ${stages}
 <details class="doc" id="doc"><summary><h2>Вся карта текстом</h2></summary><p class="why">Те же этапы и темы подряд — удобно читать, распечатать или отправить другу. Через все этапы идёт один сквозной проект: к концу у вас будет работающая система для «клиента» и история для собеседования.</p>
 ${doc}</details>
 ${foot}</div>
-<div class="dw" id="dw" aria-hidden="true"><div class="pn" role="dialog" aria-modal="true" aria-labelledby="dwh"><div class="top"><small id="dwk"></small><button type="button" class="cl" id="dwx" aria-label="Закрыть">✕</button></div><h2 id="dwh"></h2><a class="teach" id="dwteach" href="/prof/learn/" hidden>✦ Научи меня <small>— ИИ-курс по этой теме</small></a><div class="st" id="dwst" role="group" aria-label="Статус темы"><button type="button" class="b-doing" data-v="doing" aria-pressed="false">Изучаю</button><button type="button" class="b-done" data-v="done" aria-pressed="false">✓ Готово</button><button type="button" class="b-skip" data-v="skip" aria-pressed="false">Пропустить</button></div><div id="dwb"></div><div class="nv"><button type="button" id="dwp">‹ Предыдущая</button><button type="button" id="dwn">Следующая ›</button></div></div></div>
-<script>window.PROF=${JSON.stringify({ slug: P.slug, order: all.map((t) => t.id), stages: P.stages.map((s) => ({ id: s.id, title: s.title, t: s.topics.map((t) => t.id) })) })};</script>
+<div class="dw" id="dw" aria-hidden="true"><div class="pn" role="dialog" aria-modal="true" aria-labelledby="dwh"><div class="top"><small id="dwk"></small><button type="button" class="cl" id="dwx" aria-label="Закрыть">✕</button></div><div id="dwv" hidden></div><h2 id="dwh"></h2><a class="teach" id="dwteach" href="/prof/learn/" hidden>✦ Научи меня <small>— ИИ-курс по этой теме</small></a><div class="st" id="dwst" role="group" aria-label="Статус темы"><button type="button" class="b-doing" data-v="doing" aria-pressed="false">Изучаю</button><button type="button" class="b-done" data-v="done" aria-pressed="false">✓ Готово</button><button type="button" class="b-skip" data-v="skip" aria-pressed="false">Пропустить</button></div><div id="dwb"></div><div class="nv"><button type="button" id="dwp">‹ Предыдущая</button><button type="button" id="dwn">Следующая ›</button></div></div></div>
+<script>window.PROF=${JSON.stringify({ slug: P.slug, order: all.map((t) => t.id), stages: P.stages.map((s) => ({ id: s.id, title: s.title, t: s.topics.map((t) => t.id) })),
+  lec: Object.fromEntries(P.stages.flatMap((s) => [s.lec ? ["g-" + s.id, s.lec] : null, ...s.topics.map((t) => (t.lec ? ["t-" + t.id, t.lec] : null))]).filter(Boolean)) })};</script>
 <script src="/prof/roadmap.js"></script>
 </body></html>`;
 }

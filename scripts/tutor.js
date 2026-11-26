@@ -283,6 +283,18 @@ async function gemini(model, body, ms = 30000) {
 }
 // одинаковые фразы (аудиогид, подсказки наставника) озвучиваем один раз
 const ttsCache = new Map();
+// голос Microsoft Azure Speech для русского/казахского по запросу (voice: "azure") — как в ENT QUIZ: Дмитрий / Даулет; раздел «Профессии»
+const AZ_RU_VOICE = process.env.TUTOR_AZURE_VOICE_RU || "ru-RU-DmitryNeural", AZ_KK_VOICE = process.env.TUTOR_AZURE_VOICE_KK || "kk-KZ-DauletNeural";
+async function speakAzure(text, hq) {
+  const v = isKk(text) ? AZ_KK_VOICE : isEn(text) ? AZ_EN_VOICE : AZ_RU_VOICE, ck = "azure:" + v + ":" + (hq ? "hq:" : "") + text;
+  if (ttsCache.has(ck)) return ttsCache.get(ck);
+  const dk = hq ? require("crypto").createHash("sha256").update(ck).digest("hex") : null;
+  if (dk) { const got = await ttsDbGet(dk).catch(() => null); if (got) { ttsMem(ck, got); return got; } }
+  const a = { type: "audio/mpeg", buf: await azureTts(text, v) };
+  ttsMem(ck, a);
+  if (dk && a.buf.length > 500) ttsDbPut(dk, a).catch((e) => console.log("[tutor tts] cache " + (e && e.message)));
+  return a;
+}
 async function speak(text, hq) {
   const ck = azEn(text) ? "azure:" + AZ_EN_VOICE + ":" + (hq ? "hq:" : "") + text : ELEVEN_VOICE + ":" + (isKk(text) ? "kk:" + ELEVEN_MODEL_KK + ":" : "") + (hq ? "hq2:" + ELEVEN_MODEL_HQ + ":" : "") + text; // hq2 — ровный голос + выровненная громкость
   if (ttsCache.has(ck)) { const v = ttsCache.get(ck); ttsCache.delete(ck); ttsCache.set(ck, v); return v; }
@@ -414,7 +426,7 @@ function handleTts(req, res, { readBody, clientIp }) {
     if (!text) return fail(400, "нужен текст");
     if (!voiceAllowed(clientIp(req))) return fail(429, "слишком много запросов");
     try {
-      const a = await speak(text, !!b.hq);
+      const a = b.voice === "azure" && azKey() ? await speakAzure(text, !!b.hq).catch(() => speak(text, !!b.hq)) : await speak(text, !!b.hq);
       res.writeHead(200, { "Content-Type": a.type, "Cache-Control": "no-store", "Content-Length": a.buf.length });
       res.end(a.buf);
     } catch (e) { console.log("[tutor tts] " + (e && e.message)); fail(502, "озвучка не получилась"); }
