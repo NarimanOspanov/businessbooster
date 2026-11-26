@@ -44,9 +44,11 @@
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   // ---------- вкладки ----------
+  // физика, химия, биология, информатика: вкладка опыта называется «Лаборатория» (математика — «Практика»)
+  const LABN = /^\/(labs\/(phys|chem|bio|cs)-|mechanics|optics|chemistry|biology|informatics)/.test(location.pathname);
   const GROUPS = {
     theory: { name: 'Теория', subs: [['overview', 'Объяснение'], ['parts', 'Детали']] },
-    practice: { name: 'Практика', subs: [['scheme', 'Опыт и управление'], ['calc', 'Расчёты']] },
+    practice: { name: LABN ? 'Лаборатория' : 'Практика', subs: [['scheme', 'Опыт и управление'], ['calc', 'Расчёты']] },
     hw: { name: 'ДЗ', subs: [] },
   };
   const SHARE = '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="13.5" cy="4" r="2.2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="4.5" cy="9" r="2.2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="13.5" cy="14" r="2.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6.4 8l5.2-3M6.4 10l5.2 3" stroke="currentColor" stroke-width="1.6"/></svg>';
@@ -422,7 +424,7 @@
       '<div class="ctl"><button class="ic" data-a="prev" aria-label="Назад">‹</button><button class="pp" data-a="pp"></button><button class="ic" data-a="next" aria-label="Дальше">›</button>' +
       '<button class="ic rate" data-a="rate" aria-label="Скорость 1,2×" title="Скорость: 1×, 1,2×, 1,5×, 2×">1,2×</button>' +
       '<span class="volw"><button class="ic vol" data-a="vol" aria-label="Громкость" title="Громкость"></button><span class="volp" hidden><input type="range" min="0" max="100" step="5" aria-label="Громкость"><b></b></span></span>' +
-      '<span class="sp"></span><button class="ls-btn ghost" data-a="practice">К практике →</button></div></div>';
+      '<span class="sp"></span><button class="ls-btn ghost" data-a="practice">' + (LABN ? 'В лабораторию →' : 'К практике →') + '</button></div></div>';
     el.addEventListener('click', e => {
       if (e.target === el) return stopStory();
       const b = e.target.closest('[data-a]');
@@ -533,7 +535,7 @@
       journal(j => { j.theoryDone = true; });
       el.classList.add('done');
       const outro = 'Ну что, давай попробуем на практике! Если что-то осталось непонятным — ничего страшного: задай мне любой вопрос, я отвечу. Не переживай.';
-      txt.innerHTML = '<b>Объяснение закончено</b><p>' + esc(outro) + '</p><div class="end"><button class="ls-btn main" data-a="practice">Перейти к практике →</button><button class="ls-btn ghost" data-a="again">Посмотреть ещё раз</button></div>';
+      txt.innerHTML = '<b>Объяснение закончено</b><p>' + esc(outro) + '</p><div class="end"><button class="ls-btn main" data-a="practice">' + (LABN ? 'Перейти в лабораторию →' : 'Перейти к практике →') + '</button><button class="ls-btn ghost" data-a="again">Посмотреть ещё раз</button></div>';
       // наставник говорит это вслух, как продолжение объяснения (если раздел «на практике» уже сказал это сам — не повторяем)
       if (!(secs[secs.length - 1] || {}).scheme) tts(outro).then(blob => {
         if (!st || st.run !== my || !blob || blob.size < 100) return;
@@ -719,7 +721,7 @@
     w.innerHTML = `<div class="card"><div class="k">${section ? esc(section) + ' · ' : ''}Урок ${n} из ${total}</div><h3>${esc(h)}</h3>
       ${about ? `<p>${esc(about)}</p>` : ''}${list}
       <div class="flow">Лекция → Опыт → Домашнее задание</div>
-      <div class="acts">${reel ? '<button class="ls-btn main" data-a="reel">▶ Смотреть видео</button>' : ''}<button class="ls-btn ${reel ? '' : 'main'}" data-a="story">▶ Прослушать лекцию</button><button class="ls-btn ghost" data-a="practice">Перейти к практике</button></div></div>`;
+      <div class="acts">${reel ? '<button class="ls-btn main" data-a="reel">▶ Смотреть видео</button>' : ''}<button class="ls-btn ${reel ? '' : 'main'}" data-a="story">▶ Прослушать лекцию</button><button class="ls-btn ghost" data-a="practice">${LABN ? 'Перейти в лабораторию' : 'Перейти к практике'}</button></div></div>`;
     const close = () => { w.remove(); startShown = false; };
     w.addEventListener('click', e => {
       if (e.target === w) return close();
@@ -1120,7 +1122,7 @@
     const m = /^\/labs\/([a-z]+)-([a-z0-9-]+)\/?/.exec(location.pathname);
     const notesUrl = () => (m && SUBJ[m[1]] ? ((window.LuchI18n && window.LuchI18n.lang === 'kk') ? '/kk' : '') + '/learn/' + SUBJ[m[1]] + '/' + m[2] + '/' + (lessonIdx() + 1) + '/' : '');
     const box = document.createElement('div'); box.className = 'ls-mth';
-    box.innerHTML = '<button type="button" class="ls-btn main" data-go>К практике →</button><a class="ls-btn ghost" data-notes>Конспект урока</a>';
+    box.innerHTML = '<button type="button" class="ls-btn main" data-go>' + (LABN ? 'В лабораторию →' : 'К практике →') + '</button><a class="ls-btn ghost" data-notes>Конспект урока</a>';
     story.after(box);
     box.querySelector('[data-go]').addEventListener('click', () => { openTab(lastSub.practice); scrollTo(0, 0); });
     const notes = box.querySelector('[data-notes]');
