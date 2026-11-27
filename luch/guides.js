@@ -39,7 +39,7 @@ window.LUCH_GUIDES = {
   phys: {
     demo: 'current',
     ru: {
-      intro: 'Привет! Я Нариман, твой наставник по физике. Здесь вся школьная физика, с седьмого по одиннадцатый класс, и она подойдёт в любом возрасте: и школьнику, и взрослому, который хочет наконец понять, как устроен мир. Это {count}. Сидеть над учебником не нужно: всё показано через картинки, опыты и примеры из жизни. Сначала теория, потом практика.',
+      intro: 'Привет! С вами Open School. Здесь вся школьная физика, с седьмого по одиннадцатый класс, и она подойдёт в любом возрасте: и школьнику, и взрослому, который хочет наконец понять, как устроен мир. Это {count}. Сидеть над учебником не нужно: всё показано через картинки, опыты и примеры из жизни. Сначала теория, потом практика.',
       why: 'Физику часто считают набором скучных формул. Но за каждой формулой стои́т то, что ты видишь каждый день: почему лёд не тонет, как заряжается телефон, почему ложка в стакане кажется сломанной.',
       map: 'Начинаем с основ: как измерять и из чего всё состоит. От них расходятся пять веток: механика, тепло, электричество, оптика, атом и Вселенная.',
       topic: 'Электрический ток',
@@ -49,7 +49,7 @@ window.LUCH_GUIDES = {
       outcome: 'В итоге ты не просто запомнишь формулы, а поймёшь, как устроен мир вокруг: почему летит мяч, как работает двигатель, откуда берётся радуга. И всё это бесплатно.',
     },
     kk: {
-      intro: 'Сәлем! Мен Нариман, сенің физикадан тәлімгеріңмін. Мұнда жетінші сыныптан он бірінші сыныпқа дейінгі бүкіл мектеп физикасы бар, ол кез келген жасқа жарайды: оқушыға да, әлемнің қалай құрылғанын ақыры түсінгісі келетін ересекке де. Бұл {count}. Оқулыққа үңіліп отырудың қажеті жоқ: бәрі суреттер, тәжірибелер және өмірден алынған мысалдар арқылы көрсетілген. Алдымен теория, содан кейін практика.',
+      intro: 'Сәлем! Сенімен бірге — Open School. Мұнда жетінші сыныптан он бірінші сыныпқа дейінгі бүкіл мектеп физикасы бар, ол кез келген жасқа жарайды: оқушыға да, әлемнің қалай құрылғанын ақыры түсінгісі келетін ересекке де. Бұл {count}. Оқулыққа үңіліп отырудың қажеті жоқ: бәрі суреттер, тәжірибелер және өмірден алынған мысалдар арқылы көрсетілген. Алдымен теория, содан кейін практика.',
       why: 'Физиканы көбіне іш пыстыратын формулалар жиынтығы деп ойлайды. Бірақ әр формуланың артында сен күнде көретін нәрсе тұр: мұз неге батпайды, телефон қалай зарядталады, стақандағы қасық неге сынып тұрғандай көрінеді.',
       map: 'Негіздерден бастаймыз: қалай өлшейміз және бәрі неден тұрады. Олардан бес тармақ тарайды: механика, жылу, электр, оптика, атом және Ғалам.',
       topic: 'Электр тогы',
@@ -59,7 +59,7 @@ window.LUCH_GUIDES = {
       outcome: 'Соңында сен формулаларды жай жаттап қана қоймай, айналадағы әлемнің қалай құрылғанын түсінесің: доп неге ұшады, қозғалтқыш қалай жұмыс істейді, кемпірқосақ қайдан пайда болады. Әрі мұның бәрі тегін.',
     },
     en: {
-      intro: "Hi! I'm Nariman, your physics mentor. All of school physics is here, from seventh to eleventh grade, and it works at any age: for a student, and for a grown-up who finally wants to understand how the world works. That's {count}. No need to sit over a textbook: everything is shown through pictures, experiments, and examples from real life. Theory first, then practice.",
+      intro: "Hi! This is Open School. All of school physics is here, from seventh to eleventh grade, and it works at any age: for a student, and for a grown-up who finally wants to understand how the world works. That's {count}. No need to sit over a textbook: everything is shown through pictures, experiments, and examples from real life. Theory first, then practice.",
       why: "People often think physics is just a bunch of boring formulas. But behind every formula is something you see every day: why ice floats, how your phone charges, why a spoon in a glass looks broken.",
       map: "We start with the basics: how to measure things and what everything is made of. From there, five branches grow: mechanics, heat, electricity, optics, and the atom and the universe.",
       topic: "Electric current",
@@ -72,7 +72,7 @@ window.LUCH_GUIDES = {
   math: {
     demo: 'pyth',
     ru: {
-      intro: 'Привет! Я Нариман, твой наставник по математике. Здесь вся школьная математика, с пятого по одиннадцатый класс: от действий с числами до производной и вероятностей. Это {count}. Никакой сухой зубрёжки: каждое правило ты увидишь на картинке и проверишь своими руками. Сначала теория, потом практика.',
+      intro: 'Привет! С вами Open School. Здесь вся школьная математика, с пятого по одиннадцатый класс: от действий с числами до производной и вероятностей. Это {count}. Никакой сухой зубрёжки: каждое правило ты увидишь на картинке и проверишь своими руками. Сначала теория, потом практика.',
       why: 'Математику часто считают набором правил, которые надо просто выучить. Но за каждым правилом стои́т понятная идея: почему диагональ экрана считают по Пифагору, как банк начисляет проценты, какие шансы выиграть в игре.',
       map: 'Начинаем с основ: числа, дроби и проценты, задачи на движение и расчёты в жизни. От них расходятся четыре ветки: алгебра, функции и анализ, геометрия, вероятность и статистика.',
       topic: 'Пифагор и подобие',
@@ -81,7 +81,7 @@ window.LUCH_GUIDES = {
       outcome: 'В итоге ты не просто выучишь формулы, а поймёшь, откуда они берутся и где пригодятся: в покупках, кредитах, ремонте, программировании и на ЕНТ. И всё это бесплатно.',
     },
     kk: {
-      intro: 'Сәлем! Мен Нариман, сенің математикадан тәлімгеріңмін. Мұнда бесінші сыныптан он бірінші сыныпқа дейінгі бүкіл мектеп математикасы бар: сандармен амалдардан бастап туынды мен ықтималдыққа дейін. Бұл {count}. Құрғақ жаттау жоқ: әр ережені суреттен көріп, өз қолыңмен тексересің. Алдымен теория, содан кейін практика.',
+      intro: 'Сәлем! Сенімен бірге — Open School. Мұнда бесінші сыныптан он бірінші сыныпқа дейінгі бүкіл мектеп математикасы бар: сандармен амалдардан бастап туынды мен ықтималдыққа дейін. Бұл {count}. Құрғақ жаттау жоқ: әр ережені суреттен көріп, өз қолыңмен тексересің. Алдымен теория, содан кейін практика.',
       why: 'Математиканы көбіне жай жаттап алу керек ережелер жиынтығы деп ойлайды. Бірақ әр ереженің артында түсінікті идея тұр: экранның диагоналін неге Пифагор бойынша есептейді, банк пайызды қалай есептейді, ойында ұту мүмкіндігі қандай.',
       map: 'Негіздерден бастаймыз: сандар, бөлшектер мен пайыздар, қозғалысқа арналған есептер және өмірдегі есептеулер. Олардан төрт тармақ тарайды: алгебра, функциялар мен анализ, геометрия, ықтималдық пен статистика.',
       topic: 'Пифагор және ұқсастық',
@@ -90,7 +90,7 @@ window.LUCH_GUIDES = {
       outcome: 'Соңында сен формулаларды жай жаттап қана қоймай, олардың қайдан шығатынын және қай жерде керек болатынын түсінесің: сауда жасағанда, несие алғанда, жөндеу кезінде, бағдарламалауда және ҰБТ-да. Әрі мұның бәрі тегін.',
     },
     en: {
-      intro: "Hi! I'm Nariman, your math mentor. All of school math is here, from fifth to eleventh grade: from working with numbers all the way to derivatives and probability. That's {count}. No dry memorizing: you'll see every rule in a picture and test it with your own hands. Theory first, then practice.",
+      intro: "Hi! This is Open School. All of school math is here, from fifth to eleventh grade: from working with numbers all the way to derivatives and probability. That's {count}. No dry memorizing: you'll see every rule in a picture and test it with your own hands. Theory first, then practice.",
       why: "People often think math is just a set of rules you have to learn by heart. But behind every rule there's a clear idea: why a screen's diagonal is measured with Pythagoras, how a bank adds interest, what your chances of winning a game are.",
       map: "We start with the basics: numbers, fractions and percentages, motion problems, and everyday calculations. From there, four branches grow: algebra, functions and calculus, geometry, and probability and statistics.",
       topic: "Pythagoras and similarity",
@@ -102,7 +102,7 @@ window.LUCH_GUIDES = {
   chem: {
     demo: 'solutions',
     ru: {
-      intro: 'Привет! Я Нариман, твой наставник по химии. Здесь вся школьная химия, с седьмого по одиннадцатый класс: от смесей и атомов до органики и электролиза. Это {count}. Опасные реактивы не нужны: все опыты ты проводишь прямо на экране. Сначала теория, потом практика.',
+      intro: 'Привет! С вами Open School. Здесь вся школьная химия, с седьмого по одиннадцатый класс: от смесей и атомов до органики и электролиза. Это {count}. Опасные реактивы не нужны: все опыты ты проводишь прямо на экране. Сначала теория, потом практика.',
       why: 'Химию часто считают набором непонятных формул. Но она везде вокруг: почему ржавеет гвоздь, как сода гасит уксус, что происходит с едой на сковороде и почему зимой дороги посыпают солью.',
       map: 'Начинаем с основ: вещества, смеси, атомы и молекулы. От них расходятся пять веток: строение вещества, реакции и расчёты, неорганическая химия, органическая химия и химия вокруг нас.',
       topic: 'Растворы',
@@ -112,7 +112,7 @@ window.LUCH_GUIDES = {
       outcome: 'В итоге ты не просто запомнишь формулы веществ, а поймёшь, что происходит на кухне, в аптеке и на заводе, и легко решишь расчётные задачи на ЕНТ. И всё это бесплатно.',
     },
     kk: {
-      intro: 'Сәлем! Мен Нариман, сенің химиядан тәлімгеріңмін. Мұнда жетінші сыныптан он бірінші сыныпқа дейінгі бүкіл мектеп химиясы бар: қоспалар мен атомдардан бастап органика мен электролизге дейін. Бұл {count}. Қауіпті реактивтер керек емес: барлық тәжірибені тікелей экранда жасайсың. Алдымен теория, содан кейін практика.',
+      intro: 'Сәлем! Сенімен бірге — Open School. Мұнда жетінші сыныптан он бірінші сыныпқа дейінгі бүкіл мектеп химиясы бар: қоспалар мен атомдардан бастап органика мен электролизге дейін. Бұл {count}. Қауіпті реактивтер керек емес: барлық тәжірибені тікелей экранда жасайсың. Алдымен теория, содан кейін практика.',
       why: 'Химияны көбіне түсініксіз формулалар жиынтығы деп ойлайды. Бірақ ол айналаның бәрінде бар: шеге неге тот басады, сода сірке суын қалай сөндіреді, табадағы тамақпен не болады, қыста жолға неге тұз себеді.',
       map: 'Негіздерден бастаймыз: заттар, қоспалар, атомдар мен молекулалар. Олардан бес тармақ тарайды: заттың құрылысы, реакциялар мен есептеулер, бейорганикалық химия, органикалық химия және айналамыздағы химия.',
       topic: 'Ерітінділер',
@@ -122,7 +122,7 @@ window.LUCH_GUIDES = {
       outcome: 'Соңында сен заттардың формулаларын жай жаттап қана қоймай, асүйде, дәріханада және зауытта не болатынын түсінесің, ал ҰБТ-дағы есептерді оңай шығарасың. Әрі мұның бәрі тегін.',
     },
     en: {
-      intro: "Hi! I'm Nariman, your chemistry mentor. All of school chemistry is here, from seventh to eleventh grade: from mixtures and atoms all the way to organic chemistry and electrolysis. That's {count}. You don't need any dangerous chemicals: you run every experiment right on the screen. Theory first, then practice.",
+      intro: "Hi! This is Open School. All of school chemistry is here, from seventh to eleventh grade: from mixtures and atoms all the way to organic chemistry and electrolysis. That's {count}. You don't need any dangerous chemicals: you run every experiment right on the screen. Theory first, then practice.",
       why: "People often think chemistry is just a bunch of confusing formulas. But it's all around you: why a nail rusts, how baking soda fizzes with vinegar, what happens to food in a frying pan, and why roads get salted in winter.",
       map: "We start with the basics: substances, mixtures, atoms, and molecules. From there, five branches grow: the structure of matter, reactions and calculations, inorganic chemistry, organic chemistry, and chemistry all around us.",
       topic: "Solutions",
@@ -135,7 +135,7 @@ window.LUCH_GUIDES = {
   bio: {
     demo: 'blood',
     ru: {
-      intro: 'Привет! Я Нариман, твой наставник по биологии. Здесь вся школьная биология, с седьмого по одиннадцатый класс: от клетки и растений до генетики, эволюции и экологии. Это {count}. Скучных пересказов параграфов не будет: всё живое ты рассмотришь, разберёшь и проверишь сам. Сначала теория, потом практика.',
+      intro: 'Привет! С вами Open School. Здесь вся школьная биология, с седьмого по одиннадцатый класс: от клетки и растений до генетики, эволюции и экологии. Это {count}. Скучных пересказов параграфов не будет: всё живое ты рассмотришь, разберёшь и проверишь сам. Сначала теория, потом практика.',
       why: 'Биологию часто считают предметом, где надо просто заучить названия. Но это наука о тебе самом: почему мы болеем и выздоравливаем, зачем нужны прививки, почему дети похожи на родителей.',
       map: 'Начинаем с основ: признаки живого и то, как изучают жизнь. От них расходятся пять веток: клетка и молекулы, многообразие жизни, человек, наследственность и эволюция, экология.',
       topic: 'Кровь и сердце',
@@ -145,7 +145,7 @@ window.LUCH_GUIDES = {
       outcome: 'В итоге ты не просто выучишь термины, а поймёшь, как устроен твой организм и вся живая природа вокруг, и будешь уверенно отвечать на ЕНТ. И всё это бесплатно.',
     },
     kk: {
-      intro: 'Сәлем! Мен Нариман, сенің биологиядан тәлімгеріңмін. Мұнда жетінші сыныптан он бірінші сыныпқа дейінгі бүкіл мектеп биологиясы бар: жасуша мен өсімдіктерден бастап генетика, эволюция және экологияға дейін. Бұл {count}. Параграфтарды іш пыстыра қайталау болмайды: тірі табиғатты өзің қарап, талдап, тексересің. Алдымен теория, содан кейін практика.',
+      intro: 'Сәлем! Сенімен бірге — Open School. Мұнда жетінші сыныптан он бірінші сыныпқа дейінгі бүкіл мектеп биологиясы бар: жасуша мен өсімдіктерден бастап генетика, эволюция және экологияға дейін. Бұл {count}. Параграфтарды іш пыстыра қайталау болмайды: тірі табиғатты өзің қарап, талдап, тексересің. Алдымен теория, содан кейін практика.',
       why: 'Биологияны көбіне атауларды жаттап алу керек пән деп ойлайды. Бірақ бұл сенің өзің туралы ғылым: біз неге ауырамыз және қалай жазыламыз, екпе не үшін керек, балалар неге ата-анасына ұқсайды.',
       map: 'Негіздерден бастаймыз: тірі ағзалардың белгілері және тіршілікті қалай зерттейді. Олардан бес тармақ тарайды: жасуша мен молекулалар, тіршіліктің алуан түрлілігі, адам, тұқым қуалаушылық пен эволюция, экология.',
       topic: 'Қан және жүрек',
@@ -155,7 +155,7 @@ window.LUCH_GUIDES = {
       outcome: 'Соңында сен терминдерді жай жаттап қана қоймай, өз ағзаңның және айналадағы бүкіл тірі табиғаттың қалай құрылғанын түсінесің, ал ҰБТ-да сенімді жауап бересің. Әрі мұның бәрі тегін.',
     },
     en: {
-      intro: "Hi! I'm Nariman, your biology mentor. All of school biology is here, from seventh to eleventh grade: from cells and plants all the way to genetics, evolution, and ecology. That's {count}. No boring retelling of textbook chapters: you'll look at living things, take them apart, and check everything yourself. Theory first, then practice.",
+      intro: "Hi! This is Open School. All of school biology is here, from seventh to eleventh grade: from cells and plants all the way to genetics, evolution, and ecology. That's {count}. No boring retelling of textbook chapters: you'll look at living things, take them apart, and check everything yourself. Theory first, then practice.",
       why: "People often think biology is a subject where you just memorize names. But it's the science of you: why we get sick and get better, why we need vaccines, why kids look like their parents.",
       map: "We start with the basics: the signs of life and how life is studied. From there, five branches grow: cells and molecules, the diversity of life, the human body, heredity and evolution, and ecology.",
       topic: "Blood and the heart",
@@ -168,7 +168,7 @@ window.LUCH_GUIDES = {
   cs: {
     demo: 'robot',
     ru: {
-      intro: 'Привет! Я Нариман, твой наставник по информатике. Здесь вся школьная информатика, с пятого по одиннадцатый класс: от первых алгоритмов до Python, сайтов, баз данных и искусственного интеллекта. Это {count}. Всё пробуешь сам: пишешь программы, управляешь роботом, собираешь сайты. Сначала теория, потом практика.',
+      intro: 'Привет! С вами Open School. Здесь вся школьная информатика, с пятого по одиннадцатый класс: от первых алгоритмов до Python, сайтов, баз данных и искусственного интеллекта. Это {count}. Всё пробуешь сам: пишешь программы, управляешь роботом, собираешь сайты. Сначала теория, потом практика.',
       why: 'Информатику часто считают уроком, где просто сидят за компьютером. Но это про то, как устроены вещи, которыми ты пользуешься каждый день: как телефон находит дорогу, как работает поиск, как нейросеть узнаёт лицо на фото.',
       map: 'Начинаем с основ: компьютер, файлы и информация. От них расходятся четыре ветки: алгоритмы и программирование, данные и логика, сети и интернет, технологии и искусственный интеллект.',
       topic: 'Робототехника',
@@ -177,7 +177,7 @@ window.LUCH_GUIDES = {
       outcome: 'В итоге ты не просто научишься пользоваться компьютером, а поймёшь, как он думает, и сможешь сам создавать программы, сайты и ботов. И всё это бесплатно.',
     },
     kk: {
-      intro: 'Сәлем! Мен Нариман, сенің информатикадан тәлімгеріңмін. Мұнда бесінші сыныптан он бірінші сыныпқа дейінгі бүкіл мектеп информатикасы бар: алғашқы алгоритмдерден бастап Python, сайттар, дерекқорлар және жасанды интеллектке дейін. Бұл {count}. Бәрін өзің байқап көресің: бағдарлама жазасың, роботты басқарасың, сайт құрастырасың. Алдымен теория, содан кейін практика.',
+      intro: 'Сәлем! Сенімен бірге — Open School. Мұнда бесінші сыныптан он бірінші сыныпқа дейінгі бүкіл мектеп информатикасы бар: алғашқы алгоритмдерден бастап Python, сайттар, дерекқорлар және жасанды интеллектке дейін. Бұл {count}. Бәрін өзің байқап көресің: бағдарлама жазасың, роботты басқарасың, сайт құрастырасың. Алдымен теория, содан кейін практика.',
       why: 'Информатиканы көбіне жай компьютер алдында отыратын сабақ деп ойлайды. Бірақ ол сен күнде қолданатын нәрселердің қалай құрылғаны туралы: телефон жолды қалай табады, іздеу қалай жұмыс істейді, нейрожелі суреттегі адамның бетін қалай таниды.',
       map: 'Негіздерден бастаймыз: компьютер, файлдар және ақпарат. Олардан төрт тармақ тарайды: алгоритмдер мен бағдарламалау, деректер мен логика, желілер мен интернет, технологиялар мен жасанды интеллект.',
       topic: 'Робототехника',
@@ -186,7 +186,7 @@ window.LUCH_GUIDES = {
       outcome: 'Соңында сен компьютерді жай пайдаланып қана қоймай, оның қалай ойлайтынын түсінесің және бағдарламаларды, сайттарды, боттарды өзің жасай аласың. Әрі мұның бәрі тегін.',
     },
     en: {
-      intro: "Hi! I'm Nariman, your computer science mentor. All of school computer science is here, from fifth to eleventh grade: from your first algorithms all the way to Python, websites, databases, and artificial intelligence. That's {count}. You try everything yourself: you write programs, control a robot, and build websites. Theory first, then practice.",
+      intro: "Hi! This is Open School. All of school computer science is here, from fifth to eleventh grade: from your first algorithms all the way to Python, websites, databases, and artificial intelligence. That's {count}. You try everything yourself: you write programs, control a robot, and build websites. Theory first, then practice.",
       why: "People often think computer science is a class where you just sit at a computer. But it's about how the things you use every day work: how your phone finds the way, how search works, how a neural network recognizes a face in a photo.",
       map: "We start with the basics: the computer, files, and information. From there, four branches grow: algorithms and programming, data and logic, networks and the internet, and technology and artificial intelligence.",
       topic: "Robotics",
