@@ -1219,3 +1219,28 @@
   if (document.getElementById('tab-overview') && !window.LuchShell) { const sc = document.createElement('script'); sc.src = '/luch/lab-shell.js'; document.head.appendChild(sc); }
   if (typeof window.LUCH_REAL === 'function' && !window.__luchReal) { const r3 = document.createElement('script'); r3.src = '/luch/real3d.js'; document.head.appendChild(r3); }
 })();
+
+// ---------- вместо ИИ-наставника — кнопка WhatsApp (27.11.2026) ----------
+// Наставник скрыт на всех страницах; кнопка ведёт на +77029410625 с шаблоном «пишу с сайта», чтобы было видно, откуда пишут.
+(() => {
+  if (window.__luchWa) return; window.__luchWa = 1;
+  const st = document.createElement('style');
+  st.textContent = '.lt-btn,.lt-panel,.lt-tip,.lt-board{display:none!important}'
+    + '.wa-btn{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:50;display:flex;align-items:center;gap:8px;background:#25d366;color:#fff;font:600 14px/1 "Golos Text",system-ui,sans-serif;text-decoration:none;border-radius:999px;padding:11px 16px 11px 12px;box-shadow:0 10px 30px -8px rgba(0,0,0,.6)}'
+    + '.wa-btn:hover{filter:brightness(1.05)}.wa-btn svg{width:24px;height:24px;flex:none}'
+    + '@media (max-width:560px){.wa-btn{padding:12px}.wa-btn span{display:none}}'
+    + 'html.oe-embed .wa-btn{display:none}';
+  document.head.appendChild(st);
+  const T = { ru: ['Здравствуйте! Пишу с сайта openschool.work. ', 'Написать нам'], kk: ['Сәлеметсіз бе! openschool.work сайтынан жазып отырмын. ', 'Бізге жазу'], en: ["Hello! I'm writing from openschool.work. ", 'Message us'] };
+  const add = () => {
+    if (document.getElementById('wa-btn')) return; // на главной кнопка уже в разметке
+    const L = (window.LuchI18n && window.LuchI18n.lang) || 'ru', t = T[L] || T.ru;
+    const a = document.createElement('a');
+    a.className = 'wa-btn'; a.id = 'wa-btn'; a.target = '_blank'; a.rel = 'noopener'; a.setAttribute('aria-label', 'WhatsApp');
+    a.href = 'https://wa.me/77029410625?text=' + encodeURIComponent(t[0]);
+    a.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.4-.2Z"/></svg><span></span>';
+    a.querySelector('span').textContent = t[1];
+    document.body.appendChild(a);
+  };
+  if (document.body) add(); else document.addEventListener('DOMContentLoaded', add);
+})();
