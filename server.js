@@ -8809,6 +8809,38 @@ http
       return;
     }
 
+    // Instagram @openschool_kz: страница, куда владелец вставляет токен из Meta-кабинета (ключ — как у страниц Крыши).
+    // Токен сразу продлевается и ложится в dbo.insta_accounts (acc = 'openschool'), наружу не отдаётся.
+    if (urlPath === "/api/os/insta") {
+      const k = KRISHA_JOB_KEY || KRISHA_PHONE_KEY, q = parsed.searchParams;
+      if (!k || q.get("key") !== k) { res.writeHead(403); res.end("bad key"); return; }
+      const send = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+      if (req.method === "POST") {
+        (async () => {
+          let b = {}; try { b = JSON.parse(await readBody(req)) || {}; } catch { b = {}; }
+          const token = String(b.token || "").trim();
+          if (!token) return send(400, { ok: false, error: "пустой токен" });
+          const who = await INSTA.me(token);
+          let tok = token, exp = new Date(Date.now() + 60 * 86400e3);
+          try { const r = await INSTA.refreshToken(token); if (r.token) { tok = r.token; exp = new Date(Date.now() + (Number(r.expiresIn) || 5184000) * 1000); } } catch { /* продлим позже */ }
+          await db.instaAccountSet("openschool", { token: tok, ig_user_id: String(who.user_id || who.id), username: who.username || null, token_exp: exp });
+          send(200, { ok: true, username: who.username || null });
+        })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 200) }));
+        return;
+      }
+      (async () => {
+        const a = (await db.instaAccounts()).find((x) => x.acc === "openschool") || {};
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+        res.end('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Open School · Instagram</title>' +
+          '<body style="font:16px system-ui;max-width:560px;margin:40px auto;padding:0 16px"><h2>@openschool_kz — подключение</h2>' +
+          '<p>Сейчас: <b>' + (a.token ? "подключён @" + String(a.username || "").replace(/[^A-Za-z0-9_.]/g, "") + ", токен до " + (a.token_exp ? new Date(a.token_exp).toISOString().slice(0, 10) : "?") : "не подключён") + '</b></p>' +
+          '<p>Вставьте токен из Meta-кабинета (Instagram → «Сгенерировать маркер») и нажмите «Сохранить».</p>' +
+          '<textarea id="t" rows="5" style="width:100%;font:13px monospace" placeholder="IGAA…"></textarea><p><button id="b" style="font-size:16px;padding:10px 18px">Сохранить</button> <span id="r"></span></p>' +
+          '<script>document.getElementById("b").onclick=async()=>{const r=document.getElementById("r");r.textContent="…";try{const x=await fetch(location.href,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:document.getElementById("t").value})});const j=await x.json();r.textContent=j.ok?"Готово: подключён @"+j.username:"Ошибка: "+j.error;if(j.ok)document.getElementById("t").value="";}catch(e){r.textContent="Ошибка сети";}};</script></body>');
+      })().catch((e) => { try { res.writeHead(500); res.end(String(e.message).slice(0, 200)); } catch { /* уже ответили */ } });
+      return;
+    }
+
     // Суфлёр /rec/: дубли с телефона сразу в хранилище (rec/<дата>/...), список последних — rec/last.json
     if (urlPath === "/api/rec/upload" && req.method === "POST") {
       const send = (code, obj) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
