@@ -8809,6 +8809,35 @@ http
       return;
     }
 
+    // Суфлёр /rec/: дубли с телефона сразу в хранилище (rec/<дата>/...), список последних — rec/last.json
+    if (urlPath === "/api/rec/upload" && req.method === "POST") {
+      const send = (code, obj) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+      if (!blob.ready()) return send(409, { ok: false, error: "хранилище не настроено" });
+      const ip = clientIp(req), day = new Date().toISOString().slice(0, 10);
+      global.__recHits = global.__recHits || new Map(); const hk = ip + day, hits = (global.__recHits.get(hk) || 0) + 1;
+      if (hits > 40) return send(429, { ok: false, error: "слишком много загрузок за день" });
+      global.__recHits.set(hk, hits);
+      const type = String(req.headers["content-type"] || "");
+      if (!/^video\/(mp4|webm|quicktime)/.test(type)) return send(415, { ok: false, error: "нужно видео" });
+      const MAX = 300 * 1024 * 1024, parts = []; let size = 0, dead = false;
+      req.on("data", (c) => { if (dead) return; size += c.length; if (size > MAX) { dead = true; send(413, { ok: false, error: "больше 300 МБ" }); req.destroy(); return; } parts.push(c); });
+      req.on("end", async () => {
+        if (dead) return;
+        try {
+          const base = String(parsed.searchParams.get("n") || "take").replace(/[^a-z0-9_.-]/gi, "").slice(0, 60) || "take";
+          const name = "rec/" + day + "/" + Date.now().toString(36) + require("crypto").randomBytes(4).toString("hex") + "_" + base;
+          const url = await blob.put(name, Buffer.concat(parts), type.split(";")[0]);
+          let last = [];
+          try { const r = await fetch(blob.publicUrl("rec/last.json") + "?t=" + Date.now()); if (r.ok) last = await r.json(); } catch { /* первый раз */ }
+          last.unshift({ url, size, at: new Date().toISOString() }); last = last.slice(0, 50);
+          await blob.put("rec/last.json", Buffer.from(JSON.stringify(last)), "application/json").catch(() => null);
+          console.log("[rec] " + url + " " + Math.round(size / 1e6) + " МБ");
+          send(200, { ok: true, url, size });
+        } catch (e) { console.log("[rec] " + (e && e.message)); send(502, { ok: false, error: "не удалось сохранить" }); }
+      });
+      return;
+    }
+
     // ИИ-репетитор на страницах опытов (/physics, /optics, /mechanics).
     if (urlPath === "/api/tutor" || urlPath === "/api/tutor/tts" || urlPath === "/api/tutor/stt" || urlPath === "/api/tutor/hw" || urlPath === "/api/tutor/story" || urlPath === "/api/tutor/story/img" || urlPath === "/api/tutor/formulas" || urlPath === "/api/tutor/quiz") {
       require("./scripts/tutor.js").handle(req, res, { readBody, clientIp, verifyToken: verifyClerkToken });
