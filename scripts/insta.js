@@ -503,8 +503,8 @@ async function publishCarousel(userId, token, imageUrls, text) {
 // Reels: видео по ссылке. Instagram обрабатывает
 // видео дольше картинок — ждём до 5 минут.
 // toFeed=false — только вкладка Reels и рекомендации, в сетке профиля остаётся карусель.
-async function publishReel(userId, token, videoUrl, text, toFeed) {
-  const c = await ig("POST", "/" + userId + "/media", { media_type: "REELS", video_url: videoUrl, caption: text, share_to_feed: toFeed === false ? "false" : "true" }, token);
+async function publishReel(userId, token, videoUrl, text, toFeed, coverUrl) {
+  const c = await ig("POST", "/" + userId + "/media", Object.assign({ media_type: "REELS", video_url: videoUrl, caption: text, share_to_feed: toFeed === false ? "false" : "true" }, coverUrl ? { cover_url: coverUrl } : {}), token);
   await waitReady(c.id, token, 150);
   let pub;
   for (let i = 0; ; i++) {

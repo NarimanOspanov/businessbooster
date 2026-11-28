@@ -6626,6 +6626,23 @@ async function instaWebhook(raw, sig) {
 
 // «+» под постом → приватный ответ с кнопкой «Получить номер». Номер — после
 // нажатия и проверки подписки (instaHookMessage), как было в ManyChat.
+// @openschool_kz (28.11.2026): любой комментарий под роликом («+», вопрос) — в директ ссылка на ENT QUIZ
+// с меткой ролика ig_m<id поста>, по ней в боте видно, какой ролик привёл. Одному человеку под роликом — один раз.
+async function instaHookOpenSchool(acct, cid, uname, mediaId, text, cfg, verified) {
+  if (!String(text || "").trim()) { await db.instaCommentEventSet(cid, "skipped", "пустой").catch(() => {}); return; }
+  if (!cfg.reply) return;
+  if (!verified) { await db.instaCommentEventSet(cid, "skipped", "не задан секрет приложения").catch(() => {}); return; }
+  if (mediaId && await db.instaCommentAnswered(mediaId, uname, cid).catch(() => false)) { await db.instaCommentEventSet(cid, "skipped", "уже отвечали").catch(() => {}); return; }
+  const link = "https://t.me/quiz_ent_bot?startapp=ig_m" + String(mediaId || "x").replace(/\D/g, "").slice(-12);
+  const msg = "Сәлем! Міне, ҰБТ-ға дайындық ойыны ENT QUIZ:\n\n" +
+    "— 27 000+ сұрақ, барлық пәндер\n— әр есептің видео талдауы\n— апта сайын ақшалай жүлделі байқау\n\nОқушыларға тегін, Telegram-да:\n" + link;
+  try {
+    await INSTA.privateReply(acct.ig_user_id, acct.token, cid, msg);
+    await INSTA.replyComment(cid, acct.token, "Директке жібердік 📩 Хабарлама болмаса, «Сұраулар» бумасын қараңыз").catch(() => {});
+    await db.instaCommentEventSet(cid, "replied", "ссылка на бота").catch(() => {});
+  } catch (err) { console.log("[insta-hook] openschool: " + err.message); await db.instaCommentEventSet(cid, "error", String(err.message).slice(0, 200)).catch(() => {}); }
+}
+
 async function instaHookComment(e, v, accs, cfg, verified) {
   // Комментарий под рекламой приходит с id рекламного поста (media_product_type
   // AD); наш пост — в original_media_id. Без этого «+» под рекламой терялись
@@ -6640,6 +6657,7 @@ async function instaHookComment(e, v, accs, cfg, verified) {
   if (uname && acct.username && String(uname).toLowerCase() === String(acct.username).toLowerCase()) return;
   const fresh = await db.instaCommentEventAdd({ commentId: cid, acc: acct.acc, mediaId: mediaId, username: uname, text: text, status: "seen" }).catch(() => false);
   if (!fresh) return; // повтор события — уже обработали
+  if (acct.acc === "openschool") return instaHookOpenSchool(acct, cid, uname, mediaId, text, cfg, verified);
   // Бесплатная консультация: слово «консультация» под любым нашим постом или
   // любой комментарий под постом-приманкой (app_config insta.consult_posts —
   // id постов через запятую).
