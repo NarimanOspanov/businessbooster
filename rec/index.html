@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="kk"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="robots" content="noindex,nofollow">
+<title>Суфлёр</title>
+<style>
+:root{--bg:#0b0f1a;--fg:#fff;--acc:#ffd43b;--mut:rgba(255,255,255,.55)}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+video#cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);background:#000}
+.top{position:fixed;left:0;right:0;top:0;padding:calc(10px + env(safe-area-inset-top)) 16px 18px;background:linear-gradient(rgba(0,0,0,.82),rgba(0,0,0,.55) 75%,rgba(0,0,0,0))}
+#line{font-size:clamp(26px,7.4vw,40px);font-weight:800;line-height:1.2;min-height:2.4em}
+#next{font-size:clamp(15px,4.2vw,20px);color:var(--mut);margin-top:6px;min-height:1.3em}
+.bar{height:6px;background:rgba(255,255,255,.2);border-radius:3px;margin-top:10px;overflow:hidden}.bar i{display:block;height:100%;width:0;background:var(--acc)}
+#clock{position:absolute;right:16px;top:calc(10px + env(safe-area-inset-top));font:600 14px ui-monospace,monospace;color:var(--mut)}
+#big{position:fixed;inset:0;display:none;align-items:center;justify-content:center;font-size:30vw;font-weight:900;color:var(--acc);text-shadow:0 0 30px #000;pointer-events:none}
+.panel{position:fixed;left:0;right:0;bottom:0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.85) 30%);display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+button,select{font:600 16px system-ui,sans-serif;border:0;border-radius:14px;padding:14px 16px;background:#1f2740;color:#fff}
+button.main{background:var(--acc);color:#111;flex:1}button.red{background:#e2453c}
+select{flex:1}
+.hint{font-size:13px;color:var(--mut);line-height:1.4}
+#done{display:none}
+</style></head><body>
+<video id="cam" playsinline autoplay muted></video>
+<div class="top"><div id="clock">0,0</div><div id="line">Суфлёр · Арман</div><div id="next">Выбери кусок и нажми «Запись»</div><div class="bar"><i id="prog"></i></div></div>
+<div id="big"></div>
+<div class="panel">
+  <div class="row"><select id="part">
+    <option value="hook">1. Хук (0–2,6 с) — в комнате</option>
+    <option value="main">2. Объяснение (2,6–43,9 с) — ровный фон</option>
+    <option value="all">Всё подряд (0–43,9 с)</option>
+  </select></div>
+  <div class="row"><button class="main" id="rec">● Запись</button><button id="try">Без записи</button></div>
+  <div class="row" id="done"><button class="main" id="share">Отправить видео</button><button id="save">Скачать</button><button class="red" id="again">Ещё дубль</button></div>
+  <div class="hint">Отсчёт 3-2-1, потом фразы идут в своё время. Смотри в камеру — текст рядом с ней, вверху. Телефон вертикально и неподвижно.</div>
+</div>
+<script>
+// [начало, конец, текст]; время в секундах как в референсе
+const L = [
+  [0.0, 2.6, 'Синусты мектепте былай түсіндіру керек еді.'],
+  [2.6, 4.4, 'Қабырғаға сүйеулі баспалдақты елестет.'],
+  [4.4, 6.5, 'Синус дегеніміз —'],
+  [6.5, 9.1, 'баспалдақ қаншалықты биікке жеткені.'],
+  [9.1, 11.5, 'Яғни биіктікті'],
+  [11.5, 14.1, 'баспалдақтың ұзындығына бөлеміз.'],
+  [14.1, 16.5, 'Баспалдақ жерде жатса,'],
+  [16.5, 19.1, 'биіктік нөл — синус та нөл.'],
+  [19.1, 21.5, 'Отыз градусқа көтерейік.'],
+  [21.5, 24.1, 'Отыз градуста синус — жарты.'],
+  [24.1, 26.5, 'Төрт метр баспалдақ — екі метр биіктік.'],
+  [26.5, 29.1, 'Енді баспалдақты тік қоямыз.'],
+  [29.1, 31.5, 'Биіктік — төрт, ұзындық — төрт.'],
+  [31.5, 34.1, 'Тоқсан градуста'],
+  [34.1, 36.5, 'синус бірге тең.'],
+  [36.5, 39.1, 'Сондықтан синус бірден үлкен болмайды:'],
+  [39.1, 41.5, 'баспалдақ өз ұзындығынан биік жетпейді.'],
+  [41.5, 43.9, 'Ал сегіз метрлік баспалдақ? Жауабын пікірге жаз!'],
+];
+const $ = id => document.getElementById(id);
+let stream = null, rec = null, chunks = [], blob = null, raf = 0, running = false;
+const fmt = s => s.toFixed(1).replace('.', ',');
+function range() { const p = $('part').value; return p === 'hook' ? [0, 2.6] : p === 'main' ? [2.6, 43.9] : [0, 43.9]; }
+async function cam() {
+  if (stream) return stream;
+  stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1920 }, frameRate: { ideal: 30 } }, audio: { echoCancellation: true, noiseSuppression: true } });
+  $('cam').srcObject = stream; return stream;
+}
+let ac; function beep(f = 880, d = .12) { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f; g.gain.value = .15; o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + d); } catch (e) {} }
+async function countdown() { const b = $('big'); b.style.display = 'flex'; for (const n of [3, 2, 1]) { b.textContent = n; beep(660); await new Promise(r => setTimeout(r, 1000)); } b.style.display = 'none'; beep(990, .2); }
+function show(t, a, b) {
+  const tt = a + t; $('clock').textContent = fmt(tt) + ' с';
+  const i = L.findIndex(x => tt >= x[0] && tt < x[1]);
+  const cur = L[i] || L[L.length - 1], nx = i >= 0 ? L[i + 1] : null;
+  $('line').textContent = tt < b ? cur[2] : 'Стоп ✓';
+  $('next').textContent = nx && nx[0] < b ? '→ ' + nx[2] : '';
+  $('prog').style.width = Math.min(100, (tt - cur[0]) / (cur[1] - cur[0]) * 100) + '%';
+}
+async function run(record) {
+  if (running) return; running = true; $('done').style.display = 'none';
+  try { await cam(); } catch (e) { alert('Нет доступа к камере: ' + e.message); running = false; return; }
+  const [a, b] = range(); show(0, a, b); await countdown();
+  if (record) {
+    chunks = []; const types = ['video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
+    const mt = types.find(x => window.MediaRecorder && MediaRecorder.isTypeSupported(x)) || '';
+    rec = new MediaRecorder(stream, mt ? { mimeType: mt, videoBitsPerSecond: 8e6 } : {});
+    rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+    rec.onstop = () => { blob = new Blob(chunks, { type: rec.mimeType || 'video/mp4' }); $('done').style.display = 'flex'; };
+    rec.start(500);
+  }
+  const t0 = performance.now(), dur = b - a + 0.6;
+  const tick = () => { const t = (performance.now() - t0) / 1000; show(t, a, b); if (t < dur) raf = requestAnimationFrame(tick); else { running = false; if (rec && rec.state === 'recording') rec.stop(); rec = null; beep(440, .25); } };
+  tick();
+}
+function fname() { const ext = blob && /mp4/.test(blob.type) ? 'mp4' : 'webm'; return 'arman_' + $('part').value + '_' + new Date().toTimeString().slice(0, 8).replace(/:/g, '') + '.' + ext; }
+$('rec').onclick = () => run(true);
+$('try').onclick = () => run(false);
+$('again').onclick = () => run(true);
+$('save').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname(); a.click(); };
+$('share').onclick = async () => { const f = new File([blob], fname(), { type: blob.type }); if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f], title: 'Арман — дубль' }); } catch (e) {} } else $('save').onclick(); };
+</script>
+</body></html>
