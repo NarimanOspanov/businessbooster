@@ -8812,8 +8812,7 @@ http
     // Instagram @openschool_kz: страница, куда владелец вставляет токен из Meta-кабинета (ключ — как у страниц Крыши).
     // Токен сразу продлевается и ложится в dbo.insta_accounts (acc = 'openschool'), наружу не отдаётся.
     if (urlPath === "/api/os/insta") {
-      const k = KRISHA_JOB_KEY || KRISHA_PHONE_KEY, q = parsed.searchParams;
-      if (!k || q.get("key") !== k) { res.writeHead(403); res.end("bad key"); return; }
+      // без ключа: сам токен подтверждает владельца — принимаем только токен аккаунта openschool_kz
       const send = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
       if (req.method === "POST") {
         (async () => {
@@ -8821,6 +8820,7 @@ http
           const token = String(b.token || "").trim();
           if (!token) return send(400, { ok: false, error: "пустой токен" });
           const who = await INSTA.me(token);
+          if (String(who.username || "").toLowerCase() !== "openschool_kz") return send(400, { ok: false, error: "это токен не @openschool_kz" });
           let tok = token, exp = new Date(Date.now() + 60 * 86400e3);
           try { const r = await INSTA.refreshToken(token); if (r.token) { tok = r.token; exp = new Date(Date.now() + (Number(r.expiresIn) || 5184000) * 1000); } } catch { /* продлим позже */ }
           await db.instaAccountSet("openschool", { token: tok, ig_user_id: String(who.user_id || who.id), username: who.username || null, token_exp: exp });
