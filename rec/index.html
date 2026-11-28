@@ -103,16 +103,24 @@ async function countdown() { const b = $('big'); b.style.display = 'flex'; for (
 async function run(record) {
   if (running) return; running = true; closeView();
   try { await cam(); } catch (e) { alert('Нет доступа к камере: ' + e.message); running = false; return; }
-  build(); document.body.classList.add('recording'); await countdown();
+  build(); document.body.classList.add('recording');
   if (record) {
     chunks = []; const types = ['video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
     const mt = types.find(x => window.MediaRecorder && MediaRecorder.isTypeSupported(x)) || '';
-    rec = new MediaRecorder(stream, mt ? { mimeType: mt, videoBitsPerSecond: 8e6 } : {});
-    const part = $('part').value;
-    rec.ondataavailable = e => e.data.size && chunks.push(e.data);
-    rec.onstop = () => { const blob = new Blob(chunks, { type: rec.mimeType || 'video/mp4' }); takes.push({ blob, part, n: takes.length + 1, url: URL.createObjectURL(blob) }); paintTakes(); openView(takes[takes.length - 1]); };
-    rec.start(500);
+    const r = rec = new MediaRecorder(stream, mt ? { mimeType: mt, videoBitsPerSecond: 8e6 } : {});
+    const part = $('part').value, mine = chunks;
+    r.ondataavailable = e => e.data && e.data.size && mine.push(e.data);
+    r.onstop = () => { // r — свой рекордер этого дубля (глобальный rec к этому моменту уже обнулён)
+      try {
+        const blob = new Blob(mine, { type: r.mimeType || mt || 'video/mp4' });
+        if (!blob.size) { alert('Запись пустая — попробуй ещё раз (открой ссылку в Safari или Chrome, не внутри Instagram/Telegram).'); return; }
+        takes.push({ blob, part, n: takes.length + 1, url: URL.createObjectURL(blob) }); paintTakes(); openView(takes[takes.length - 1]);
+      } catch (e) { alert('Не получилось сохранить дубль: ' + e.message); }
+    };
+    r.onerror = e => alert('Ошибка записи: ' + ((e.error && e.error.message) || e.message || 'неизвестно'));
+    r.start(500); // пишем уже с отсчёта — лишнее вырежу при монтаже
   }
+  await countdown();
   const [a, b] = range(), t0 = performance.now(), dur = b - a + 0.6;
   const tick = () => { const t = (performance.now() - t0) / 1000; show(t); if (t < dur) raf = requestAnimationFrame(tick); else { running = false; document.body.classList.remove('recording'); if (rec && rec.state === 'recording') rec.stop(); rec = null; beep(440, .25); } };
   tick();
