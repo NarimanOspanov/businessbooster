@@ -329,7 +329,9 @@
   const LANG2 = (window.LuchI18n && window.LuchI18n.lang) || 'ru';
   // подписи внутри блоков без автоперевода (data-noi18n: там казахский текст лекции и теста из базы)
   const KKL = {"Формулы урока":"Сабақтың формулалары","Перейти к другому уроку?":"Басқа сабаққа өтесіз бе?","Сейчас открыт урок «{t}». Перейти к уроку {n}{n2}?":"Қазір «{t}» сабағы ашық. {n}-сабаққа{n2} өтесіз бе?","Перейти":"Өту","Остаться":"Қалу","Готовлю лекцию":"Дәрісті дайындап жатырмын","Пока готовлю — знаете ли вы?":"Дайындап жатқанда — білесіз бе?","Минутку":"Бір минут","Сейчас будет лекция с картинками: что это, зачем нужно, как работает и немного истории.":"Қазір суреттері бар дәріс басталады: бұл не, не үшін керек, қалай жұмыс істейді және аздап тарих.","Закрепим · вопрос ":"Бекітейік · сұрақ ","Закрепим · ":"Бекітейік · ","Закрепили · ":"Бекіттік · ","Готовлю вопросы по уроку…":"Сабақ бойынша сұрақтарды дайындап жатырмын…","Верно!":"Дұрыс!","Не совсем.":"Толық емес.","Следующий вопрос →":"Келесі сұрақ →","Отлично! Всё понял 🎉":"Керемет! Бәрін түсіндің 🎉","Хорошо! Почти без ошибок.":"Жақсы! Қатесіз дерлік.","Есть над чем подумать — спроси наставника, что осталось непонятным.":"Ойланатын нәрсе бар — түсініксіз қалғанын тәлімгерден сұра.","🎤 Разобрать ошибки":"🎤 Қателерді талдау","Дальше →":"Әрі қарай →","Сделать ДЗ":"Үй тапсырмасын орындау","Ещё раз":"Тағы бір рет","Итог":"Қорытынды"," из ":" / "};
-  const L = t => (LANG2 === 'kk' && KKL[t]) || t;
+  Object.assign(KKL, {"Объяснение закончено":"Түсіндірме аяқталды","Ну что, давай попробуем на практике! Если что-то осталось непонятным — ничего страшного: задай мне любой вопрос, я отвечу. Не переживай.":"Ал енді тәжірибеде байқап көрейік! Бірдеңе түсініксіз қалса, ештеңе етпейді: кез келген сұрақ қой, жауап беремін.","Перейти в лабораторию →":"Зертханаға өту →","Перейти к практике →":"Практикаға өту →","Посмотреть ещё раз":"Қайта көру","Теория":"Теория","Не получилось подготовить лекцию. Попробуйте ещё раз чуть позже.":"Дәрісті дайындау мүмкін болмады. Сәл кейінірек қайталап көріңіз.","Готово, поехали!":"Дайын, бастадық!","Задание":"Тапсырма","Наставник объяснит задание голосом":"Ұстаз тапсырманы дауыспен түсіндіреді"});
+  const ENL = {"Формулы урока":"Lesson formulas","Перейти к другому уроку?":"Go to another lesson?","Сейчас открыт урок «{t}». Перейти к уроку {n}{n2}?":"You are on the lesson “{t}”. Go to lesson {n}{n2}?","Перейти":"Go","Остаться":"Stay","Готовлю лекцию":"Preparing the lecture","Пока готовлю — знаете ли вы?":"While it loads — did you know?","Минутку":"Just a moment","Сейчас будет лекция с картинками: что это, зачем нужно, как работает и немного истории.":"Here comes a lecture with pictures: what it is, why it matters, how it works and a bit of history.","Закрепим · вопрос ":"Review · question ","Закрепим · ":"Review · ","Закрепили · ":"Reviewed · ","Готовлю вопросы по уроку…":"Preparing questions for the lesson…","Верно!":"Correct!","Не совсем.":"Not quite.","Следующий вопрос →":"Next question →","Отлично! Всё понял 🎉":"Excellent! You got it all 🎉","Хорошо! Почти без ошибок.":"Good! Almost no mistakes.","Есть над чем подумать — спроси наставника, что осталось непонятным.":"Some things to think over — ask about what is still unclear.","🎤 Разобрать ошибки":"🎤 Go over mistakes","Дальше →":"Next →","Сделать ДЗ":"Do homework","Ещё раз":"Again","Итог":"Result"," из ":" of ","Объяснение закончено":"Explanation finished","Ну что, давай попробуем на практике! Если что-то осталось непонятным — ничего страшного: задай мне любой вопрос, я отвечу. Не переживай.":"Now let's try it in practice! If something is still unclear, that's fine: ask any question and I'll answer.","Перейти в лабораторию →":"Go to the lab →","Перейти к практике →":"Go to practice →","Посмотреть ещё раз":"Watch again","Теория":"Theory","Не получилось подготовить лекцию. Попробуйте ещё раз чуть позже.":"Couldn't prepare the lecture. Please try again a bit later.","Готово, поехали!":"Ready, let's go!","Задание":"Task","Наставник объяснит задание голосом":"The task explained by voice"};
+  const L = t => (LANG2 === 'kk' ? KKL[t] : LANG2 === 'en' ? ENL[t] : null) || t;
   // Старые ролики-рилсы (разделы «Механика», «Оптика») больше не показываем: везде одинаково — лекция, потом практика
   const reelBtn = () => null;
   const taskBox = () => [...document.querySelectorAll('[class*="task"]')].find(e => e.offsetParent && !e.closest('.ls-story,.ls-start,#pane-hw,.lt-panel,.lt-tip') && e.getBoundingClientRect().width > 120);
@@ -534,8 +536,8 @@
     if (i >= secs.length) { // конец
       journal(j => { j.theoryDone = true; });
       el.classList.add('done');
-      const outro = 'Ну что, давай попробуем на практике! Если что-то осталось непонятным — ничего страшного: задай мне любой вопрос, я отвечу. Не переживай.';
-      txt.innerHTML = '<b>Объяснение закончено</b><p>' + esc(outro) + '</p><div class="end"><button class="ls-btn main" data-a="practice">' + (LABN ? 'Перейти в лабораторию →' : 'Перейти к практике →') + '</button><button class="ls-btn ghost" data-a="again">Посмотреть ещё раз</button></div>';
+      const outro = L('Ну что, давай попробуем на практике! Если что-то осталось непонятным — ничего страшного: задай мне любой вопрос, я отвечу. Не переживай.');
+      txt.innerHTML = '<b>' + L('Объяснение закончено') + '</b><p>' + esc(outro) + '</p><div class="end"><button class="ls-btn main" data-a="practice">' + L(LABN ? 'Перейти в лабораторию →' : 'Перейти к практике →') + '</button><button class="ls-btn ghost" data-a="again">' + L('Посмотреть ещё раз') + '</button></div>';
       // наставник говорит это вслух, как продолжение объяснения (если раздел «на практике» уже сказал это сам — не повторяем)
       if (!(secs[secs.length - 1] || {}).scheme) tts(outro).then(blob => {
         if (!st || st.run !== my || !blob || blob.size < 100) return;
@@ -598,7 +600,7 @@
     let s; try { s = await fetchStory(); } catch (e) {
       if (st !== me) return;
       clearInterval(me.factT);
-      st.el.querySelector('.txt').innerHTML = '<b>Теория</b><p>Не получилось подготовить лекцию. Попробуйте ещё раз чуть позже.</p>';
+      st.el.querySelector('.txt').innerHTML = '<b>' + L('Теория') + '</b><p>' + L('Не получилось подготовить лекцию. Попробуйте ещё раз чуть позже.') + '</p>';
       return;
     }
     if (st !== me) return;
@@ -609,7 +611,7 @@
     await Promise.all(first);
     if (st !== me) return;
     clearInterval(me.factT);
-    const pv = me.el.querySelector('.pv'); pv.querySelector('ul').outerHTML = '<div class="go">Готово, поехали!</div>';
+    const pv = me.el.querySelector('.pv'); pv.querySelector('ul').outerHTML = '<div class="go">' + L('Готово, поехали!') + '</div>';
     await new Promise(r => setTimeout(r, 900));
     if (st !== me) return;
     stGo(f0);
@@ -749,8 +751,8 @@
     if (idx < 0 || !box) return;
     const b = document.createElement('button'); b.type = 'button'; b.className = 'ls-tplay';
     // коротко, одним словом — длинная надпись не помещалась на телефоне
-    b.setAttribute('data-noi18n', ''); b.innerHTML = '<i>▶</i>' + (LANG2 === 'kk' ? 'Тапсырма' : 'Задание');
-    b.title = LANG2 === 'kk' ? 'Ұстаз тапсырманы дауыспен түсіндіреді' : 'Наставник объяснит задание голосом';
+    b.setAttribute('data-noi18n', ''); b.innerHTML = '<i>▶</i>' + L('Задание');
+    b.title = L('Наставник объяснит задание голосом');
     b.addEventListener('click', e => { e.stopPropagation(); playStory(idx); });
     const k = box.querySelector('.k'); if (k) k.after(b); else box.prepend(b);
   }
@@ -1164,7 +1166,7 @@
       e.preventDefault(); e.stopImmediatePropagation();
       const tb = list[to], tt = tb && tb.querySelector('.t') ? tb.querySelector('.t').textContent.trim() : '';
       const w = document.createElement('div'); w.className = 'ls-cf'; w.setAttribute('role', 'dialog'); w.dataset.noi18n = '';
-      const ask = L('Сейчас открыт урок «{t}». Перейти к уроку {n}{n2}?').replace('{t}', esc(lessonTitle())).replace('{n}', to + 1).replace('{n2}', tt ? ' «' + esc(tt) + '»' : '');
+      const ask = L('Сейчас открыт урок «{t}». Перейти к уроку {n}{n2}?').replace('{t}', esc(lessonTitle())).replace('{n}', to + 1).replace('{n2}', tt ? (LANG2 === 'en' ? ' “' + esc(tt) + '”' : ' «' + esc(tt) + '»') : '');
       w.innerHTML = '<div class="b"><h3>' + L('Перейти к другому уроку?') + '</h3><p>' + ask + '</p><div class="r"><button type="button" class="ls-btn ghost" data-x>' + L('Остаться') + '</button><button type="button" class="ls-btn main" data-ok>' + L('Перейти') + '</button></div></div>';
       document.body.appendChild(w);
       const close = () => { w.remove(); removeEventListener('keydown', key, true); };
