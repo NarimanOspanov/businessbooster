@@ -5,25 +5,35 @@
 <meta name="robots" content="noindex,nofollow">
 <title>Суфлёр</title>
 <style>
-:root{--bg:#0b0f1a;--fg:#fff;--acc:#ffd43b;--mut:rgba(255,255,255,.55)}
+:root{--bg:#0b0f1a;--fg:#fff;--acc:#ffd43b;--mut:rgba(255,255,255,.5)}
 *{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
 video#cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);background:#000}
-.top{position:fixed;left:0;right:0;top:0;padding:calc(10px + env(safe-area-inset-top)) 16px 18px;background:linear-gradient(rgba(0,0,0,.82),rgba(0,0,0,.55) 75%,rgba(0,0,0,0))}
-#line{font-size:clamp(26px,7.4vw,40px);font-weight:800;line-height:1.2;min-height:2.4em}
-#next{font-size:clamp(15px,4.2vw,20px);color:var(--mut);margin-top:6px;min-height:1.3em}
-.bar{height:6px;background:rgba(255,255,255,.2);border-radius:3px;margin-top:10px;overflow:hidden}.bar i{display:block;height:100%;width:0;background:var(--acc)}
-#clock{position:absolute;right:16px;top:calc(10px + env(safe-area-inset-top));font:600 14px ui-monospace,monospace;color:var(--mut)}
-#big{position:fixed;inset:0;display:none;align-items:center;justify-content:center;font-size:30vw;font-weight:900;color:var(--acc);text-shadow:0 0 30px #000;pointer-events:none}
+.top{position:fixed;left:0;right:0;top:0;height:52vh;padding:calc(8px + env(safe-area-inset-top)) 16px 0;background:linear-gradient(rgba(0,0,0,.86),rgba(0,0,0,.7) 80%,rgba(0,0,0,0));overflow:hidden}
+#clock{position:absolute;right:14px;top:calc(8px + env(safe-area-inset-top));font:600 13px ui-monospace,monospace;color:var(--mut);z-index:2}
+#script{position:relative;transition:transform .35s ease;padding-top:4px}
+.ln{font-size:clamp(20px,5.6vw,30px);font-weight:700;line-height:1.28;color:var(--mut);margin:0 0 12px;transition:color .2s,font-size .2s}
+.ln.done{color:rgba(255,255,255,.28)}
+.ln.cur{color:#fff;font-size:clamp(25px,7vw,38px);font-weight:800}
+.ln .w{border-radius:6px;padding:0 2px}
+.ln.cur .w.said{color:var(--acc)}
+.ln.cur .w.now{background:var(--acc);color:#111}
+.ln .t{display:block;font:600 11px ui-monospace,monospace;color:rgba(255,255,255,.35);margin-bottom:2px}
+#big{position:fixed;inset:0;display:none;align-items:center;justify-content:center;font-size:30vw;font-weight:900;color:var(--acc);text-shadow:0 0 30px #000;pointer-events:none;z-index:5}
 .panel{position:fixed;left:0;right:0;bottom:0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.85) 30%);display:flex;flex-direction:column;gap:10px}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 button,select{font:600 16px system-ui,sans-serif;border:0;border-radius:14px;padding:14px 16px;background:#1f2740;color:#fff}
 button.main{background:var(--acc);color:#111;flex:1}button.red{background:#e2453c}
 select{flex:1}
 .hint{font-size:13px;color:var(--mut);line-height:1.4}
-#done{display:none}
+#takes{display:flex;gap:6px;flex-wrap:wrap}#takes button{padding:9px 12px;font-size:14px}
+body.recording .panel{display:none}
+#view{position:fixed;inset:0;background:#000;display:none;flex-direction:column;z-index:10}
+#view video{flex:1;width:100%;min-height:0;background:#000}
+#view .row{padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+#vtitle{padding:calc(10px + env(safe-area-inset-top)) 16px 6px;color:var(--mut);font-size:14px}
 </style></head><body>
 <video id="cam" playsinline autoplay muted></video>
-<div class="top"><div id="clock">0,0</div><div id="line">Суфлёр · Арман</div><div id="next">Выбери кусок и нажми «Запись»</div><div class="bar"><i id="prog"></i></div></div>
+<div class="top"><div id="clock">0,0 с</div><div id="script"></div></div>
 <div id="big"></div>
 <div class="panel">
   <div class="row"><select id="part">
@@ -32,9 +42,11 @@ select{flex:1}
     <option value="all">Всё подряд (0–43,9 с)</option>
   </select></div>
   <div class="row"><button class="main" id="rec">● Запись</button><button id="try">Без записи</button></div>
-  <div class="row" id="done"><button class="main" id="share">Отправить видео</button><button id="save">Скачать</button><button class="red" id="again">Ещё дубль</button></div>
-  <div class="hint">Отсчёт 3-2-1, потом фразы идут в своё время. Смотри в камеру — текст рядом с ней, вверху. Телефон вертикально и неподвижно.</div>
+  <div id="takes"></div>
+  <div class="hint">Отсчёт 3-2-1, дальше подсвечивается слово, которое пора говорить. Следующие строки видно заранее: если закончил раньше — можно сразу читать дальше, тайминг подгоню при монтаже.</div>
 </div>
+<div id="view"><div id="vtitle"></div><video id="play" controls playsinline></video>
+  <div class="row"><button class="main" id="share">Отправить</button><button id="save">Скачать</button><button class="red" id="again">Ещё дубль</button><button id="close">✕</button></div></div>
 <script>
 // [начало, конец, текст]; время в секундах как в референсе
 const L = [
@@ -58,9 +70,29 @@ const L = [
   [41.5, 43.9, 'Ал сегіз метрлік баспалдақ? Жауабын пікірге жаз!'],
 ];
 const $ = id => document.getElementById(id);
-let stream = null, rec = null, chunks = [], blob = null, raf = 0, running = false;
 const fmt = s => s.toFixed(1).replace('.', ',');
+let stream = null, rec = null, chunks = [], raf = 0, running = false, view = null;
+const takes = [];
+
+// разметка текста: каждое слово со своим окном времени (пропорционально длине)
+const W = L.map(([a, b, txt]) => { const ws = txt.split(/\s+/).filter(Boolean), sp = 0.88 * (b - a); const tot = ws.reduce((s, w) => s + w.length + 2, 0); let acc = 0; return ws.map(w => { const st = a + sp * acc / tot; acc += w.length + 2; return { w, st, en: a + sp * acc / tot }; }); });
+function build() {
+  const [a, b] = range();
+  $('script').innerHTML = L.map(([s, e], i) => s >= a && s < b ? `<p class="ln" data-i="${i}"><span class="t">${fmt(s)} с</span>${W[i].map((x, k) => `<span class="w" data-k="${k}">${x.w}</span>`).join(' ')}</p>` : '').join('');
+  show(0);
+}
 function range() { const p = $('part').value; return p === 'hook' ? [0, 2.6] : p === 'main' ? [2.6, 43.9] : [0, 43.9]; }
+let lastI = -2;
+function show(t) {
+  const [a, b] = range(), tt = a + t; $('clock').textContent = fmt(Math.min(tt, b)) + ' с';
+  const i = L.findIndex(x => tt >= x[0] && tt < x[1]);
+  const lines = [...document.querySelectorAll('.ln')];
+  lines.forEach(p => { const j = +p.dataset.i; p.classList.toggle('cur', j === i && tt < b); p.classList.toggle('done', j < i || tt >= b); });
+  const cur = lines.find(p => +p.dataset.i === i);
+  document.querySelectorAll('.ln:not(.cur) .w.now, .ln:not(.cur) .w.said').forEach(s => s.classList.remove('now', 'said'));
+  if (cur) cur.querySelectorAll('.w').forEach(s => { const x = W[i][+s.dataset.k]; s.classList.toggle('said', tt >= x.en); s.classList.toggle('now', tt >= x.st && tt < x.en); });
+  if (i !== lastI) { lastI = i; const target = cur || lines[0]; if (target) { const prev = target.previousElementSibling; const off = prev ? prev.offsetTop + prev.offsetHeight * .35 : target.offsetTop; $('script').style.transform = `translateY(${-Math.max(0, off - 4)}px)`; } }
+}
 async function cam() {
   if (stream) return stream;
   stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1920 }, frameRate: { ideal: 30 } }, audio: { echoCancellation: true, noiseSuppression: true } });
@@ -68,35 +100,36 @@ async function cam() {
 }
 let ac; function beep(f = 880, d = .12) { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f; g.gain.value = .15; o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + d); } catch (e) {} }
 async function countdown() { const b = $('big'); b.style.display = 'flex'; for (const n of [3, 2, 1]) { b.textContent = n; beep(660); await new Promise(r => setTimeout(r, 1000)); } b.style.display = 'none'; beep(990, .2); }
-function show(t, a, b) {
-  const tt = a + t; $('clock').textContent = fmt(tt) + ' с';
-  const i = L.findIndex(x => tt >= x[0] && tt < x[1]);
-  const cur = L[i] || L[L.length - 1], nx = i >= 0 ? L[i + 1] : null;
-  $('line').textContent = tt < b ? cur[2] : 'Стоп ✓';
-  $('next').textContent = nx && nx[0] < b ? '→ ' + nx[2] : '';
-  $('prog').style.width = Math.min(100, (tt - cur[0]) / (cur[1] - cur[0]) * 100) + '%';
-}
 async function run(record) {
-  if (running) return; running = true; $('done').style.display = 'none';
+  if (running) return; running = true; closeView();
   try { await cam(); } catch (e) { alert('Нет доступа к камере: ' + e.message); running = false; return; }
-  const [a, b] = range(); show(0, a, b); await countdown();
+  build(); document.body.classList.add('recording'); await countdown();
   if (record) {
     chunks = []; const types = ['video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
     const mt = types.find(x => window.MediaRecorder && MediaRecorder.isTypeSupported(x)) || '';
     rec = new MediaRecorder(stream, mt ? { mimeType: mt, videoBitsPerSecond: 8e6 } : {});
+    const part = $('part').value;
     rec.ondataavailable = e => e.data.size && chunks.push(e.data);
-    rec.onstop = () => { blob = new Blob(chunks, { type: rec.mimeType || 'video/mp4' }); $('done').style.display = 'flex'; };
+    rec.onstop = () => { const blob = new Blob(chunks, { type: rec.mimeType || 'video/mp4' }); takes.push({ blob, part, n: takes.length + 1, url: URL.createObjectURL(blob) }); paintTakes(); openView(takes[takes.length - 1]); };
     rec.start(500);
   }
-  const t0 = performance.now(), dur = b - a + 0.6;
-  const tick = () => { const t = (performance.now() - t0) / 1000; show(t, a, b); if (t < dur) raf = requestAnimationFrame(tick); else { running = false; if (rec && rec.state === 'recording') rec.stop(); rec = null; beep(440, .25); } };
+  const [a, b] = range(), t0 = performance.now(), dur = b - a + 0.6;
+  const tick = () => { const t = (performance.now() - t0) / 1000; show(t); if (t < dur) raf = requestAnimationFrame(tick); else { running = false; document.body.classList.remove('recording'); if (rec && rec.state === 'recording') rec.stop(); rec = null; beep(440, .25); } };
   tick();
 }
-function fname() { const ext = blob && /mp4/.test(blob.type) ? 'mp4' : 'webm'; return 'arman_' + $('part').value + '_' + new Date().toTimeString().slice(0, 8).replace(/:/g, '') + '.' + ext; }
+const PN = { hook: 'хук', main: 'объяснение', all: 'всё' };
+function paintTakes() { $('takes').innerHTML = takes.map((x, i) => `<button data-i="${i}">▶ Дубль ${x.n} · ${PN[x.part]}</button>`).join(''); }
+$('takes').onclick = e => { const b = e.target.closest('button'); if (b) openView(takes[+b.dataset.i]); };
+function openView(x) { view = x; $('vtitle').textContent = `Дубль ${x.n} · ${PN[x.part]} — проверь звук и картинку`; $('play').src = x.url; $('view').style.display = 'flex'; $('play').play().catch(() => {}); }
+function closeView() { $('play').pause(); $('view').style.display = 'none'; }
+function fname(x) { const ext = /mp4/.test(x.blob.type) ? 'mp4' : 'webm'; return `arman_${x.part}_dubl${x.n}.${ext}`; }
 $('rec').onclick = () => run(true);
 $('try').onclick = () => run(false);
 $('again').onclick = () => run(true);
-$('save').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname(); a.click(); };
-$('share').onclick = async () => { const f = new File([blob], fname(), { type: blob.type }); if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f], title: 'Арман — дубль' }); } catch (e) {} } else $('save').onclick(); };
+$('close').onclick = closeView;
+$('part').onchange = build;
+$('save').onclick = () => { const a = document.createElement('a'); a.href = view.url; a.download = fname(view); a.click(); };
+$('share').onclick = async () => { const f = new File([view.blob], fname(view), { type: view.blob.type }); if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f], title: 'Арман — дубль ' + view.n }); } catch (e) {} } else $('save').onclick(); };
+build();
 </script>
 </body></html>
