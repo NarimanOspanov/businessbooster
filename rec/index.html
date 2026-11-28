@@ -72,6 +72,7 @@ const L = [
 ];
 const $ = id => document.getElementById(id);
 const fmt = s => s.toFixed(1).replace('.', ',');
+const TAIL = 2.5; // запас записи после последней фразы, с
 let lastRec = true, gen = 0, stream = null, rec = null, chunks = [], raf = 0, running = false, view = null;
 const takes = [];
 
@@ -85,7 +86,7 @@ function build() {
 function range() { const p = $('part').value; return p === 'hook' ? [0, 2.6] : p === 'main' ? [2.6, 45.5] : [0, 45.5]; }
 let lastI = -2;
 function show(t) {
-  const [a, b] = range(), tt = a + t; $('clock').textContent = fmt(Math.min(tt, b)) + ' с';
+  const [a, b] = range(), tt = a + t; $('clock').textContent = tt < b ? fmt(tt) + ' с' : 'запас ' + fmt(Math.max(0, b + TAIL - tt)) + ' с';
   const i = L.findIndex(x => tt >= x[0] && tt < x[1]);
   const lines = [...document.querySelectorAll('.ln')];
   lines.forEach(p => { const j = +p.dataset.i; p.classList.toggle('cur', j === i && tt < b); p.classList.toggle('done', j < i || tt >= b); });
@@ -132,7 +133,7 @@ async function run(record) {
   }
   await countdown(my);
   if (my !== gen) return;
-  const [a, b] = range(), t0 = performance.now(), dur = b - a + 0.6;
+  const [a, b] = range(), t0 = performance.now(), dur = b - a + TAIL;
   const tick = () => { if (my !== gen) return; const t = (performance.now() - t0) / 1000; show(t); if (t < dur) raf = requestAnimationFrame(tick); else { running = false; document.body.classList.remove('recording'); if (rec && rec.state === 'recording') rec.stop(); rec = null; beep(440, .25); } };
   tick();
 }
