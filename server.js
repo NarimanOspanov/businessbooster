@@ -6634,7 +6634,17 @@ async function instaHookOpenSchool(acct, cid, uname, mediaId, text, cfg, verifie
   if (!verified) { await db.instaCommentEventSet(cid, "skipped", "не задан секрет приложения").catch(() => {}); return; }
   if (mediaId && await db.instaCommentAnswered(mediaId, uname, cid).catch(() => false)) { await db.instaCommentEventSet(cid, "skipped", "уже отвечали").catch(() => {}); return; }
   const link = "https://t.me/quiz_ent_bot?startapp=ig_m" + String(mediaId || "x").replace(/\D/g, "").slice(-12);
-  const msg = "Сәлем! Міне, ҰБТ-ға дайындық ойыны ENT QUIZ:\n\n" +
+  // Рубрика «Дәріс»: в подписи ролика есть ссылка на урок openschool.work/labs/<id>/?l=N —
+  // тогда в директ сначала сам урок (лекция + зертхана), потом бот ENT QUIZ.
+  let lesson = "";
+  if (mediaId) try {
+    const r = await fetch("https://graph.instagram.com/v23.0/" + encodeURIComponent(mediaId) + "?fields=caption&access_token=" + encodeURIComponent(acct.token));
+    const m = /openschool\.work\/labs\/[\w-]+\/\?l=\d+/.exec(((await r.json()) || {}).caption || "");
+    if (m) lesson = "https://" + m[0] + "&lang=kk&from=ig";
+  } catch (e) { /* без подписи — обычный ответ */ }
+  const msg = lesson
+    ? "Сәлем! Міне, толық дәріс пен зертхана, тегін:\n" + lesson + "\n\nҰБТ-ға дайындалсаң — ENT QUIZ ойыны: 27 000+ сұрақ, әр есептің видео талдауы, апта сайын ақшалай жүлделі байқау:\n" + link
+    : "Сәлем! Міне, ҰБТ-ға дайындық ойыны ENT QUIZ:\n\n" +
     "— 27 000+ сұрақ, барлық пәндер\n— әр есептің видео талдауы\n— апта сайын ақшалай жүлделі байқау\n\nОқушыларға тегін, Telegram-да:\n" + link;
   try {
     await INSTA.privateReply(acct.ig_user_id, acct.token, cid, msg);
