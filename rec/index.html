@@ -7,7 +7,7 @@
 <style>
 :root{--bg:#0b0f1a;--fg:#fff;--acc:#ffd43b;--mut:rgba(255,255,255,.5)}
 *{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
-video#cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);background:#000}
+#cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);background:#000}#src{position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none}#res{position:absolute;left:14px;bottom:-22px;font:600 11px ui-monospace,monospace;color:rgba(255,255,255,.35)}
 .top{position:fixed;left:0;right:0;top:0;height:52vh;padding:calc(8px + env(safe-area-inset-top)) 16px 0;background:linear-gradient(rgba(0,0,0,.86),rgba(0,0,0,.7) 80%,rgba(0,0,0,0));overflow:hidden}
 #clock{position:absolute;right:14px;top:calc(8px + env(safe-area-inset-top));font:600 13px ui-monospace,monospace;color:var(--mut);z-index:2}
 #script{position:relative;transition:transform .35s ease;padding-top:4px}
@@ -32,8 +32,8 @@ body.recording .panel{display:none}
 #view .row{padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
 #vtitle{padding:calc(10px + env(safe-area-inset-top)) 16px 6px;color:var(--mut);font-size:14px}
 </style></head><body>
-<video id="cam" playsinline autoplay muted></video>
-<div class="top"><div id="clock">0,0 с</div><div id="script"></div></div>
+<video id="src" playsinline autoplay muted></video><canvas id="cam" width="1080" height="1920"></canvas>
+<div class="top"><div id="clock">0,0 с</div><div id="res"></div><div id="script"></div></div>
 <div id="big"></div>
 <div class="panel">
   <div class="row"><select id="part">
@@ -93,10 +93,18 @@ function show(t) {
   if (cur) cur.querySelectorAll('.w').forEach(s => { const x = W[i][+s.dataset.k]; s.classList.toggle('said', tt >= x.en); s.classList.toggle('now', tt >= x.st && tt < x.en); });
   if (i !== lastI) { lastI = i; const target = cur || lines[0]; if (target) { const prev = target.previousElementSibling; const off = prev ? prev.offsetTop + prev.offsetHeight * .35 : target.offsetTop; $('script').style.transform = `translateY(${-Math.max(0, off - 4)}px)`; } }
 }
+// камера отдаёт кадр в своём формате (часто горизонтальном) — рисуем его на холст 1080×1920 с обрезкой по центру и пишем уже холст: всегда вертикально 9:16
+let recStream = null;
 async function cam() {
-  if (stream) return stream;
-  stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1920 }, frameRate: { ideal: 30 } }, audio: { echoCancellation: true, noiseSuppression: true } });
-  $('cam').srcObject = stream; return stream;
+  if (recStream) return recStream;
+  stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1920 }, frameRate: { ideal: 30 } }, audio: { echoCancellation: true, noiseSuppression: true } });
+  const v = $('src'); v.srcObject = stream; await v.play().catch(() => {});
+  await new Promise(r => v.videoWidth ? r() : v.addEventListener('loadedmetadata', r, { once: true }));
+  const c = $('cam'), g = c.getContext('2d');
+  const draw = () => { const vw = v.videoWidth, vh = v.videoHeight; if (vw && vh) { const k = Math.max(1080 / vw, 1920 / vh), w = vw * k, h = vh * k; g.drawImage(v, (1080 - w) / 2, (1920 - h) / 2, w, h); $('res').textContent = 'камера ' + vw + '×' + vh + ' → видео 1080×1920'; } requestAnimationFrame(draw); };
+  draw();
+  recStream = c.captureStream(30); stream.getAudioTracks().forEach(t => recStream.addTrack(t));
+  return recStream;
 }
 let ac; function beep(f = 880, d = .12) { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f; g.gain.value = .15; o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + d); } catch (e) {} }
 async function countdown() { const b = $('big'); b.style.display = 'flex'; for (const n of [3, 2, 1]) { b.textContent = n; beep(660); await new Promise(r => setTimeout(r, 1000)); } b.style.display = 'none'; beep(990, .2); }
@@ -107,7 +115,7 @@ async function run(record) {
   if (record) {
     chunks = []; const types = ['video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
     const mt = types.find(x => window.MediaRecorder && MediaRecorder.isTypeSupported(x)) || '';
-    const r = rec = new MediaRecorder(stream, mt ? { mimeType: mt, videoBitsPerSecond: 8e6 } : {});
+    const r = rec = new MediaRecorder(recStream, mt ? { mimeType: mt, videoBitsPerSecond: 8e6 } : {});
     const part = $('part').value, mine = chunks;
     r.ondataavailable = e => e.data && e.data.size && mine.push(e.data);
     r.onstop = () => { // r — свой рекордер этого дубля (глобальный rec к этому моменту уже обнулён)
