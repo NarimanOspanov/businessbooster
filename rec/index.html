@@ -26,7 +26,7 @@ button.main{background:var(--acc);color:#111;flex:1}button.red{background:#e2453
 select{flex:1}
 .hint{font-size:13px;color:var(--mut);line-height:1.4}
 #takes{display:flex;gap:6px;flex-wrap:wrap}#takes button{padding:9px 12px;font-size:14px}
-body.recording .panel{display:none}
+body.recording .panel{display:none}#live{position:fixed;left:0;right:0;bottom:0;display:none;gap:10px;padding:14px 16px calc(14px + env(safe-area-inset-bottom));z-index:6}body.recording #live{display:flex}#live button{flex:1;padding:16px;font-size:17px;background:rgba(20,26,45,.85)}#live #redo{background:rgba(255,212,59,.92);color:#111}
 #view{position:fixed;inset:0;background:#000;display:none;flex-direction:column;z-index:10}
 #view video{flex:1;width:100%;min-height:0;background:#000}
 #view .row{padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
@@ -45,6 +45,7 @@ body.recording .panel{display:none}
   <div id="takes"></div>
   <div class="hint">Отсчёт 3-2-1, дальше подсвечивается слово, которое пора говорить. Следующие строки видно заранее: если закончил раньше — можно сразу читать дальше, тайминг подгоню при монтаже.</div>
 </div>
+<div id="live"><button id="redo">↺ Заново</button><button id="abort">■ Стоп</button></div>
 <div id="view"><div id="vtitle"></div><video id="play" controls playsinline></video>
   <div class="row"><button class="main" id="share">Отправить</button><button id="save">Скачать</button><button class="red" id="again">Ещё дубль</button><button id="close">✕</button></div></div>
 <script>
@@ -71,7 +72,7 @@ const L = [
 ];
 const $ = id => document.getElementById(id);
 const fmt = s => s.toFixed(1).replace('.', ',');
-let stream = null, rec = null, chunks = [], raf = 0, running = false, view = null;
+let lastRec = true, gen = 0, stream = null, rec = null, chunks = [], raf = 0, running = false, view = null;
 const takes = [];
 
 // разметка текста: каждое слово со своим окном времени (пропорционально длине)
@@ -107,9 +108,9 @@ async function cam() {
   return recStream;
 }
 let ac; function beep(f = 880, d = .12) { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f; g.gain.value = .15; o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + d); } catch (e) {} }
-async function countdown() { const b = $('big'); b.style.display = 'flex'; for (const n of [3, 2, 1]) { b.textContent = n; beep(660); await new Promise(r => setTimeout(r, 1000)); } b.style.display = 'none'; beep(990, .2); }
+async function countdown(my) { const b = $('big'); b.style.display = 'flex'; for (const n of [3, 2, 1]) { if (my !== gen) break; b.textContent = n; beep(660); await new Promise(r => setTimeout(r, 1000)); } b.style.display = 'none'; if (my === gen) beep(990, .2); }
 async function run(record) {
-  if (running) return; running = true; closeView();
+  if (running) return; running = true; closeView(); const my = ++gen; lastRec = record;
   try { await cam(); } catch (e) { alert('Нет доступа к камере: ' + e.message); running = false; return; }
   build(); document.body.classList.add('recording');
   if (record) {
@@ -119,6 +120,7 @@ async function run(record) {
     const part = $('part').value, mine = chunks;
     r.ondataavailable = e => e.data && e.data.size && mine.push(e.data);
     r.onstop = () => { // r — свой рекордер этого дубля (глобальный rec к этому моменту уже обнулён)
+      if (r.discard) return; // дубль прерван кнопкой
       try {
         const blob = new Blob(mine, { type: r.mimeType || mt || 'video/mp4' });
         if (!blob.size) { alert('Запись пустая — попробуй ещё раз (открой ссылку в Safari или Chrome, не внутри Instagram/Telegram).'); return; }
@@ -128,9 +130,10 @@ async function run(record) {
     r.onerror = e => alert('Ошибка записи: ' + ((e.error && e.error.message) || e.message || 'неизвестно'));
     r.start(500); // пишем уже с отсчёта — лишнее вырежу при монтаже
   }
-  await countdown();
+  await countdown(my);
+  if (my !== gen) return;
   const [a, b] = range(), t0 = performance.now(), dur = b - a + 0.6;
-  const tick = () => { const t = (performance.now() - t0) / 1000; show(t); if (t < dur) raf = requestAnimationFrame(tick); else { running = false; document.body.classList.remove('recording'); if (rec && rec.state === 'recording') rec.stop(); rec = null; beep(440, .25); } };
+  const tick = () => { if (my !== gen) return; const t = (performance.now() - t0) / 1000; show(t); if (t < dur) raf = requestAnimationFrame(tick); else { running = false; document.body.classList.remove('recording'); if (rec && rec.state === 'recording') rec.stop(); rec = null; beep(440, .25); } };
   tick();
 }
 const PN = { hook: 'хук', main: 'объяснение', all: 'всё' };
@@ -143,6 +146,9 @@ $('rec').onclick = () => run(true);
 $('try').onclick = () => run(false);
 $('again').onclick = () => run(true);
 $('close').onclick = closeView;
+function cancel() { gen++; cancelAnimationFrame(raf); if (rec && rec.state === 'recording') { rec.discard = true; rec.stop(); } rec = null; running = false; document.body.classList.remove('recording'); $('big').style.display = 'none'; build(); }
+$('abort').onclick = cancel;
+$('redo').onclick = () => { const again = rec !== null || running; cancel(); if (again) setTimeout(() => run(lastRec), 150); };
 $('part').onchange = build;
 $('save').onclick = () => { const a = document.createElement('a'); a.href = view.url; a.download = fname(view); a.click(); };
 $('share').onclick = async () => { const f = new File([view.blob], fname(view), { type: view.blob.type }); if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f], title: 'Арман — дубль ' + view.n }); } catch (e) {} } else $('save').onclick(); };
